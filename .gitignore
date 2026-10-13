@@ -1,0 +1,16 @@
+node_modules/
+.expo/
+build/
+signing/
+credentials.json
+**/.env*
+**/*service-account*.json
+**/*firebase-adminsdk*.json
+google-services.json
+deliverables/
+Claude outputs/
+_respaldo*/
+*.apk
+*.aab
+*.jks
+*.keystore

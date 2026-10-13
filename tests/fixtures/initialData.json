@@ -1,0 +1,1904 @@
+{
+  "app": "nova-negocio",
+  "version": 1,
+  "created": "2026-09-30T12:00:00Z",
+  "data": {
+    "products": [
+      {
+        "id": "NS-CAF-001",
+        "sku": "NS-CAF-001",
+        "name": "Coffee Fit · Advance Labs Nutrition · 60 servicios",
+        "category": "Café funcional",
+        "price": 66900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-OME-001",
+        "sku": "NS-OME-001",
+        "name": "Omega 3 Salmon Oil · B Life · 90 cápsulas",
+        "category": "Omega 3",
+        "price": 27900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-AMI-001",
+        "sku": "NS-AMI-001",
+        "name": "AMINOx · BSN · 30 servicios",
+        "category": "Aminoácidos",
+        "price": 46900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-BEB-001",
+        "sku": "NS-BEB-001",
+        "name": "C4 Energy Zero Sugar · Cellucor · 1 Lata",
+        "category": "Bebida energética",
+        "price": 5900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-CRE-001",
+        "sku": "NS-CRE-001",
+        "name": "Creatine · Dragon Pharma · 300 g",
+        "category": "Creatina",
+        "price": 41900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-CRE-002",
+        "sku": "NS-CRE-002",
+        "name": "Creatine · Dragon Pharma · 1 kg",
+        "category": "Creatina",
+        "price": 68900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-PRE-001",
+        "sku": "NS-PRE-001",
+        "name": "Venom Inferno · Dragon Pharma · 30 Servicios",
+        "category": "Preentreno",
+        "price": 49900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-PRO-001",
+        "sku": "NS-PRO-001",
+        "name": "ISO100 · Dymatize · 5 lb",
+        "category": "Proteína",
+        "price": 199900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-VIT-001",
+        "sku": "NS-VIT-001",
+        "name": "D3 + K2 · Evogen · 60 Servicios",
+        "category": "Vitaminas",
+        "price": 36900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-SOP-001",
+        "sku": "NS-SOP-001",
+        "name": "Testrol Gold · GAT Sport · 30 Servicios",
+        "category": "Soporte hormonal",
+        "price": 37900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-SOP-002",
+        "sku": "NS-SOP-002",
+        "name": "Testrol 60 · GAT Sport · 60 Servicios",
+        "category": "Soporte hormonal",
+        "price": 34500,
+        "minimum": 1
+      },
+      {
+        "id": "NS-OME-002",
+        "sku": "NS-OME-002",
+        "name": "Omega 3 · GAT Sport · 60 Servicios",
+        "category": "Omega 3",
+        "price": 27900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-CRE-003",
+        "sku": "NS-CRE-003",
+        "name": "Creatine · GAT Sport · 1 kg",
+        "category": "Creatina",
+        "price": 63900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-CRE-004",
+        "sku": "NS-CRE-004",
+        "name": "Creatine · GAT Sport · 300 g",
+        "category": "Creatina",
+        "price": 36900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-PRE-002",
+        "sku": "NS-PRE-002",
+        "name": "Nitraflex · GAT Sport · 300 g",
+        "category": "Preentreno",
+        "price": 45900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-VIT-002",
+        "sku": "NS-VIT-002",
+        "name": "Vitamin C + Glutathione · Ghost Life · Por confirmar",
+        "category": "Vitaminas",
+        "price": 47900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-VIT-003",
+        "sku": "NS-VIT-003",
+        "name": "Vitamin D3 · Hi-Tech · Por confirmar",
+        "category": "Vitaminas",
+        "price": 28900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-PRE-003",
+        "sku": "NS-PRE-003",
+        "name": "Psychotic Test · Insane Labz · Por confirmar",
+        "category": "Preentreno",
+        "price": 49900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-AMI-002",
+        "sku": "NS-AMI-002",
+        "name": "Demon BCAA · Insane Labz · Por confirmar",
+        "category": "Aminoácidos",
+        "price": 43900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-PRE-004",
+        "sku": "NS-PRE-004",
+        "name": "Psychotic · Insane Labz · 35 servicios",
+        "category": "Preentreno",
+        "price": 43900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-PRE-005",
+        "sku": "NS-PRE-005",
+        "name": "Psychotic Gold · Insane Labz · Por confirmar",
+        "category": "Preentreno",
+        "price": 46900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-PRE-006",
+        "sku": "NS-PRE-006",
+        "name": "Psychotic Gold muestra · Insane Labz · 1 Servicio",
+        "category": "Preentreno",
+        "price": 2900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-AMI-003",
+        "sku": "NS-AMI-003",
+        "name": "Killer BCAA · Killer Labz · Por confirmar",
+        "category": "Aminoácidos",
+        "price": 42900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-PRE-007",
+        "sku": "NS-PRE-007",
+        "name": "NitroTest · MuscleMeds · Por confirmar",
+        "category": "Preentreno",
+        "price": 58900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-PRO-002",
+        "sku": "NS-PRO-002",
+        "name": "Nitro-Tech Gold · MuscleTech · 5 lb",
+        "category": "Proteína",
+        "price": 139900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-PRO-003",
+        "sku": "NS-PRO-003",
+        "name": "Nitro-Tech Ripped · MuscleTech · 4 lb",
+        "category": "Proteína",
+        "price": 124900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-AMI-004",
+        "sku": "NS-AMI-004",
+        "name": "Hardcore BCAA · Mutant · 30 Servicios",
+        "category": "Aminoácidos",
+        "price": 31900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-PRO-004",
+        "sku": "NS-PRO-004",
+        "name": "Whey · Mutant · 5 lb",
+        "category": "Proteína",
+        "price": 94900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-GAN-001",
+        "sku": "NS-GAN-001",
+        "name": "Mass · Mutant · 6 lb",
+        "category": "Ganador de peso",
+        "price": 53900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-AMI-005",
+        "sku": "NS-AMI-005",
+        "name": "Amino Energy · Optimum Nutrition · Por confirmar",
+        "category": "Aminoácidos",
+        "price": 45900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-PRE-008",
+        "sku": "NS-PRE-008",
+        "name": "CBUM Essential · RAW Nutrition · Por confirmar",
+        "category": "Preentreno",
+        "price": 51900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-PRE-009",
+        "sku": "NS-PRE-009",
+        "name": "CBUM Charged · RAW Nutrition · Por confirmar",
+        "category": "Preentreno",
+        "price": 56900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-PRO-005",
+        "sku": "NS-PRO-005",
+        "name": "Isolate · RAW Nutrition · Por confirmar",
+        "category": "Proteína",
+        "price": 113900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-OME-003",
+        "sku": "NS-OME-003",
+        "name": "Omega 3 · Ronnie Coleman Signature Series · Por confirmar",
+        "category": "Omega 3",
+        "price": 21900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-PRO-006",
+        "sku": "NS-PRO-006",
+        "name": "Whey Isolate · SD Nutrition · 1 kg",
+        "category": "Proteína",
+        "price": 35900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-PRE-010",
+        "sku": "NS-PRE-010",
+        "name": "Joker · Terror Labz · 30 Servicios",
+        "category": "Preentreno",
+        "price": 51900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-PRO-007",
+        "sku": "NS-PRO-007",
+        "name": "Unique Whey · Unique Nutrition · 5 lb",
+        "category": "Proteína",
+        "price": 52900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-PRO-008",
+        "sku": "NS-PRO-008",
+        "name": "Whey HD · BPI Sports · 4 lb",
+        "category": "Proteína",
+        "price": 154900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-BAR-001",
+        "sku": "NS-BAR-001",
+        "name": "Muscle Sandwich · Muscle Sandwich · 1 barra",
+        "category": "Barra proteica",
+        "price": 3900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-CAR-001",
+        "sku": "NS-CAR-001",
+        "name": "Carnigen · Evogen Nutrition · 30 Servicios",
+        "category": "Carnitina",
+        "price": 50900,
+        "minimum": 1
+      },
+      {
+        "id": "NS-GLU-001",
+        "sku": "NS-GLU-001",
+        "name": "Glutamine · Optimum Nutrition · 1 kg",
+        "category": "Glutamina",
+        "price": 117500,
+        "minimum": 1
+      }
+    ],
+    "accounts": [
+      {
+        "id": "cash",
+        "name": "Efectivo · por conciliar",
+        "kind": "Efectivo"
+      },
+      {
+        "id": "transfer",
+        "name": "Transferencias · por conciliar",
+        "kind": "Banco"
+      },
+      {
+        "id": "card",
+        "name": "Tarjeta · control neto",
+        "kind": "Tarjeta"
+      }
+    ],
+    "customers": [
+      {
+        "id": "client-1",
+        "name": "Fernanda Guerrero",
+        "phone": "",
+        "notes": "Importado del Excel; contacto no informado.",
+        "stage": "Cliente",
+        "nextDate": ""
+      },
+      {
+        "id": "client-2",
+        "name": "Jesús Ventura",
+        "phone": "",
+        "notes": "Importado del Excel; contacto no informado.",
+        "stage": "Cliente",
+        "nextDate": ""
+      },
+      {
+        "id": "client-3",
+        "name": "Alejandra Calderon",
+        "phone": "",
+        "notes": "Importado del Excel; contacto no informado.",
+        "stage": "Cliente",
+        "nextDate": ""
+      },
+      {
+        "id": "client-4",
+        "name": "Fernando Chávez",
+        "phone": "",
+        "notes": "Importado del Excel; contacto no informado.",
+        "stage": "Cliente",
+        "nextDate": ""
+      },
+      {
+        "id": "client-5",
+        "name": "Jesús Salazar",
+        "phone": "",
+        "notes": "Importado del Excel; contacto no informado.",
+        "stage": "Cliente",
+        "nextDate": ""
+      },
+      {
+        "id": "client-6",
+        "name": "José Smart Fit Santin",
+        "phone": "",
+        "notes": "Importado del Excel; contacto no informado.",
+        "stage": "Cliente",
+        "nextDate": ""
+      },
+      {
+        "id": "client-7",
+        "name": "Martín Smart-Fit",
+        "phone": "",
+        "notes": "Importado del Excel; contacto no informado.",
+        "stage": "Cliente",
+        "nextDate": ""
+      },
+      {
+        "id": "client-8",
+        "name": "Cliente Gustavo",
+        "phone": "",
+        "notes": "Importado del Excel; contacto no informado.",
+        "stage": "Cliente",
+        "nextDate": ""
+      }
+    ],
+    "campaigns": [],
+    "lots": [
+      {
+        "id": "initial-NS-CAF-001",
+        "productId": "NS-CAF-001",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 44831,
+        "qty": 2
+      },
+      {
+        "id": "initial-NS-OME-001",
+        "productId": "NS-OME-001",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 19400,
+        "qty": 3
+      },
+      {
+        "id": "initial-NS-AMI-001",
+        "productId": "NS-AMI-001",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 32208,
+        "qty": 3
+      },
+      {
+        "id": "initial-NS-BEB-001",
+        "productId": "NS-BEB-001",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 4000,
+        "qty": 11
+      },
+      {
+        "id": "initial-NS-CRE-001",
+        "productId": "NS-CRE-001",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 29300,
+        "qty": 3
+      },
+      {
+        "id": "initial-NS-CRE-002",
+        "productId": "NS-CRE-002",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 46667,
+        "qty": 1
+      },
+      {
+        "id": "initial-NS-PRE-001",
+        "productId": "NS-PRE-001",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 42048,
+        "qty": 2
+      },
+      {
+        "id": "initial-NS-PRO-001",
+        "productId": "NS-PRO-001",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 191200,
+        "qty": 1
+      },
+      {
+        "id": "initial-NS-VIT-001",
+        "productId": "NS-VIT-001",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 24180,
+        "qty": 1
+      },
+      {
+        "id": "initial-NS-SOP-001",
+        "productId": "NS-SOP-001",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 26460,
+        "qty": 2
+      },
+      {
+        "id": "initial-NS-SOP-002",
+        "productId": "NS-SOP-002",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 22704,
+        "qty": 2
+      },
+      {
+        "id": "initial-NS-OME-002",
+        "productId": "NS-OME-002",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 19536,
+        "qty": 3
+      },
+      {
+        "id": "initial-NS-CRE-003",
+        "productId": "NS-CRE-003",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 55176,
+        "qty": 1
+      },
+      {
+        "id": "initial-NS-CRE-004",
+        "productId": "NS-CRE-004",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 26200,
+        "qty": 4
+      },
+      {
+        "id": "initial-NS-PRE-002",
+        "productId": "NS-PRE-002",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 31680,
+        "qty": 2
+      },
+      {
+        "id": "initial-NS-VIT-002",
+        "productId": "NS-VIT-002",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 33465,
+        "qty": 4
+      },
+      {
+        "id": "initial-NS-VIT-003",
+        "productId": "NS-VIT-003",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 20234,
+        "qty": 4
+      },
+      {
+        "id": "initial-NS-PRE-003",
+        "productId": "NS-PRE-003",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 41600,
+        "qty": 3
+      },
+      {
+        "id": "initial-NS-AMI-002",
+        "productId": "NS-AMI-002",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 30400,
+        "qty": 4
+      },
+      {
+        "id": "initial-NS-PRE-004",
+        "productId": "NS-PRE-004",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 35600,
+        "qty": 3
+      },
+      {
+        "id": "initial-NS-PRE-005",
+        "productId": "NS-PRE-005",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 37800,
+        "qty": 2
+      },
+      {
+        "id": "initial-NS-PRE-006",
+        "productId": "NS-PRE-006",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 1800,
+        "qty": 28
+      },
+      {
+        "id": "initial-NS-AMI-003",
+        "productId": "NS-AMI-003",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 29900,
+        "qty": 5
+      },
+      {
+        "id": "initial-NS-PRE-007",
+        "productId": "NS-PRE-007",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 40800,
+        "qty": 2
+      },
+      {
+        "id": "initial-NS-PRO-002",
+        "productId": "NS-PRO-002",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 129492,
+        "qty": 1
+      },
+      {
+        "id": "initial-NS-PRO-003",
+        "productId": "NS-PRO-003",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 104803,
+        "qty": 2
+      },
+      {
+        "id": "initial-NS-AMI-004",
+        "productId": "NS-AMI-004",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 22044,
+        "qty": 3
+      },
+      {
+        "id": "initial-NS-PRO-004",
+        "productId": "NS-PRO-004",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 84876,
+        "qty": 1
+      },
+      {
+        "id": "initial-NS-GAN-001",
+        "productId": "NS-GAN-001",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 37620,
+        "qty": 2
+      },
+      {
+        "id": "initial-NS-AMI-005",
+        "productId": "NS-AMI-005",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 32076,
+        "qty": 4
+      },
+      {
+        "id": "initial-NS-PRE-008",
+        "productId": "NS-PRE-008",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 34716,
+        "qty": 2
+      },
+      {
+        "id": "initial-NS-PRE-009",
+        "productId": "NS-PRE-009",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 39864,
+        "qty": 2
+      },
+      {
+        "id": "initial-NS-PRO-005",
+        "productId": "NS-PRO-005",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 76033,
+        "qty": 2
+      },
+      {
+        "id": "initial-NS-OME-003",
+        "productId": "NS-OME-003",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 14800,
+        "qty": 2
+      },
+      {
+        "id": "initial-NS-PRO-006",
+        "productId": "NS-PRO-006",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 24900,
+        "qty": 1
+      },
+      {
+        "id": "initial-NS-PRE-010",
+        "productId": "NS-PRE-010",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 36168,
+        "qty": 2
+      },
+      {
+        "id": "initial-NS-PRO-007",
+        "productId": "NS-PRO-007",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 36600,
+        "qty": 3
+      },
+      {
+        "id": "initial-NS-PRO-008",
+        "productId": "NS-PRO-008",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 105554,
+        "qty": 3
+      },
+      {
+        "id": "initial-NS-BAR-001",
+        "productId": "NS-BAR-001",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 2353,
+        "qty": 26
+      },
+      {
+        "id": "initial-NS-CAR-001",
+        "productId": "NS-CAR-001",
+        "label": "Inicial Excel; lote físico pendiente",
+        "expires": "",
+        "cost": 33087,
+        "qty": 1
+      }
+    ],
+    "bundles": [],
+    "bundle_items": [],
+    "sales": [
+      {
+        "id": "VNS0001",
+        "created": "2026-09-17T12:00:00Z",
+        "customerId": "client-1",
+        "campaignId": null,
+        "channel": "Sin canal informado · Excel",
+        "total": 61900,
+        "cost": 49648,
+        "status": "confirmed"
+      },
+      {
+        "id": "VNS0002",
+        "created": "2026-09-17T12:00:00Z",
+        "customerId": "client-2",
+        "campaignId": null,
+        "channel": "Sin canal informado · Excel",
+        "total": 63900,
+        "cost": 55176,
+        "status": "confirmed"
+      },
+      {
+        "id": "VNS0003",
+        "created": "2026-09-18T12:00:00Z",
+        "customerId": "client-3",
+        "campaignId": null,
+        "channel": "Sin canal informado · Excel",
+        "total": 36900,
+        "cost": 26200,
+        "status": "confirmed"
+      },
+      {
+        "id": "VNS0004",
+        "created": "2026-09-18T12:00:00Z",
+        "customerId": "client-4",
+        "campaignId": null,
+        "channel": "Sin canal informado · Excel",
+        "total": 63900,
+        "cost": 55176,
+        "status": "confirmed"
+      },
+      {
+        "id": "VNS0005",
+        "created": "2026-09-18T12:00:00Z",
+        "customerId": "client-5",
+        "campaignId": null,
+        "channel": "Sin canal informado · Excel",
+        "total": 63900,
+        "cost": 55176,
+        "status": "confirmed"
+      },
+      {
+        "id": "VNS0006",
+        "created": "2026-09-21T12:00:00Z",
+        "customerId": "client-1",
+        "campaignId": null,
+        "channel": "Sin canal informado · Excel",
+        "total": 15600,
+        "cost": 9412,
+        "status": "confirmed"
+      },
+      {
+        "id": "VNS0007",
+        "created": "2026-09-22T12:00:00Z",
+        "customerId": "client-6",
+        "campaignId": null,
+        "channel": "Sin canal informado · Excel",
+        "total": 68900,
+        "cost": 46667,
+        "status": "confirmed"
+      },
+      {
+        "id": "VNS0008",
+        "created": "2026-09-23T12:00:00Z",
+        "customerId": "client-7",
+        "campaignId": null,
+        "channel": "Sin canal informado · Excel",
+        "total": 46900,
+        "cost": 37800,
+        "status": "confirmed"
+      },
+      {
+        "id": "VNS0009",
+        "created": "2026-09-30T12:00:00Z",
+        "customerId": "client-8",
+        "campaignId": null,
+        "channel": "Sin canal informado · Excel",
+        "total": 103800,
+        "cost": 69011,
+        "status": "confirmed"
+      }
+    ],
+    "sale_lines": [
+      {
+        "id": "line-14",
+        "saleId": "VNS0001",
+        "productId": "NS-PRE-001",
+        "qty": 1,
+        "name": "Venom Inferno · Dragon Pharma · 30 Servicios"
+      },
+      {
+        "id": "line-15",
+        "saleId": "VNS0001",
+        "productId": "NS-PRE-006",
+        "qty": 2,
+        "name": "Psychotic Gold muestra · Insane Labz · 1 Servicio"
+      },
+      {
+        "id": "line-16",
+        "saleId": "VNS0001",
+        "productId": "NS-BEB-001",
+        "qty": 1,
+        "name": "C4 Energy Zero Sugar · Cellucor · 1 Lata"
+      },
+      {
+        "id": "line-17",
+        "saleId": "VNS0002",
+        "productId": "NS-CRE-003",
+        "qty": 1,
+        "name": "Creatine · GAT Sport · 1 kg"
+      },
+      {
+        "id": "line-18",
+        "saleId": "VNS0003",
+        "productId": "NS-CRE-004",
+        "qty": 1,
+        "name": "Creatine · GAT Sport · 300 g"
+      },
+      {
+        "id": "line-19",
+        "saleId": "VNS0004",
+        "productId": "NS-CRE-003",
+        "qty": 1,
+        "name": "Creatine · GAT Sport · 1 kg"
+      },
+      {
+        "id": "line-20",
+        "saleId": "VNS0005",
+        "productId": "NS-CRE-003",
+        "qty": 1,
+        "name": "Creatine · GAT Sport · 1 kg"
+      },
+      {
+        "id": "line-21",
+        "saleId": "VNS0006",
+        "productId": "NS-BAR-001",
+        "qty": 4,
+        "name": "Muscle Sandwich · Muscle Sandwich · 1 barra"
+      },
+      {
+        "id": "line-22",
+        "saleId": "VNS0007",
+        "productId": "NS-CRE-002",
+        "qty": 1,
+        "name": "Creatine · Dragon Pharma · 1 kg"
+      },
+      {
+        "id": "line-23",
+        "saleId": "VNS0008",
+        "productId": "NS-PRE-005",
+        "qty": 1,
+        "name": "Psychotic Gold · Insane Labz · Por confirmar"
+      },
+      {
+        "id": "line-24",
+        "saleId": "VNS0009",
+        "productId": "NS-VIT-001",
+        "qty": 1,
+        "name": "D3 + K2 · Evogen · 60 Servicios"
+      },
+      {
+        "id": "line-25",
+        "saleId": "VNS0009",
+        "productId": "NS-CAF-001",
+        "qty": 1,
+        "name": "Coffee Fit · Advance Labs Nutrition · 60 servicios"
+      }
+    ],
+    "allocations": [
+      {
+        "id": "allocation-14",
+        "lineId": "line-14",
+        "lotId": "initial-NS-PRE-001",
+        "qty": 1,
+        "cost": 42048
+      },
+      {
+        "id": "allocation-15",
+        "lineId": "line-15",
+        "lotId": "initial-NS-PRE-006",
+        "qty": 2,
+        "cost": 1800
+      },
+      {
+        "id": "allocation-16",
+        "lineId": "line-16",
+        "lotId": "initial-NS-BEB-001",
+        "qty": 1,
+        "cost": 4000
+      },
+      {
+        "id": "allocation-17",
+        "lineId": "line-17",
+        "lotId": "initial-NS-CRE-003",
+        "qty": 1,
+        "cost": 55176
+      },
+      {
+        "id": "allocation-18",
+        "lineId": "line-18",
+        "lotId": "initial-NS-CRE-004",
+        "qty": 1,
+        "cost": 26200
+      },
+      {
+        "id": "allocation-19",
+        "lineId": "line-19",
+        "lotId": "initial-NS-CRE-003",
+        "qty": 1,
+        "cost": 55176
+      },
+      {
+        "id": "allocation-20",
+        "lineId": "line-20",
+        "lotId": "initial-NS-CRE-003",
+        "qty": 1,
+        "cost": 55176
+      },
+      {
+        "id": "allocation-21",
+        "lineId": "line-21",
+        "lotId": "initial-NS-BAR-001",
+        "qty": 4,
+        "cost": 2353
+      },
+      {
+        "id": "allocation-22",
+        "lineId": "line-22",
+        "lotId": "initial-NS-CRE-002",
+        "qty": 1,
+        "cost": 46667
+      },
+      {
+        "id": "allocation-23",
+        "lineId": "line-23",
+        "lotId": "initial-NS-PRE-005",
+        "qty": 1,
+        "cost": 37800
+      },
+      {
+        "id": "allocation-24",
+        "lineId": "line-24",
+        "lotId": "initial-NS-VIT-001",
+        "qty": 1,
+        "cost": 24180
+      },
+      {
+        "id": "allocation-25",
+        "lineId": "line-25",
+        "lotId": "initial-NS-CAF-001",
+        "qty": 1,
+        "cost": 44831
+      }
+    ],
+    "ledger": [
+      {
+        "id": "pay-14-transfer",
+        "created": "2026-09-17T12:00:00Z",
+        "accountId": "transfer",
+        "amount": 49900,
+        "kind": "sale",
+        "ref": "VNS0001",
+        "note": "Cobro histórico VNS0001",
+        "campaignId": null
+      },
+      {
+        "id": "pay-15-transfer",
+        "created": "2026-09-17T12:00:00Z",
+        "accountId": "transfer",
+        "amount": 6000,
+        "kind": "sale",
+        "ref": "VNS0001",
+        "note": "Cobro histórico VNS0001",
+        "campaignId": null
+      },
+      {
+        "id": "pay-16-transfer",
+        "created": "2026-09-17T12:00:00Z",
+        "accountId": "transfer",
+        "amount": 6000,
+        "kind": "sale",
+        "ref": "VNS0001",
+        "note": "Cobro histórico VNS0001",
+        "campaignId": null
+      },
+      {
+        "id": "pay-17-transfer",
+        "created": "2026-09-17T12:00:00Z",
+        "accountId": "transfer",
+        "amount": 63900,
+        "kind": "sale",
+        "ref": "VNS0002",
+        "note": "Cobro histórico VNS0002",
+        "campaignId": null
+      },
+      {
+        "id": "pay-18-transfer",
+        "created": "2026-09-18T12:00:00Z",
+        "accountId": "transfer",
+        "amount": 36900,
+        "kind": "sale",
+        "ref": "VNS0003",
+        "note": "Cobro histórico VNS0003",
+        "campaignId": null
+      },
+      {
+        "id": "pay-19-transfer",
+        "created": "2026-09-18T12:00:00Z",
+        "accountId": "transfer",
+        "amount": 63900,
+        "kind": "sale",
+        "ref": "VNS0004",
+        "note": "Cobro histórico VNS0004",
+        "campaignId": null
+      },
+      {
+        "id": "pay-20-transfer",
+        "created": "2026-09-18T12:00:00Z",
+        "accountId": "transfer",
+        "amount": 63900,
+        "kind": "sale",
+        "ref": "VNS0005",
+        "note": "Cobro histórico VNS0005",
+        "campaignId": null
+      },
+      {
+        "id": "pay-21-card",
+        "created": "2026-09-21T12:00:00Z",
+        "accountId": "card",
+        "amount": 15600,
+        "kind": "sale",
+        "ref": "VNS0006",
+        "note": "Cobro histórico VNS0006",
+        "campaignId": null
+      },
+      {
+        "id": "fee-21",
+        "created": "2026-09-21T12:00:00Z",
+        "accountId": "card",
+        "amount": -633,
+        "kind": "expense",
+        "ref": "VNS0006",
+        "note": "Comisión tarjeta 4.06% según Excel",
+        "campaignId": null
+      },
+      {
+        "id": "pay-22-card",
+        "created": "2026-09-22T12:00:00Z",
+        "accountId": "card",
+        "amount": 68900,
+        "kind": "sale",
+        "ref": "VNS0007",
+        "note": "Cobro histórico VNS0007",
+        "campaignId": null
+      },
+      {
+        "id": "fee-22",
+        "created": "2026-09-22T12:00:00Z",
+        "accountId": "card",
+        "amount": -2797,
+        "kind": "expense",
+        "ref": "VNS0007",
+        "note": "Comisión tarjeta 4.06% según Excel",
+        "campaignId": null
+      },
+      {
+        "id": "expense-IL001",
+        "created": "2026-09-21T12:00:00Z",
+        "accountId": "card",
+        "amount": -49900,
+        "kind": "expense",
+        "ref": "IL001",
+        "note": "Terminal end-point para cobro con tarjeta",
+        "campaignId": null
+      },
+      {
+        "id": "pay-23-transfer",
+        "created": "2026-09-23T12:00:00Z",
+        "accountId": "transfer",
+        "amount": 46900,
+        "kind": "sale",
+        "ref": "VNS0008",
+        "note": "Cobro histórico VNS0008",
+        "campaignId": null
+      },
+      {
+        "id": "pay-24-transfer",
+        "created": "2026-09-30T12:00:00Z",
+        "accountId": "transfer",
+        "amount": 66900,
+        "kind": "sale",
+        "ref": "VNS0009",
+        "note": "Cobro histórico VNS0009",
+        "campaignId": null
+      },
+      {
+        "id": "pay-25-transfer",
+        "created": "2026-09-30T12:00:00Z",
+        "accountId": "transfer",
+        "amount": 36900,
+        "kind": "sale",
+        "ref": "VNS0009",
+        "note": "Cobro histórico VNS0009",
+        "campaignId": null
+      },
+      {
+        "id": "expense-IL002",
+        "created": "2026-09-29T12:00:00Z",
+        "accountId": "transfer",
+        "amount": -60000,
+        "kind": "expense",
+        "ref": "IL002",
+        "note": "Publicidad Paq Clásico [Pancarta + Flyers]",
+        "campaignId": null
+      }
+    ],
+    "stock_moves": [
+      {
+        "id": "initial-NS-CAF-001",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-CAF-001",
+        "qty": 3,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-OME-001",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-OME-001",
+        "qty": 3,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-AMI-001",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-AMI-001",
+        "qty": 3,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-BEB-001",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-BEB-001",
+        "qty": 12,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-CRE-001",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-CRE-001",
+        "qty": 3,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-CRE-002",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-CRE-002",
+        "qty": 2,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-PRE-001",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-PRE-001",
+        "qty": 3,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-PRO-001",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-PRO-001",
+        "qty": 1,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-VIT-001",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-VIT-001",
+        "qty": 2,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-SOP-001",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-SOP-001",
+        "qty": 2,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-SOP-002",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-SOP-002",
+        "qty": 2,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-OME-002",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-OME-002",
+        "qty": 3,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-CRE-003",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-CRE-003",
+        "qty": 4,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-CRE-004",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-CRE-004",
+        "qty": 5,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-PRE-002",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-PRE-002",
+        "qty": 2,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-VIT-002",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-VIT-002",
+        "qty": 4,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-VIT-003",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-VIT-003",
+        "qty": 4,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-PRE-003",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-PRE-003",
+        "qty": 3,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-AMI-002",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-AMI-002",
+        "qty": 4,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-PRE-004",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-PRE-004",
+        "qty": 3,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-PRE-005",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-PRE-005",
+        "qty": 3,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-PRE-006",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-PRE-006",
+        "qty": 30,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-AMI-003",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-AMI-003",
+        "qty": 5,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-PRE-007",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-PRE-007",
+        "qty": 2,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-PRO-002",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-PRO-002",
+        "qty": 1,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-PRO-003",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-PRO-003",
+        "qty": 2,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-AMI-004",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-AMI-004",
+        "qty": 3,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-PRO-004",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-PRO-004",
+        "qty": 1,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-GAN-001",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-GAN-001",
+        "qty": 2,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-AMI-005",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-AMI-005",
+        "qty": 4,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-PRE-008",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-PRE-008",
+        "qty": 2,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-PRE-009",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-PRE-009",
+        "qty": 2,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-PRO-005",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-PRO-005",
+        "qty": 2,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-OME-003",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-OME-003",
+        "qty": 2,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-PRO-006",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-PRO-006",
+        "qty": 1,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-PRE-010",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-PRE-010",
+        "qty": 2,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-PRO-007",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-PRO-007",
+        "qty": 3,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-PRO-008",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-PRO-008",
+        "qty": 3,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-BAR-001",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-BAR-001",
+        "qty": 30,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "initial-NS-CAR-001",
+        "created": "2026-09-27T21:03:57Z",
+        "lotId": "initial-NS-CAR-001",
+        "qty": 1,
+        "kind": "opening",
+        "ref": "excel-septiembre",
+        "note": "Stock inicial; fecha original no informada."
+      },
+      {
+        "id": "sold-14",
+        "created": "2026-09-17T12:00:00Z",
+        "lotId": "initial-NS-PRE-001",
+        "qty": -1,
+        "kind": "sale",
+        "ref": "VNS0001",
+        "note": "Entrega registrada en Excel; fecha de movimiento usa fecha de venta."
+      },
+      {
+        "id": "sold-15",
+        "created": "2026-09-17T12:00:00Z",
+        "lotId": "initial-NS-PRE-006",
+        "qty": -2,
+        "kind": "sale",
+        "ref": "VNS0001",
+        "note": "Entrega registrada en Excel; fecha de movimiento usa fecha de venta."
+      },
+      {
+        "id": "sold-16",
+        "created": "2026-09-17T12:00:00Z",
+        "lotId": "initial-NS-BEB-001",
+        "qty": -1,
+        "kind": "sale",
+        "ref": "VNS0001",
+        "note": "Entrega registrada en Excel; fecha de movimiento usa fecha de venta."
+      },
+      {
+        "id": "sold-17",
+        "created": "2026-09-17T12:00:00Z",
+        "lotId": "initial-NS-CRE-003",
+        "qty": -1,
+        "kind": "sale",
+        "ref": "VNS0002",
+        "note": "Entrega registrada en Excel; fecha de movimiento usa fecha de venta."
+      },
+      {
+        "id": "sold-18",
+        "created": "2026-09-18T12:00:00Z",
+        "lotId": "initial-NS-CRE-004",
+        "qty": -1,
+        "kind": "sale",
+        "ref": "VNS0003",
+        "note": "Entrega registrada en Excel; fecha de movimiento usa fecha de venta."
+      },
+      {
+        "id": "sold-19",
+        "created": "2026-09-18T12:00:00Z",
+        "lotId": "initial-NS-CRE-003",
+        "qty": -1,
+        "kind": "sale",
+        "ref": "VNS0004",
+        "note": "Entrega registrada en Excel; fecha de movimiento usa fecha de venta."
+      },
+      {
+        "id": "sold-20",
+        "created": "2026-09-18T12:00:00Z",
+        "lotId": "initial-NS-CRE-003",
+        "qty": -1,
+        "kind": "sale",
+        "ref": "VNS0005",
+        "note": "Entrega registrada en Excel; fecha de movimiento usa fecha de venta."
+      },
+      {
+        "id": "sold-21",
+        "created": "2026-09-21T12:00:00Z",
+        "lotId": "initial-NS-BAR-001",
+        "qty": -4,
+        "kind": "sale",
+        "ref": "VNS0006",
+        "note": "Entrega registrada en Excel; fecha de movimiento usa fecha de venta."
+      },
+      {
+        "id": "sold-22",
+        "created": "2026-09-22T12:00:00Z",
+        "lotId": "initial-NS-CRE-002",
+        "qty": -1,
+        "kind": "sale",
+        "ref": "VNS0007",
+        "note": "Entrega registrada en Excel; fecha de movimiento usa fecha de venta."
+      },
+      {
+        "id": "sold-23",
+        "created": "2026-09-23T12:00:00Z",
+        "lotId": "initial-NS-PRE-005",
+        "qty": -1,
+        "kind": "sale",
+        "ref": "VNS0008",
+        "note": "Entrega registrada en Excel; fecha de movimiento usa fecha de venta."
+      },
+      {
+        "id": "sold-24",
+        "created": "2026-09-30T12:00:00Z",
+        "lotId": "initial-NS-VIT-001",
+        "qty": -1,
+        "kind": "sale",
+        "ref": "VNS0009",
+        "note": "Entrega registrada en Excel; fecha de movimiento usa fecha de venta."
+      },
+      {
+        "id": "sold-25",
+        "created": "2026-09-30T12:00:00Z",
+        "lotId": "initial-NS-CAF-001",
+        "qty": -1,
+        "kind": "sale",
+        "ref": "VNS0009",
+        "note": "Entrega registrada en Excel; fecha de movimiento usa fecha de venta."
+      }
+    ],
+    "audit": [
+      {
+        "id": "import-september",
+        "created": "2026-09-27T21:03:57Z",
+        "action": "import.excel",
+        "ref": "september-2026",
+        "note": "Carga conciliada con Excel, catálogo y costos de referencia del pedido."
+      }
+    ],
+    "settings": [
+      {
+        "key": "product:NS-CAF-001",
+        "value": "{\"sourceName\": \"Coffee Fit\", \"brand\": \"Advance Labs Nutrition\", \"flavor\": \"Café\", \"presentation\": \"60 servicios\", \"page\": 10, \"inventoryKnown\": true, \"referenceCost\": 44831, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Marca identificada en distribuidor; cotejar etiqueta.\", \"excelRow\": 14, \"description\": \"Café funcional de Advance Labs Nutrition. Coffee Fit. Presentación: 60 servicios. Sabor: Café.\"}"
+      },
+      {
+        "key": "product:NS-OME-001",
+        "value": "{\"sourceName\": \"Omega 3 Salmon Oil\", \"brand\": \"B Life\", \"flavor\": \"Sin Sabor\", \"presentation\": \"90 cápsulas\", \"page\": 2, \"inventoryKnown\": true, \"referenceCost\": 19400, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Marca confirmada por el usuario. Completar sabor según etiqueta.\", \"excelRow\": 15, \"description\": \"Omega 3 de B Life. Omega 3 Salmon Oil. Presentación: 90 cápsulas.\"}"
+      },
+      {
+        "key": "product:NS-AMI-001",
+        "value": "{\"sourceName\": \"AMINOx\", \"brand\": \"BSN\", \"flavor\": \"Watermelon\", \"presentation\": \"30 servicios\", \"page\": 12, \"inventoryKnown\": true, \"referenceCost\": 32208, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \"El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. Completar sabor según la etiqueta.\", \"excelRow\": 16, \"description\": \"Aminoácidos de BSN. AMINOx. Presentación: 30 servicios. Sabor: Watermelon.\"}"
+      },
+      {
+        "key": "product:NS-BEB-001",
+        "value": "{\"sourceName\": \"C4 Energy Zero Sugar\", \"brand\": \"Cellucor\", \"flavor\": \"Diferentes Sabores\", \"presentation\": \"1 Lata\", \"page\": 10, \"inventoryKnown\": true, \"referenceCost\": 4000, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \"El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. Confirmar volumen y si la unidad de venta es lata o paquete.\", \"excelRow\": 17, \"description\": \"Bebida energética de Cellucor. C4 Energy Zero Sugar. Presentación: 1 Lata. Sabor: Diferentes Sabores.\"}"
+      },
+      {
+        "key": "product:NS-CRE-001",
+        "value": "{\"sourceName\": \"Creatine\", \"brand\": \"Dragon Pharma\", \"flavor\": \"Sin Sabor\", \"presentation\": \"300 g\", \"page\": 11, \"inventoryKnown\": true, \"referenceCost\": 29300, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Marca Dragon normalizada como Dragon Pharma; confirmar etiqueta.\", \"excelRow\": 18, \"description\": \"Creatina de Dragon Pharma. Creatine. Presentación: 300 g.\"}"
+      },
+      {
+        "key": "product:NS-CRE-002",
+        "value": "{\"sourceName\": \"Creatine\", \"brand\": \"Dragon Pharma\", \"flavor\": \"Sin Sabor\", \"presentation\": \"1 kg\", \"page\": 11, \"inventoryKnown\": true, \"referenceCost\": 46667, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Marca Dragon normalizada como Dragon Pharma; confirmar etiqueta.\", \"excelRow\": 19, \"description\": \"Creatina de Dragon Pharma. Creatine. Presentación: 1 kg.\"}"
+      },
+      {
+        "key": "product:NS-PRE-001",
+        "value": "{\"sourceName\": \"Venom Inferno\", \"brand\": \"Dragon Pharma\", \"flavor\": \"Dragon Lychee\", \"presentation\": \"30 Servicios\", \"page\": 8, \"inventoryKnown\": true, \"referenceCost\": 42048, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \"Excel 30 servicios; pedido 40. Confirmar presentación. Confirmar contenido del envase; no se asignó un tamaño por defecto.\", \"excelRow\": 20, \"description\": \"Preentreno de Dragon Pharma. Venom Inferno. Presentación: 30 Servicios. Sabor: Dragon Lychee.\"}"
+      },
+      {
+        "key": "product:NS-PRO-001",
+        "value": "{\"sourceName\": \"ISO100\", \"brand\": \"Dymatize\", \"flavor\": \"Gourmet Chocolate\", \"presentation\": \"5 lb\", \"page\": 5, \"inventoryKnown\": true, \"referenceCost\": 191200, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Completar sabor según la etiqueta.\", \"excelRow\": 21, \"description\": \"Proteína de Dymatize. ISO100. Presentación: 5 lb. Sabor: Gourmet Chocolate.\"}"
+      },
+      {
+        "key": "product:NS-VIT-001",
+        "value": "{\"sourceName\": \"D3 + K2\", \"brand\": \"Evogen\", \"flavor\": \"Sin Sabor\", \"presentation\": \"60 Servicios\", \"page\": 2, \"inventoryKnown\": true, \"referenceCost\": 24180, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Confirmar unidades por envase y concentración.\", \"excelRow\": 22, \"description\": \"Vitaminas de Evogen. D3 + K2. Presentación: 60 Servicios.\"}"
+      },
+      {
+        "key": "product:NS-SOP-001",
+        "value": "{\"sourceName\": \"Testrol Gold\", \"brand\": \"GAT Sport\", \"flavor\": \"Sin Sabor\", \"presentation\": \"30 Servicios\", \"page\": 3, \"inventoryKnown\": true, \"referenceCost\": 26460, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Categoría comercial; confirmar versión y cantidad por envase.\", \"excelRow\": 23, \"description\": \"Soporte hormonal de GAT Sport. Testrol Gold. Presentación: 30 Servicios.\"}"
+      },
+      {
+        "key": "product:NS-SOP-002",
+        "value": "{\"sourceName\": \"Testrol 60\", \"brand\": \"GAT Sport\", \"flavor\": \"Sin Sabor\", \"presentation\": \"60 Servicios\", \"page\": 3, \"inventoryKnown\": true, \"referenceCost\": 22704, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Confirmar si 60 corresponde a tabletas o cápsulas y versión exacta.\", \"excelRow\": 24, \"description\": \"Soporte hormonal de GAT Sport. Testrol 60. Presentación: 60 Servicios.\"}"
+      },
+      {
+        "key": "product:NS-OME-002",
+        "value": "{\"sourceName\": \"Omega 3\", \"brand\": \"GAT Sport\", \"flavor\": \"Sin Sabor\", \"presentation\": \"60 Servicios\", \"page\": 3, \"inventoryKnown\": true, \"referenceCost\": 19536, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Confirmar unidades y concentración.\", \"excelRow\": 25, \"description\": \"Omega 3 de GAT Sport. Omega 3. Presentación: 60 Servicios.\"}"
+      },
+      {
+        "key": "product:NS-CRE-003",
+        "value": "{\"sourceName\": \"Creatine\", \"brand\": \"GAT Sport\", \"flavor\": \"Sin Sabor\", \"presentation\": \"1 kg\", \"page\": 11, \"inventoryKnown\": true, \"referenceCost\": 55176, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Completar sabor según la etiqueta.\", \"excelRow\": 26, \"description\": \"Creatina de GAT Sport. Creatine. Presentación: 1 kg.\"}"
+      },
+      {
+        "key": "product:NS-CRE-004",
+        "value": "{\"sourceName\": \"Creatine\", \"brand\": \"GAT Sport\", \"flavor\": \"Sin Sabor\", \"presentation\": \"300 g\", \"page\": 11, \"inventoryKnown\": true, \"referenceCost\": 26200, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Completar sabor según la etiqueta.\", \"excelRow\": 27, \"description\": \"Creatina de GAT Sport. Creatine. Presentación: 300 g.\"}"
+      },
+      {
+        "key": "product:NS-PRE-002",
+        "value": "{\"sourceName\": \"Nitraflex\", \"brand\": \"GAT Sport\", \"flavor\": \"Watermelon\", \"presentation\": \"300 g\", \"page\": 8, \"inventoryKnown\": true, \"referenceCost\": 31680, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \"El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. Completar sabor según la etiqueta.\", \"excelRow\": 28, \"description\": \"Preentreno de GAT Sport. Nitraflex. Presentación: 300 g. Sabor: Watermelon.\"}"
+      },
+      {
+        "key": "product:NS-VIT-002",
+        "value": "{\"sourceName\": \"Vitamin C + Glutathione\", \"brand\": \"Ghost Life\", \"flavor\": \"Sin Sabor\", \"presentation\": \"Por confirmar\", \"page\": 2, \"inventoryKnown\": true, \"referenceCost\": 33465, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Confirmar presentación y concentración.\", \"excelRow\": 29, \"description\": \"Vitaminas de Ghost Life. Vitamin C + Glutathione.\"}"
+      },
+      {
+        "key": "product:NS-VIT-003",
+        "value": "{\"sourceName\": \"Vitamin D3\", \"brand\": \"Hi-Tech\", \"flavor\": \"Sin Sabor\", \"presentation\": \"Por confirmar\", \"page\": 2, \"inventoryKnown\": true, \"referenceCost\": 20234, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Confirmar presentación y concentración.\", \"excelRow\": 30, \"description\": \"Vitaminas de Hi-Tech. Vitamin D3.\"}"
+      },
+      {
+        "key": "product:NS-PRE-003",
+        "value": "{\"sourceName\": \"Psychotic Test\", \"brand\": \"Insane Labz\", \"flavor\": \"Grape\", \"presentation\": \"Por confirmar\", \"page\": 8, \"inventoryKnown\": true, \"referenceCost\": 41600, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \"El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. Confirmar cantidad de servicios del envase.\", \"excelRow\": 31, \"description\": \"Preentreno de Insane Labz. Psychotic Test. Sabor: Grape.\"}"
+      },
+      {
+        "key": "product:NS-AMI-002",
+        "value": "{\"sourceName\": \"Demon BCAA\", \"brand\": \"Insane Labz\", \"flavor\": \"Blue Raspberry\", \"presentation\": \"Por confirmar\", \"page\": 12, \"inventoryKnown\": true, \"referenceCost\": 30400, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \"El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. La marca publica 60 servicios; cotejar el envase antes de asignarlos.\", \"excelRow\": 32, \"description\": \"Aminoácidos de Insane Labz. Demon BCAA. Sabor: Blue Raspberry.\"}"
+      },
+      {
+        "key": "product:NS-PRE-004",
+        "value": "{\"sourceName\": \"Psychotic\", \"brand\": \"Insane Labz\", \"flavor\": \"Grape\", \"presentation\": \"35 servicios\", \"page\": 8, \"inventoryKnown\": true, \"referenceCost\": 35600, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" El 35 de la lista corresponde a la variante de 35 servicios.\", \"excelRow\": 33, \"description\": \"Preentreno de Insane Labz. Psychotic. Presentación: 35 servicios. Sabor: Grape.\"}"
+      },
+      {
+        "key": "product:NS-PRE-005",
+        "value": "{\"sourceName\": \"Psychotic Gold\", \"brand\": \"Insane Labz\", \"flavor\": \"Fruit Punch\", \"presentation\": \"30 Servicios\", \"page\": 9, \"inventoryKnown\": true, \"referenceCost\": 37800, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Confirmar cantidad de servicios.\", \"excelRow\": 34, \"description\": \"Preentreno de Insane Labz. Psychotic Gold. Presentación: 30 Servicios. Sabor: Fruit Punch.\"}"
+      },
+      {
+        "key": "product:NS-PRE-006",
+        "value": "{\"sourceName\": \"Psychotic Gold muestra\", \"brand\": \"Insane Labz\", \"flavor\": \"Diferentes Sabores\", \"presentation\": \"1 Servicio\", \"page\": 9, \"inventoryKnown\": true, \"referenceCost\": 1800, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \"El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. Confirmar gramos/servicios de la muestra y sabor.\", \"excelRow\": 35, \"description\": \"Preentreno de Insane Labz. Psychotic Gold muestra. Presentación: 1 Servicio. Sabor: Diferentes Sabores.\"}"
+      },
+      {
+        "key": "product:NS-AMI-003",
+        "value": "{\"sourceName\": \"Killer BCAA\", \"brand\": \"Killer Labz\", \"flavor\": \"Furious Punch\", \"presentation\": \"Por confirmar\", \"page\": 12, \"inventoryKnown\": true, \"referenceCost\": 29900, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \"El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. Marca asociada a Brute BCAA; confirmar modelo exacto de la etiqueta.\", \"excelRow\": 36, \"description\": \"Aminoácidos de Killer Labz. Killer BCAA. Sabor: Furious Punch.\"}"
+      },
+      {
+        "key": "product:NS-PRE-007",
+        "value": "{\"sourceName\": \"NitroTest\", \"brand\": \"MuscleMeds\", \"flavor\": \"Watermelon\", \"presentation\": \"Por confirmar\", \"page\": 9, \"inventoryKnown\": true, \"referenceCost\": 40800, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Preentreno según fabricante; confirmar cantidad de servicios.\", \"excelRow\": 37, \"description\": \"Preentreno de MuscleMeds. NitroTest. Sabor: Watermelon.\"}"
+      },
+      {
+        "key": "product:NS-PRO-002",
+        "value": "{\"sourceName\": \"Nitro-Tech Gold\", \"brand\": \"MuscleTech\", \"flavor\": \"Vainilla Ice Cream\", \"presentation\": \"5 lb\", \"page\": 5, \"inventoryKnown\": true, \"referenceCost\": 129492, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Confirmar que la versión de la etiqueta sea 100% Whey Gold.\", \"excelRow\": 38, \"description\": \"Proteína de MuscleTech. Nitro-Tech Gold. Presentación: 5 lb. Sabor: Vainilla Ice Cream.\"}"
+      },
+      {
+        "key": "product:NS-PRO-003",
+        "value": "{\"sourceName\": \"Nitro-Tech Ripped\", \"brand\": \"MuscleTech\", \"flavor\": \"Chocolate Fugde Brownie\", \"presentation\": \"4 lb\", \"page\": 5, \"inventoryKnown\": true, \"referenceCost\": 104803, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Completar sabor según la etiqueta.\", \"excelRow\": 39, \"description\": \"Proteína de MuscleTech. Nitro-Tech Ripped. Presentación: 4 lb. Sabor: Chocolate Fugde Brownie.\"}"
+      },
+      {
+        "key": "product:NS-AMI-004",
+        "value": "{\"sourceName\": \"Hardcore BCAA\", \"brand\": \"Mutant\", \"flavor\": \"Watermelon\", \"presentation\": \"30 Servicios\", \"page\": 12, \"inventoryKnown\": true, \"referenceCost\": 22044, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \"El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. Confirmar gramos o servicios del envase.\", \"excelRow\": 40, \"description\": \"Aminoácidos de Mutant. Hardcore BCAA. Presentación: 30 Servicios. Sabor: Watermelon.\"}"
+      },
+      {
+        "key": "product:NS-PRO-004",
+        "value": "{\"sourceName\": \"Whey\", \"brand\": \"Mutant\", \"flavor\": \"Chocolate\", \"presentation\": \"5 lb\", \"page\": 5, \"inventoryKnown\": true, \"referenceCost\": 84876, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Completar sabor según la etiqueta.\", \"excelRow\": 41, \"description\": \"Proteína de Mutant. Whey. Presentación: 5 lb. Sabor: Chocolate.\"}"
+      },
+      {
+        "key": "product:NS-GAN-001",
+        "value": "{\"sourceName\": \"Mass\", \"brand\": \"Mutant\", \"flavor\": \"Cookies & Cream\", \"presentation\": \"6 lb\", \"page\": 7, \"inventoryKnown\": true, \"referenceCost\": 37620, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Confirmar si corresponde a Mass o a Mass Extreme.\", \"excelRow\": 42, \"description\": \"Ganador de peso de Mutant. Mass. Presentación: 6 lb. Sabor: Cookies & Cream.\"}"
+      },
+      {
+        "key": "product:NS-AMI-005",
+        "value": "{\"sourceName\": \"Amino Energy\", \"brand\": \"Optimum Nutrition\", \"flavor\": \"Tropical Sunrise\", \"presentation\": \"Por confirmar\", \"page\": 13, \"inventoryKnown\": true, \"referenceCost\": 32076, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \"El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. La marca ofrece varias presentaciones; confirmar tamaño y versión.\", \"excelRow\": 43, \"description\": \"Aminoácidos de Optimum Nutrition. Amino Energy. Sabor: Tropical Sunrise.\"}"
+      },
+      {
+        "key": "product:NS-PRE-008",
+        "value": "{\"sourceName\": \"CBUM Essential\", \"brand\": \"RAW Nutrition\", \"flavor\": \"Champion Mentality\", \"presentation\": \"Por confirmar\", \"page\": 9, \"inventoryKnown\": true, \"referenceCost\": 34716, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Confirmar cantidad de servicios y versión Essential.\", \"excelRow\": 44, \"description\": \"Preentreno de RAW Nutrition. CBUM Essential. Sabor: Champion Mentality.\"}"
+      },
+      {
+        "key": "product:NS-PRE-009",
+        "value": "{\"sourceName\": \"CBUM Charged\", \"brand\": \"RAW Nutrition\", \"flavor\": \"Blue Rathberry\", \"presentation\": \"Por confirmar\", \"page\": 10, \"inventoryKnown\": true, \"referenceCost\": 39864, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Confirmar cantidad de servicios.\", \"excelRow\": 45, \"description\": \"Preentreno de RAW Nutrition. CBUM Charged. Sabor: Blue Rathberry.\"}"
+      },
+      {
+        "key": "product:NS-PRO-005",
+        "value": "{\"sourceName\": \"Isolate\", \"brand\": \"RAW Nutrition\", \"flavor\": \"Nieve Napolitano\", \"presentation\": \"Por confirmar\", \"page\": 6, \"inventoryKnown\": true, \"referenceCost\": 76033, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Confirmar peso neto.\", \"excelRow\": 46, \"description\": \"Proteína de RAW Nutrition. Isolate. Sabor: Nieve Napolitano.\"}"
+      },
+      {
+        "key": "product:NS-OME-003",
+        "value": "{\"sourceName\": \"Omega 3\", \"brand\": \"Ronnie Coleman Signature Series\", \"flavor\": \"Sin Sabor\", \"presentation\": \"Por confirmar\", \"page\": 3, \"inventoryKnown\": true, \"referenceCost\": 14800, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Confirmar unidades y concentración.\", \"excelRow\": 47, \"description\": \"Omega 3 de Ronnie Coleman Signature Series. Omega 3.\"}"
+      },
+      {
+        "key": "product:NS-PRO-006",
+        "value": "{\"sourceName\": \"Whey Isolate\", \"brand\": \"SD Nutrition\", \"flavor\": \"Vainilla Ice Cream\", \"presentation\": \"1 kg\", \"page\": 6, \"inventoryKnown\": true, \"referenceCost\": 24900, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \"Excel Vainilla; pedido Luneta de Chocolate. Confirmar etiqueta. Marca identificada en distribuidor; cotejar etiqueta.\", \"excelRow\": 48, \"description\": \"Proteína de SD Nutrition. Whey Isolate. Presentación: 1 kg. Sabor: Vainilla Ice Cream.\"}"
+      },
+      {
+        "key": "product:NS-PRE-010",
+        "value": "{\"sourceName\": \"Joker\", \"brand\": \"Terror Labz\", \"flavor\": \"Blood Orange\", \"presentation\": \"30 Servicios\", \"page\": 10, \"inventoryKnown\": true, \"referenceCost\": 36168, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Marca identificada en distribuidor; confirmar servicios del envase.\", \"excelRow\": 49, \"description\": \"Preentreno de Terror Labz. Joker. Presentación: 30 Servicios. Sabor: Blood Orange.\"}"
+      },
+      {
+        "key": "product:NS-PRO-007",
+        "value": "{\"sourceName\": \"Unique Whey\", \"brand\": \"Unique Nutrition\", \"flavor\": \"Chocolate\", \"presentation\": \"5 lb\", \"page\": 6, \"inventoryKnown\": true, \"referenceCost\": 36600, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \"Excel 3 unidades; pedido 2. Confirmar la tercera unidad y costo. Choco y Chocolate unificados por el usuario. Confirmar marca en etiqueta.\", \"excelRow\": 50, \"description\": \"Proteína de Unique Nutrition. Unique Whey. Presentación: 5 lb. Sabor: Chocolate.\"}"
+      },
+      {
+        "key": "product:NS-PRO-008",
+        "value": "{\"sourceName\": \"Whey HD\", \"brand\": \"BPI Sports\", \"flavor\": \"Chocolate\", \"presentation\": \"4 lb\", \"page\": 6, \"inventoryKnown\": true, \"referenceCost\": 105554, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \"Excel 3 unidades Chocolate; pedido 2 Milk & Cookies. Confirmar cantidad, variante y costo. Completar sabor según la etiqueta.\", \"excelRow\": 51, \"description\": \"Proteína de BPI Sports. Whey HD. Presentación: 4 lb. Sabor: Chocolate.\"}"
+      },
+      {
+        "key": "product:NS-BAR-001",
+        "value": "{\"sourceName\": \"Muscle Sandwich\", \"brand\": \"Muscle Sandwich\", \"flavor\": \"Peanut Butter\", \"presentation\": \"1 barra\", \"page\": 4, \"inventoryKnown\": true, \"referenceCost\": 2353, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \" Confirmar sabor y peso por barra.\", \"excelRow\": 52, \"description\": \"Barra proteica de Muscle Sandwich. Muscle Sandwich. Presentación: 1 barra. Sabor: Peanut Butter.\"}"
+      },
+      {
+        "key": "product:NS-CAR-001",
+        "value": "{\"sourceName\": \"Carnigen\", \"brand\": \"Evogen Nutrition\", \"flavor\": \"Sin Sabor\", \"presentation\": \"30 Servicios\", \"page\": 13, \"inventoryKnown\": true, \"referenceCost\": 33087, \"costSource\": \"Pedido 0635262; referencia sin envío ni seguro\", \"notes\": \"Excel Sin Sabor, 30 servicios; pedido Tropic Thunder, 50 servicios. Confirmar versión: polvo, líquido u otra; no se asignó tamaño por defecto.\", \"excelRow\": 53, \"description\": \"Carnitina de Evogen Nutrition. Carnigen. Presentación: 30 Servicios.\"}"
+      },
+      {
+        "key": "product:NS-GLU-001",
+        "value": "{\"sourceName\": \"Glutamine\", \"brand\": \"Optimum Nutrition\", \"flavor\": \"\", \"presentation\": \"1 kg\", \"page\": 13, \"inventoryKnown\": false, \"referenceCost\": null, \"notes\": \"Solo en catálogo: inventario y costo pendientes.\", \"description\": \"Glutamina. Presentación: 1 kg.\"}"
+      },
+      {
+        "key": "line:line-14",
+        "value": "{\"unitPrice\": 49900, \"discount\": 0, \"deliveryDate\": null, \"sourceRow\": 14}"
+      },
+      {
+        "key": "line:line-15",
+        "value": "{\"unitPrice\": 3000, \"discount\": 0, \"deliveryDate\": null, \"sourceRow\": 15}"
+      },
+      {
+        "key": "line:line-16",
+        "value": "{\"unitPrice\": 6000, \"discount\": 0, \"deliveryDate\": null, \"sourceRow\": 16}"
+      },
+      {
+        "key": "line:line-17",
+        "value": "{\"unitPrice\": 63900, \"discount\": 0, \"deliveryDate\": null, \"sourceRow\": 17}"
+      },
+      {
+        "key": "line:line-18",
+        "value": "{\"unitPrice\": 36900, \"discount\": 0, \"deliveryDate\": null, \"sourceRow\": 18}"
+      },
+      {
+        "key": "line:line-19",
+        "value": "{\"unitPrice\": 63900, \"discount\": 0, \"deliveryDate\": null, \"sourceRow\": 19}"
+      },
+      {
+        "key": "line:line-20",
+        "value": "{\"unitPrice\": 63900, \"discount\": 0, \"deliveryDate\": null, \"sourceRow\": 20}"
+      },
+      {
+        "key": "line:line-21",
+        "value": "{\"unitPrice\": 3900, \"discount\": 0, \"deliveryDate\": null, \"sourceRow\": 21}"
+      },
+      {
+        "key": "line:line-22",
+        "value": "{\"unitPrice\": 68900, \"discount\": 0, \"deliveryDate\": \"2026-09-22\", \"sourceRow\": 22}"
+      },
+      {
+        "key": "sale:VNS0001",
+        "value": "{\"folio\": \"VNS0001\", \"dateOnly\": \"2026-09-17\", \"source\": \"Excel\", \"costEstimated\": true}"
+      },
+      {
+        "key": "sale:VNS0002",
+        "value": "{\"folio\": \"VNS0002\", \"dateOnly\": \"2026-09-17\", \"source\": \"Excel\", \"costEstimated\": true}"
+      },
+      {
+        "key": "sale:VNS0003",
+        "value": "{\"folio\": \"VNS0003\", \"dateOnly\": \"2026-09-18\", \"source\": \"Excel\", \"costEstimated\": true}"
+      },
+      {
+        "key": "sale:VNS0004",
+        "value": "{\"folio\": \"VNS0004\", \"dateOnly\": \"2026-09-18\", \"source\": \"Excel\", \"costEstimated\": true}"
+      },
+      {
+        "key": "sale:VNS0005",
+        "value": "{\"folio\": \"VNS0005\", \"dateOnly\": \"2026-09-18\", \"source\": \"Excel\", \"costEstimated\": true}"
+      },
+      {
+        "key": "sale:VNS0006",
+        "value": "{\"folio\": \"VNS0006\", \"dateOnly\": \"2026-09-21\", \"source\": \"Excel\", \"costEstimated\": true}"
+      },
+      {
+        "key": "sale:VNS0007",
+        "value": "{\"folio\": \"VNS0007\", \"dateOnly\": \"2026-09-22\", \"source\": \"Excel\", \"costEstimated\": true}"
+      },
+      {
+        "key": "import:september-2026",
+        "value": "{\"summary\": {\"products\": 41, \"images\": 43, \"customers\": 6, \"sales\": 7, \"initialUnits\": 169, \"remainingUnits\": 156, \"revenue\": 375000, \"cash\": 321670}, \"sha256\": \"9844606cede2e1aa8c649bc2bd66dba0312710cde49ecc67abe2117b79606691\"}"
+      },
+      {
+        "key": "cardFeeBps",
+        "value": "406"
+      },
+      {
+        "key": "importWarnings",
+        "value": "[\"Los saldos son por medio de pago, pendientes de conciliar con bancos.\", \"Costos de referencia del Pedido 0635262, sin envío de $500 ni seguro de $398.24; no se inventó la cuenta de pago.\", \"Excel: 169 unidades iniciales. Pedido: 168 incluyendo una muestra de regalo ausente en Excel. Unique y BPI tienen 3 unidades en Excel y 2 en el pedido. Se conserva el Excel.\", \"Sabores agregados y presentaciones por confirmar: revisar notas de cada producto. Las imágenes conservan las variantes originales del PDF.\", \"Las ventas no presentes en el Excel no se añadieron a partir de conversaciones. No hay registros de campañas ni direcciones en las fuentes.\", \"Los lotes importados son agrupaciones administrativas sin caducidad informada.\", \"Glutamina: solo catálogo, sin existencias ni costo confirmados.\", \"VNS0009: fecha de entrega 29/09 anterior a fecha de venta 30/09; revisar en Excel.\", \"VNS0009: NS-VIT-001 y NS-CAF-001 se vendieron a $669 y $369; el catálogo los lista a $369 y $669. Se conservaron los importes de la venta.\"]"
+      },
+      {
+        "key": "sale:VNS0008",
+        "value": "{\"folio\": \"VNS0008\", \"dateOnly\": \"2026-09-23\", \"source\": \"Excel\", \"costEstimated\": true, \"notes\": \"Pagado y Entregado\", \"deliveryDate\": \"2026-09-23\"}"
+      },
+      {
+        "key": "dataRelease",
+        "value": "\"2026-09-30\""
+      },
+      {
+        "key": "sale:VNS0009",
+        "value": "{\"folio\": \"VNS0009\", \"dateOnly\": \"2026-09-30\", \"source\": \"Excel\", \"costEstimated\": true, \"notes\": \"Excel conciliado: D3 + K2 $369 y Coffee Fit $669; entrega 29/09 anterior a fecha de venta 30/09.\", \"deliveryDate\": \"2026-09-29\"}"
+      }
+    ]
+  }
+}

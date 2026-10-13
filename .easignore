@@ -1,0 +1,36 @@
+# Lo que NO se sube a los servidores de Expo al compilar con "eas build".
+# Nunca se suben la llave de firma (signing), los APK ni los respaldos.
+node_modules/
+.expo/
+.git/
+signing/
+deliverables/
+build/
+android/
+ios/
+_respaldo*/
+_versiones_anteriores/
+_codigo_retirado*/
+_to_delete/
+_partes*/
+Claude outputs/
+tests/
+docs/
+scripts/
+supabase/
+*.apk
+*.aab
+*.ipa
+*.tgz
+*.tar
+*.gz
+*.keystore
+*.jks
+*.p12
+*.p8
+*.mobileprovision
+credentials.json
+**/credentials.json
+**/.env*
+**/*service-account*.json
+**/*firebase-adminsdk*.json

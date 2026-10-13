@@ -1,0 +1,91 @@
+{
+  "expo": {
+    "name": "Nova Negocio",
+    "slug": "nova-negocio",
+    "version": "2.2.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.novasupps.negocio",
+      "icon": "./assets/logo/icono_ios.png",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "CFBundleDevelopmentRegion": "es",
+        "CFBundleAllowMixedLocalizations": true
+      }
+    },
+    "android": {
+      "package": "com.novasupps.negocio",
+      "allowBackup": false,
+      "versionCode": 38,
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.CAMERA"
+      ]
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-document-picker",
+      "expo-sharing",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Nova Negocio utiliza Face ID para proteger los datos de tu negocio."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Nova Negocio usa tus fotos para poner la imagen de cada producto en tu catálogo.",
+          "cameraPermission": "Nova Negocio usa la cámara para tomar la foto de cada producto de tu catálogo.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Nova Negocio usa la cámara para leer códigos de productos.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/logo/notificacion.png",
+          "color": "#163927"
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "icon": "./assets/logo/A_icono_claro.png",
+    "splash": {
+      "image": "./native/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "checkAutomatically": "NEVER",
+      "fallbackToCacheTimeout": 0
+    },
+    "extra": {
+      "eas": {
+        "projectId": "832d4228-542d-4cee-a11a-cb304c1fda71"
+      }
+    },
+    "owner": "emmgamart"
+  }
+}

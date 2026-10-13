@@ -1,0 +1,1983 @@
+{
+  "customers": [
+    {
+      "id": "client-7",
+      "name": "Martín Smart-Fit",
+      "phone": "",
+      "notes": "Importado del Excel; contacto no informado.",
+      "stage": "Cliente",
+      "nextDate": ""
+    },
+    {
+      "id": "client-8",
+      "name": "Cliente Gustavo",
+      "phone": "",
+      "notes": "Importado del Excel; contacto no informado.",
+      "stage": "Cliente",
+      "nextDate": ""
+    }
+  ],
+  "sales": [
+    {
+      "id": "VNS0008",
+      "created": "2026-09-23T12:00:00Z",
+      "customerId": "client-7",
+      "campaignId": null,
+      "channel": "Sin canal informado · Excel",
+      "total": 46900,
+      "cost": 37800,
+      "status": "confirmed"
+    },
+    {
+      "id": "VNS0009",
+      "created": "2026-09-30T12:00:00Z",
+      "customerId": "client-8",
+      "campaignId": null,
+      "channel": "Sin canal informado · Excel",
+      "total": 103800,
+      "cost": 69011,
+      "status": "confirmed"
+    }
+  ],
+  "sale_lines": [
+    {
+      "id": "line-23",
+      "saleId": "VNS0008",
+      "productId": "NS-PRE-005",
+      "qty": 1,
+      "name": "Psychotic Gold · Insane Labz · Por confirmar"
+    },
+    {
+      "id": "line-24",
+      "saleId": "VNS0009",
+      "productId": "NS-VIT-001",
+      "qty": 1,
+      "name": "D3 + K2 · Evogen · 60 Servicios"
+    },
+    {
+      "id": "line-25",
+      "saleId": "VNS0009",
+      "productId": "NS-CAF-001",
+      "qty": 1,
+      "name": "Coffee Fit · Advance Labs Nutrition · 60 servicios"
+    }
+  ],
+  "allocations": [
+    {
+      "id": "allocation-23",
+      "lineId": "line-23",
+      "lotId": "initial-NS-PRE-005",
+      "qty": 1,
+      "cost": 37800
+    },
+    {
+      "id": "allocation-24",
+      "lineId": "line-24",
+      "lotId": "initial-NS-VIT-001",
+      "qty": 1,
+      "cost": 24180
+    },
+    {
+      "id": "allocation-25",
+      "lineId": "line-25",
+      "lotId": "initial-NS-CAF-001",
+      "qty": 1,
+      "cost": 44831
+    }
+  ],
+  "ledger": [
+    {
+      "id": "pay-23-transfer",
+      "created": "2026-09-23T12:00:00Z",
+      "accountId": "transfer",
+      "amount": 46900,
+      "kind": "sale",
+      "ref": "VNS0008",
+      "note": "Cobro histórico VNS0008",
+      "campaignId": null
+    },
+    {
+      "id": "pay-24-transfer",
+      "created": "2026-09-30T12:00:00Z",
+      "accountId": "transfer",
+      "amount": 66900,
+      "kind": "sale",
+      "ref": "VNS0009",
+      "note": "Cobro histórico VNS0009",
+      "campaignId": null
+    },
+    {
+      "id": "pay-25-transfer",
+      "created": "2026-09-30T12:00:00Z",
+      "accountId": "transfer",
+      "amount": 36900,
+      "kind": "sale",
+      "ref": "VNS0009",
+      "note": "Cobro histórico VNS0009",
+      "campaignId": null
+    },
+    {
+      "id": "expense-IL002",
+      "created": "2026-09-29T12:00:00Z",
+      "accountId": "transfer",
+      "amount": -60000,
+      "kind": "expense",
+      "ref": "IL002",
+      "note": "Publicidad Paq Clásico [Pancarta + Flyers]",
+      "campaignId": null
+    }
+  ],
+  "stock_moves": [
+    {
+      "id": "sold-23",
+      "created": "2026-09-23T12:00:00Z",
+      "lotId": "initial-NS-PRE-005",
+      "qty": -1,
+      "kind": "sale",
+      "ref": "VNS0008",
+      "note": "Entrega registrada en Excel; fecha de movimiento usa fecha de venta."
+    },
+    {
+      "id": "sold-24",
+      "created": "2026-09-30T12:00:00Z",
+      "lotId": "initial-NS-VIT-001",
+      "qty": -1,
+      "kind": "sale",
+      "ref": "VNS0009",
+      "note": "Entrega registrada en Excel; fecha de movimiento usa fecha de venta."
+    },
+    {
+      "id": "sold-25",
+      "created": "2026-09-30T12:00:00Z",
+      "lotId": "initial-NS-CAF-001",
+      "qty": -1,
+      "kind": "sale",
+      "ref": "VNS0009",
+      "note": "Entrega registrada en Excel; fecha de movimiento usa fecha de venta."
+    }
+  ],
+  "settings": [
+    {
+      "key": "sale:VNS0008",
+      "value": "{\"folio\": \"VNS0008\", \"dateOnly\": \"2026-09-23\", \"source\": \"Excel\", \"costEstimated\": true, \"notes\": \"Pagado y Entregado\", \"deliveryDate\": \"2026-09-23\"}"
+    },
+    {
+      "key": "sale:VNS0009",
+      "value": "{\"folio\": \"VNS0009\", \"dateOnly\": \"2026-09-30\", \"source\": \"Excel\", \"costEstimated\": true, \"notes\": \"Excel conciliado: D3 + K2 $369 y Coffee Fit $669; entrega 29/09 anterior a fecha de venta 30/09.\", \"deliveryDate\": \"2026-09-29\"}"
+    }
+  ],
+  "catalogue": [
+    {
+      "id": "NS-CAF-001",
+      "old": {
+        "id": "NS-CAF-001",
+        "sku": "NS-CAF-001",
+        "name": "Coffee Fit · Advance Labs Nutrition · 60 servicios",
+        "category": "Café funcional",
+        "price": 66900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-CAF-001",
+        "sku": "NS-CAF-001",
+        "name": "Coffee Fit · Advance Labs Nutrition · 60 servicios",
+        "category": "Café funcional",
+        "price": 66900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Coffee Fit",
+        "brand": "Advance Labs Nutrition",
+        "flavor": "Café",
+        "presentation": "60 servicios",
+        "page": 10,
+        "inventoryKnown": true,
+        "referenceCost": 44831,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Marca identificada en distribuidor; cotejar etiqueta.",
+        "excelRow": 14
+      },
+      "newMeta": {
+        "sourceName": "Coffee Fit",
+        "brand": "Advance Labs Nutrition",
+        "flavor": "Café",
+        "presentation": "60 servicios",
+        "page": 10,
+        "inventoryKnown": true,
+        "referenceCost": 44831,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Marca identificada en distribuidor; cotejar etiqueta.",
+        "excelRow": 14,
+        "description": "Café funcional de Advance Labs Nutrition. Coffee Fit. Presentación: 60 servicios. Sabor: Café."
+      }
+    },
+    {
+      "id": "NS-OME-001",
+      "old": {
+        "id": "NS-OME-001",
+        "sku": "NS-OME-001",
+        "name": "Omega 3 Salmon Oil · B Life · 90 cápsulas",
+        "category": "Omega 3",
+        "price": 27900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-OME-001",
+        "sku": "NS-OME-001",
+        "name": "Omega 3 Salmon Oil · B Life · 90 cápsulas",
+        "category": "Omega 3",
+        "price": 27900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Omega 3 Salmon Oil",
+        "brand": "B Life",
+        "flavor": "Sin Sabor",
+        "presentation": "90 cápsulas",
+        "page": 2,
+        "inventoryKnown": true,
+        "referenceCost": 19400,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Marca confirmada por el usuario. Completar sabor según etiqueta.",
+        "excelRow": 15
+      },
+      "newMeta": {
+        "sourceName": "Omega 3 Salmon Oil",
+        "brand": "B Life",
+        "flavor": "Sin Sabor",
+        "presentation": "90 cápsulas",
+        "page": 2,
+        "inventoryKnown": true,
+        "referenceCost": 19400,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Marca confirmada por el usuario. Completar sabor según etiqueta.",
+        "excelRow": 15,
+        "description": "Omega 3 de B Life. Omega 3 Salmon Oil. Presentación: 90 cápsulas."
+      }
+    },
+    {
+      "id": "NS-AMI-001",
+      "old": {
+        "id": "NS-AMI-001",
+        "sku": "NS-AMI-001",
+        "name": "AMINOx · BSN · 30 servicios",
+        "category": "Aminoácidos",
+        "price": 46900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-AMI-001",
+        "sku": "NS-AMI-001",
+        "name": "AMINOx · BSN · 30 servicios",
+        "category": "Aminoácidos",
+        "price": 46900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "AMINOx",
+        "brand": "BSN",
+        "flavor": "Watermelon",
+        "presentation": "30 servicios",
+        "page": 12,
+        "inventoryKnown": true,
+        "referenceCost": 32208,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. Completar sabor según la etiqueta.",
+        "excelRow": 16
+      },
+      "newMeta": {
+        "sourceName": "AMINOx",
+        "brand": "BSN",
+        "flavor": "Watermelon",
+        "presentation": "30 servicios",
+        "page": 12,
+        "inventoryKnown": true,
+        "referenceCost": 32208,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. Completar sabor según la etiqueta.",
+        "excelRow": 16,
+        "description": "Aminoácidos de BSN. AMINOx. Presentación: 30 servicios. Sabor: Watermelon."
+      }
+    },
+    {
+      "id": "NS-BEB-001",
+      "old": {
+        "id": "NS-BEB-001",
+        "sku": "NS-BEB-001",
+        "name": "C4 Energy Zero Sugar · Cellucor · 1 Lata",
+        "category": "Bebida energética",
+        "price": 5900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-BEB-001",
+        "sku": "NS-BEB-001",
+        "name": "C4 Energy Zero Sugar · Cellucor · 1 Lata",
+        "category": "Bebida energética",
+        "price": 5900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "C4 Energy Zero Sugar",
+        "brand": "Cellucor",
+        "flavor": "Diferentes Sabores",
+        "presentation": "1 Lata",
+        "page": 10,
+        "inventoryKnown": true,
+        "referenceCost": 4000,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. Confirmar volumen y si la unidad de venta es lata o paquete.",
+        "excelRow": 17
+      },
+      "newMeta": {
+        "sourceName": "C4 Energy Zero Sugar",
+        "brand": "Cellucor",
+        "flavor": "Diferentes Sabores",
+        "presentation": "1 Lata",
+        "page": 10,
+        "inventoryKnown": true,
+        "referenceCost": 4000,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. Confirmar volumen y si la unidad de venta es lata o paquete.",
+        "excelRow": 17,
+        "description": "Bebida energética de Cellucor. C4 Energy Zero Sugar. Presentación: 1 Lata. Sabor: Diferentes Sabores."
+      }
+    },
+    {
+      "id": "NS-CRE-001",
+      "old": {
+        "id": "NS-CRE-001",
+        "sku": "NS-CRE-001",
+        "name": "Creatine · Dragon Pharma · 300 g",
+        "category": "Creatina",
+        "price": 41900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-CRE-001",
+        "sku": "NS-CRE-001",
+        "name": "Creatine · Dragon Pharma · 300 g",
+        "category": "Creatina",
+        "price": 41900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Creatine",
+        "brand": "Dragon Pharma",
+        "flavor": "Sin Sabor",
+        "presentation": "300 g",
+        "page": 11,
+        "inventoryKnown": true,
+        "referenceCost": 29300,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Marca Dragon normalizada como Dragon Pharma; confirmar etiqueta.",
+        "excelRow": 18
+      },
+      "newMeta": {
+        "sourceName": "Creatine",
+        "brand": "Dragon Pharma",
+        "flavor": "Sin Sabor",
+        "presentation": "300 g",
+        "page": 11,
+        "inventoryKnown": true,
+        "referenceCost": 29300,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Marca Dragon normalizada como Dragon Pharma; confirmar etiqueta.",
+        "excelRow": 18,
+        "description": "Creatina de Dragon Pharma. Creatine. Presentación: 300 g."
+      }
+    },
+    {
+      "id": "NS-CRE-002",
+      "old": {
+        "id": "NS-CRE-002",
+        "sku": "NS-CRE-002",
+        "name": "Creatine · Dragon Pharma · 1 kg",
+        "category": "Creatina",
+        "price": 68900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-CRE-002",
+        "sku": "NS-CRE-002",
+        "name": "Creatine · Dragon Pharma · 1 kg",
+        "category": "Creatina",
+        "price": 68900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Creatine",
+        "brand": "Dragon Pharma",
+        "flavor": "Sin Sabor",
+        "presentation": "1 kg",
+        "page": 11,
+        "inventoryKnown": true,
+        "referenceCost": 46667,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Marca Dragon normalizada como Dragon Pharma; confirmar etiqueta.",
+        "excelRow": 19
+      },
+      "newMeta": {
+        "sourceName": "Creatine",
+        "brand": "Dragon Pharma",
+        "flavor": "Sin Sabor",
+        "presentation": "1 kg",
+        "page": 11,
+        "inventoryKnown": true,
+        "referenceCost": 46667,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Marca Dragon normalizada como Dragon Pharma; confirmar etiqueta.",
+        "excelRow": 19,
+        "description": "Creatina de Dragon Pharma. Creatine. Presentación: 1 kg."
+      }
+    },
+    {
+      "id": "NS-PRE-001",
+      "old": {
+        "id": "NS-PRE-001",
+        "sku": "NS-PRE-001",
+        "name": "Venom Inferno · Dragon Pharma · 30 Servicios",
+        "category": "Preentreno",
+        "price": 49900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-PRE-001",
+        "sku": "NS-PRE-001",
+        "name": "Venom Inferno · Dragon Pharma · 30 Servicios",
+        "category": "Preentreno",
+        "price": 49900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Venom Inferno",
+        "brand": "Dragon Pharma",
+        "flavor": "Dragon Lychee",
+        "presentation": "30 Servicios",
+        "page": 8,
+        "inventoryKnown": true,
+        "referenceCost": 42048,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "Excel 30 servicios; pedido 40. Confirmar presentación. Confirmar contenido del envase; no se asignó un tamaño por defecto.",
+        "excelRow": 20
+      },
+      "newMeta": {
+        "sourceName": "Venom Inferno",
+        "brand": "Dragon Pharma",
+        "flavor": "Dragon Lychee",
+        "presentation": "30 Servicios",
+        "page": 8,
+        "inventoryKnown": true,
+        "referenceCost": 42048,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "Excel 30 servicios; pedido 40. Confirmar presentación. Confirmar contenido del envase; no se asignó un tamaño por defecto.",
+        "excelRow": 20,
+        "description": "Preentreno de Dragon Pharma. Venom Inferno. Presentación: 30 Servicios. Sabor: Dragon Lychee."
+      }
+    },
+    {
+      "id": "NS-PRO-001",
+      "old": {
+        "id": "NS-PRO-001",
+        "sku": "NS-PRO-001",
+        "name": "ISO100 · Dymatize · 5 lb",
+        "category": "Proteína",
+        "price": 199900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-PRO-001",
+        "sku": "NS-PRO-001",
+        "name": "ISO100 · Dymatize · 5 lb",
+        "category": "Proteína",
+        "price": 199900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "ISO100",
+        "brand": "Dymatize",
+        "flavor": "Gourmet Chocolate",
+        "presentation": "5 lb",
+        "page": 5,
+        "inventoryKnown": true,
+        "referenceCost": 191200,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Completar sabor según la etiqueta.",
+        "excelRow": 21
+      },
+      "newMeta": {
+        "sourceName": "ISO100",
+        "brand": "Dymatize",
+        "flavor": "Gourmet Chocolate",
+        "presentation": "5 lb",
+        "page": 5,
+        "inventoryKnown": true,
+        "referenceCost": 191200,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Completar sabor según la etiqueta.",
+        "excelRow": 21,
+        "description": "Proteína de Dymatize. ISO100. Presentación: 5 lb. Sabor: Gourmet Chocolate."
+      }
+    },
+    {
+      "id": "NS-VIT-001",
+      "old": {
+        "id": "NS-VIT-001",
+        "sku": "NS-VIT-001",
+        "name": "D3 + K2 · Evogen · 60 Servicios",
+        "category": "Vitaminas",
+        "price": 36900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-VIT-001",
+        "sku": "NS-VIT-001",
+        "name": "D3 + K2 · Evogen · 60 Servicios",
+        "category": "Vitaminas",
+        "price": 36900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "D3 + K2",
+        "brand": "Evogen",
+        "flavor": "Sin Sabor",
+        "presentation": "60 Servicios",
+        "page": 2,
+        "inventoryKnown": true,
+        "referenceCost": 24180,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar unidades por envase y concentración.",
+        "excelRow": 22
+      },
+      "newMeta": {
+        "sourceName": "D3 + K2",
+        "brand": "Evogen",
+        "flavor": "Sin Sabor",
+        "presentation": "60 Servicios",
+        "page": 2,
+        "inventoryKnown": true,
+        "referenceCost": 24180,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar unidades por envase y concentración.",
+        "excelRow": 22,
+        "description": "Vitaminas de Evogen. D3 + K2. Presentación: 60 Servicios."
+      }
+    },
+    {
+      "id": "NS-SOP-001",
+      "old": {
+        "id": "NS-SOP-001",
+        "sku": "NS-SOP-001",
+        "name": "Testrol Gold · GAT Sport · 30 Servicios",
+        "category": "Soporte hormonal",
+        "price": 37900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-SOP-001",
+        "sku": "NS-SOP-001",
+        "name": "Testrol Gold · GAT Sport · 30 Servicios",
+        "category": "Soporte hormonal",
+        "price": 37900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Testrol Gold",
+        "brand": "GAT Sport",
+        "flavor": "Sin Sabor",
+        "presentation": "30 Servicios",
+        "page": 3,
+        "inventoryKnown": true,
+        "referenceCost": 26460,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Categoría comercial; confirmar versión y cantidad por envase.",
+        "excelRow": 23
+      },
+      "newMeta": {
+        "sourceName": "Testrol Gold",
+        "brand": "GAT Sport",
+        "flavor": "Sin Sabor",
+        "presentation": "30 Servicios",
+        "page": 3,
+        "inventoryKnown": true,
+        "referenceCost": 26460,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Categoría comercial; confirmar versión y cantidad por envase.",
+        "excelRow": 23,
+        "description": "Soporte hormonal de GAT Sport. Testrol Gold. Presentación: 30 Servicios."
+      }
+    },
+    {
+      "id": "NS-SOP-002",
+      "old": {
+        "id": "NS-SOP-002",
+        "sku": "NS-SOP-002",
+        "name": "Testrol 60 · GAT Sport · 60 Servicios",
+        "category": "Soporte hormonal",
+        "price": 34500,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-SOP-002",
+        "sku": "NS-SOP-002",
+        "name": "Testrol 60 · GAT Sport · 60 Servicios",
+        "category": "Soporte hormonal",
+        "price": 34500,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Testrol 60",
+        "brand": "GAT Sport",
+        "flavor": "Sin Sabor",
+        "presentation": "60 Servicios",
+        "page": 3,
+        "inventoryKnown": true,
+        "referenceCost": 22704,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar si 60 corresponde a tabletas o cápsulas y versión exacta.",
+        "excelRow": 24
+      },
+      "newMeta": {
+        "sourceName": "Testrol 60",
+        "brand": "GAT Sport",
+        "flavor": "Sin Sabor",
+        "presentation": "60 Servicios",
+        "page": 3,
+        "inventoryKnown": true,
+        "referenceCost": 22704,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar si 60 corresponde a tabletas o cápsulas y versión exacta.",
+        "excelRow": 24,
+        "description": "Soporte hormonal de GAT Sport. Testrol 60. Presentación: 60 Servicios."
+      }
+    },
+    {
+      "id": "NS-OME-002",
+      "old": {
+        "id": "NS-OME-002",
+        "sku": "NS-OME-002",
+        "name": "Omega 3 · GAT Sport · 60 Servicios",
+        "category": "Omega 3",
+        "price": 27900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-OME-002",
+        "sku": "NS-OME-002",
+        "name": "Omega 3 · GAT Sport · 60 Servicios",
+        "category": "Omega 3",
+        "price": 27900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Omega 3",
+        "brand": "GAT Sport",
+        "flavor": "Sin Sabor",
+        "presentation": "60 Servicios",
+        "page": 3,
+        "inventoryKnown": true,
+        "referenceCost": 19536,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar unidades y concentración.",
+        "excelRow": 25
+      },
+      "newMeta": {
+        "sourceName": "Omega 3",
+        "brand": "GAT Sport",
+        "flavor": "Sin Sabor",
+        "presentation": "60 Servicios",
+        "page": 3,
+        "inventoryKnown": true,
+        "referenceCost": 19536,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar unidades y concentración.",
+        "excelRow": 25,
+        "description": "Omega 3 de GAT Sport. Omega 3. Presentación: 60 Servicios."
+      }
+    },
+    {
+      "id": "NS-CRE-003",
+      "old": {
+        "id": "NS-CRE-003",
+        "sku": "NS-CRE-003",
+        "name": "Creatine · GAT Sport · 1 kg",
+        "category": "Creatina",
+        "price": 63900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-CRE-003",
+        "sku": "NS-CRE-003",
+        "name": "Creatine · GAT Sport · 1 kg",
+        "category": "Creatina",
+        "price": 63900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Creatine",
+        "brand": "GAT Sport",
+        "flavor": "Sin Sabor",
+        "presentation": "1 kg",
+        "page": 11,
+        "inventoryKnown": true,
+        "referenceCost": 55176,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Completar sabor según la etiqueta.",
+        "excelRow": 26
+      },
+      "newMeta": {
+        "sourceName": "Creatine",
+        "brand": "GAT Sport",
+        "flavor": "Sin Sabor",
+        "presentation": "1 kg",
+        "page": 11,
+        "inventoryKnown": true,
+        "referenceCost": 55176,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Completar sabor según la etiqueta.",
+        "excelRow": 26,
+        "description": "Creatina de GAT Sport. Creatine. Presentación: 1 kg."
+      }
+    },
+    {
+      "id": "NS-CRE-004",
+      "old": {
+        "id": "NS-CRE-004",
+        "sku": "NS-CRE-004",
+        "name": "Creatine · GAT Sport · 300 g",
+        "category": "Creatina",
+        "price": 36900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-CRE-004",
+        "sku": "NS-CRE-004",
+        "name": "Creatine · GAT Sport · 300 g",
+        "category": "Creatina",
+        "price": 36900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Creatine",
+        "brand": "GAT Sport",
+        "flavor": "Sin Sabor",
+        "presentation": "300 g",
+        "page": 11,
+        "inventoryKnown": true,
+        "referenceCost": 26200,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Completar sabor según la etiqueta.",
+        "excelRow": 27
+      },
+      "newMeta": {
+        "sourceName": "Creatine",
+        "brand": "GAT Sport",
+        "flavor": "Sin Sabor",
+        "presentation": "300 g",
+        "page": 11,
+        "inventoryKnown": true,
+        "referenceCost": 26200,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Completar sabor según la etiqueta.",
+        "excelRow": 27,
+        "description": "Creatina de GAT Sport. Creatine. Presentación: 300 g."
+      }
+    },
+    {
+      "id": "NS-PRE-002",
+      "old": {
+        "id": "NS-PRE-002",
+        "sku": "NS-PRE-002",
+        "name": "Nitraflex · GAT Sport · 300 g",
+        "category": "Preentreno",
+        "price": 45900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-PRE-002",
+        "sku": "NS-PRE-002",
+        "name": "Nitraflex · GAT Sport · 300 g",
+        "category": "Preentreno",
+        "price": 45900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Nitraflex",
+        "brand": "GAT Sport",
+        "flavor": "Watermelon",
+        "presentation": "300 g",
+        "page": 8,
+        "inventoryKnown": true,
+        "referenceCost": 31680,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. Completar sabor según la etiqueta.",
+        "excelRow": 28
+      },
+      "newMeta": {
+        "sourceName": "Nitraflex",
+        "brand": "GAT Sport",
+        "flavor": "Watermelon",
+        "presentation": "300 g",
+        "page": 8,
+        "inventoryKnown": true,
+        "referenceCost": 31680,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. Completar sabor según la etiqueta.",
+        "excelRow": 28,
+        "description": "Preentreno de GAT Sport. Nitraflex. Presentación: 300 g. Sabor: Watermelon."
+      }
+    },
+    {
+      "id": "NS-VIT-002",
+      "old": {
+        "id": "NS-VIT-002",
+        "sku": "NS-VIT-002",
+        "name": "Vitamin C + Glutathione · Ghost Life · Por confirmar",
+        "category": "Vitaminas",
+        "price": 47900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-VIT-002",
+        "sku": "NS-VIT-002",
+        "name": "Vitamin C + Glutathione · Ghost Life · Por confirmar",
+        "category": "Vitaminas",
+        "price": 47900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Vitamin C + Glutathione",
+        "brand": "Ghost Life",
+        "flavor": "Sin Sabor",
+        "presentation": "Por confirmar",
+        "page": 2,
+        "inventoryKnown": true,
+        "referenceCost": 33465,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar presentación y concentración.",
+        "excelRow": 29
+      },
+      "newMeta": {
+        "sourceName": "Vitamin C + Glutathione",
+        "brand": "Ghost Life",
+        "flavor": "Sin Sabor",
+        "presentation": "Por confirmar",
+        "page": 2,
+        "inventoryKnown": true,
+        "referenceCost": 33465,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar presentación y concentración.",
+        "excelRow": 29,
+        "description": "Vitaminas de Ghost Life. Vitamin C + Glutathione."
+      }
+    },
+    {
+      "id": "NS-VIT-003",
+      "old": {
+        "id": "NS-VIT-003",
+        "sku": "NS-VIT-003",
+        "name": "Vitamin D3 · Hi-Tech · Por confirmar",
+        "category": "Vitaminas",
+        "price": 28900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-VIT-003",
+        "sku": "NS-VIT-003",
+        "name": "Vitamin D3 · Hi-Tech · Por confirmar",
+        "category": "Vitaminas",
+        "price": 28900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Vitamin D3",
+        "brand": "Hi-Tech",
+        "flavor": "Sin Sabor",
+        "presentation": "Por confirmar",
+        "page": 2,
+        "inventoryKnown": true,
+        "referenceCost": 20234,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar presentación y concentración.",
+        "excelRow": 30
+      },
+      "newMeta": {
+        "sourceName": "Vitamin D3",
+        "brand": "Hi-Tech",
+        "flavor": "Sin Sabor",
+        "presentation": "Por confirmar",
+        "page": 2,
+        "inventoryKnown": true,
+        "referenceCost": 20234,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar presentación y concentración.",
+        "excelRow": 30,
+        "description": "Vitaminas de Hi-Tech. Vitamin D3."
+      }
+    },
+    {
+      "id": "NS-PRE-003",
+      "old": {
+        "id": "NS-PRE-003",
+        "sku": "NS-PRE-003",
+        "name": "Psychotic Test · Insane Labz · Por confirmar",
+        "category": "Preentreno",
+        "price": 49900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-PRE-003",
+        "sku": "NS-PRE-003",
+        "name": "Psychotic Test · Insane Labz · Por confirmar",
+        "category": "Preentreno",
+        "price": 49900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Psychotic Test",
+        "brand": "Insane Labz",
+        "flavor": "Grape",
+        "presentation": "Por confirmar",
+        "page": 8,
+        "inventoryKnown": true,
+        "referenceCost": 41600,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. Confirmar cantidad de servicios del envase.",
+        "excelRow": 31
+      },
+      "newMeta": {
+        "sourceName": "Psychotic Test",
+        "brand": "Insane Labz",
+        "flavor": "Grape",
+        "presentation": "Por confirmar",
+        "page": 8,
+        "inventoryKnown": true,
+        "referenceCost": 41600,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. Confirmar cantidad de servicios del envase.",
+        "excelRow": 31,
+        "description": "Preentreno de Insane Labz. Psychotic Test. Sabor: Grape."
+      }
+    },
+    {
+      "id": "NS-AMI-002",
+      "old": {
+        "id": "NS-AMI-002",
+        "sku": "NS-AMI-002",
+        "name": "Demon BCAA · Insane Labz · Por confirmar",
+        "category": "Aminoácidos",
+        "price": 43900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-AMI-002",
+        "sku": "NS-AMI-002",
+        "name": "Demon BCAA · Insane Labz · Por confirmar",
+        "category": "Aminoácidos",
+        "price": 43900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Demon BCAA",
+        "brand": "Insane Labz",
+        "flavor": "Blue Raspberry",
+        "presentation": "Por confirmar",
+        "page": 12,
+        "inventoryKnown": true,
+        "referenceCost": 30400,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. La marca publica 60 servicios; cotejar el envase antes de asignarlos.",
+        "excelRow": 32
+      },
+      "newMeta": {
+        "sourceName": "Demon BCAA",
+        "brand": "Insane Labz",
+        "flavor": "Blue Raspberry",
+        "presentation": "Por confirmar",
+        "page": 12,
+        "inventoryKnown": true,
+        "referenceCost": 30400,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. La marca publica 60 servicios; cotejar el envase antes de asignarlos.",
+        "excelRow": 32,
+        "description": "Aminoácidos de Insane Labz. Demon BCAA. Sabor: Blue Raspberry."
+      }
+    },
+    {
+      "id": "NS-PRE-004",
+      "old": {
+        "id": "NS-PRE-004",
+        "sku": "NS-PRE-004",
+        "name": "Psychotic · Insane Labz · 35 servicios",
+        "category": "Preentreno",
+        "price": 43900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-PRE-004",
+        "sku": "NS-PRE-004",
+        "name": "Psychotic · Insane Labz · 35 servicios",
+        "category": "Preentreno",
+        "price": 43900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Psychotic",
+        "brand": "Insane Labz",
+        "flavor": "Grape",
+        "presentation": "35 servicios",
+        "page": 8,
+        "inventoryKnown": true,
+        "referenceCost": 35600,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " El 35 de la lista corresponde a la variante de 35 servicios.",
+        "excelRow": 33
+      },
+      "newMeta": {
+        "sourceName": "Psychotic",
+        "brand": "Insane Labz",
+        "flavor": "Grape",
+        "presentation": "35 servicios",
+        "page": 8,
+        "inventoryKnown": true,
+        "referenceCost": 35600,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " El 35 de la lista corresponde a la variante de 35 servicios.",
+        "excelRow": 33,
+        "description": "Preentreno de Insane Labz. Psychotic. Presentación: 35 servicios. Sabor: Grape."
+      }
+    },
+    {
+      "id": "NS-PRE-005",
+      "old": {
+        "id": "NS-PRE-005",
+        "sku": "NS-PRE-005",
+        "name": "Psychotic Gold · Insane Labz · Por confirmar",
+        "category": "Preentreno",
+        "price": 46900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-PRE-005",
+        "sku": "NS-PRE-005",
+        "name": "Psychotic Gold · Insane Labz · Por confirmar",
+        "category": "Preentreno",
+        "price": 46900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Psychotic Gold",
+        "brand": "Insane Labz",
+        "flavor": "Fruit Punch",
+        "presentation": "Por confirmar",
+        "page": 9,
+        "inventoryKnown": true,
+        "referenceCost": 37800,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar cantidad de servicios.",
+        "excelRow": 34
+      },
+      "newMeta": {
+        "sourceName": "Psychotic Gold",
+        "brand": "Insane Labz",
+        "flavor": "Fruit Punch",
+        "presentation": "30 Servicios",
+        "page": 9,
+        "inventoryKnown": true,
+        "referenceCost": 37800,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar cantidad de servicios.",
+        "excelRow": 34,
+        "description": "Preentreno de Insane Labz. Psychotic Gold. Presentación: 30 Servicios. Sabor: Fruit Punch."
+      }
+    },
+    {
+      "id": "NS-PRE-006",
+      "old": {
+        "id": "NS-PRE-006",
+        "sku": "NS-PRE-006",
+        "name": "Psychotic Gold muestra · Insane Labz · 1 Servicio",
+        "category": "Preentreno",
+        "price": 2900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-PRE-006",
+        "sku": "NS-PRE-006",
+        "name": "Psychotic Gold muestra · Insane Labz · 1 Servicio",
+        "category": "Preentreno",
+        "price": 2900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Psychotic Gold muestra",
+        "brand": "Insane Labz",
+        "flavor": "Diferentes Sabores",
+        "presentation": "1 Servicio",
+        "page": 9,
+        "inventoryKnown": true,
+        "referenceCost": 1800,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. Confirmar gramos/servicios de la muestra y sabor.",
+        "excelRow": 35
+      },
+      "newMeta": {
+        "sourceName": "Psychotic Gold muestra",
+        "brand": "Insane Labz",
+        "flavor": "Diferentes Sabores",
+        "presentation": "1 Servicio",
+        "page": 9,
+        "inventoryKnown": true,
+        "referenceCost": 1800,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. Confirmar gramos/servicios de la muestra y sabor.",
+        "excelRow": 35,
+        "description": "Preentreno de Insane Labz. Psychotic Gold muestra. Presentación: 1 Servicio. Sabor: Diferentes Sabores."
+      }
+    },
+    {
+      "id": "NS-AMI-003",
+      "old": {
+        "id": "NS-AMI-003",
+        "sku": "NS-AMI-003",
+        "name": "Killer BCAA · Killer Labz · Por confirmar",
+        "category": "Aminoácidos",
+        "price": 42900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-AMI-003",
+        "sku": "NS-AMI-003",
+        "name": "Killer BCAA · Killer Labz · Por confirmar",
+        "category": "Aminoácidos",
+        "price": 42900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Killer BCAA",
+        "brand": "Killer Labz",
+        "flavor": "Furious Punch",
+        "presentation": "Por confirmar",
+        "page": 12,
+        "inventoryKnown": true,
+        "referenceCost": 29900,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. Marca asociada a Brute BCAA; confirmar modelo exacto de la etiqueta.",
+        "excelRow": 36
+      },
+      "newMeta": {
+        "sourceName": "Killer BCAA",
+        "brand": "Killer Labz",
+        "flavor": "Furious Punch",
+        "presentation": "Por confirmar",
+        "page": 12,
+        "inventoryKnown": true,
+        "referenceCost": 29900,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. Marca asociada a Brute BCAA; confirmar modelo exacto de la etiqueta.",
+        "excelRow": 36,
+        "description": "Aminoácidos de Killer Labz. Killer BCAA. Sabor: Furious Punch."
+      }
+    },
+    {
+      "id": "NS-PRE-007",
+      "old": {
+        "id": "NS-PRE-007",
+        "sku": "NS-PRE-007",
+        "name": "NitroTest · MuscleMeds · Por confirmar",
+        "category": "Preentreno",
+        "price": 58900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-PRE-007",
+        "sku": "NS-PRE-007",
+        "name": "NitroTest · MuscleMeds · Por confirmar",
+        "category": "Preentreno",
+        "price": 58900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "NitroTest",
+        "brand": "MuscleMeds",
+        "flavor": "Watermelon",
+        "presentation": "Por confirmar",
+        "page": 9,
+        "inventoryKnown": true,
+        "referenceCost": 40800,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Preentreno según fabricante; confirmar cantidad de servicios.",
+        "excelRow": 37
+      },
+      "newMeta": {
+        "sourceName": "NitroTest",
+        "brand": "MuscleMeds",
+        "flavor": "Watermelon",
+        "presentation": "Por confirmar",
+        "page": 9,
+        "inventoryKnown": true,
+        "referenceCost": 40800,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Preentreno según fabricante; confirmar cantidad de servicios.",
+        "excelRow": 37,
+        "description": "Preentreno de MuscleMeds. NitroTest. Sabor: Watermelon."
+      }
+    },
+    {
+      "id": "NS-PRO-002",
+      "old": {
+        "id": "NS-PRO-002",
+        "sku": "NS-PRO-002",
+        "name": "Nitro-Tech Gold · MuscleTech · 5 lb",
+        "category": "Proteína",
+        "price": 139900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-PRO-002",
+        "sku": "NS-PRO-002",
+        "name": "Nitro-Tech Gold · MuscleTech · 5 lb",
+        "category": "Proteína",
+        "price": 139900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Nitro-Tech Gold",
+        "brand": "MuscleTech",
+        "flavor": "Vainilla Ice Cream",
+        "presentation": "5 lb",
+        "page": 5,
+        "inventoryKnown": true,
+        "referenceCost": 129492,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar que la versión de la etiqueta sea 100% Whey Gold.",
+        "excelRow": 38
+      },
+      "newMeta": {
+        "sourceName": "Nitro-Tech Gold",
+        "brand": "MuscleTech",
+        "flavor": "Vainilla Ice Cream",
+        "presentation": "5 lb",
+        "page": 5,
+        "inventoryKnown": true,
+        "referenceCost": 129492,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar que la versión de la etiqueta sea 100% Whey Gold.",
+        "excelRow": 38,
+        "description": "Proteína de MuscleTech. Nitro-Tech Gold. Presentación: 5 lb. Sabor: Vainilla Ice Cream."
+      }
+    },
+    {
+      "id": "NS-PRO-003",
+      "old": {
+        "id": "NS-PRO-003",
+        "sku": "NS-PRO-003",
+        "name": "Nitro-Tech Ripped · MuscleTech · 4 lb",
+        "category": "Proteína",
+        "price": 124900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-PRO-003",
+        "sku": "NS-PRO-003",
+        "name": "Nitro-Tech Ripped · MuscleTech · 4 lb",
+        "category": "Proteína",
+        "price": 124900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Nitro-Tech Ripped",
+        "brand": "MuscleTech",
+        "flavor": "Chocolate Fugde Brownie",
+        "presentation": "4 lb",
+        "page": 5,
+        "inventoryKnown": true,
+        "referenceCost": 104803,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Completar sabor según la etiqueta.",
+        "excelRow": 39
+      },
+      "newMeta": {
+        "sourceName": "Nitro-Tech Ripped",
+        "brand": "MuscleTech",
+        "flavor": "Chocolate Fugde Brownie",
+        "presentation": "4 lb",
+        "page": 5,
+        "inventoryKnown": true,
+        "referenceCost": 104803,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Completar sabor según la etiqueta.",
+        "excelRow": 39,
+        "description": "Proteína de MuscleTech. Nitro-Tech Ripped. Presentación: 4 lb. Sabor: Chocolate Fugde Brownie."
+      }
+    },
+    {
+      "id": "NS-AMI-004",
+      "old": {
+        "id": "NS-AMI-004",
+        "sku": "NS-AMI-004",
+        "name": "Hardcore BCAA · Mutant · 30 Servicios",
+        "category": "Aminoácidos",
+        "price": 31900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-AMI-004",
+        "sku": "NS-AMI-004",
+        "name": "Hardcore BCAA · Mutant · 30 Servicios",
+        "category": "Aminoácidos",
+        "price": 31900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Hardcore BCAA",
+        "brand": "Mutant",
+        "flavor": "Watermelon",
+        "presentation": "30 Servicios",
+        "page": 12,
+        "inventoryKnown": true,
+        "referenceCost": 22044,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. Confirmar gramos o servicios del envase.",
+        "excelRow": 40
+      },
+      "newMeta": {
+        "sourceName": "Hardcore BCAA",
+        "brand": "Mutant",
+        "flavor": "Watermelon",
+        "presentation": "30 Servicios",
+        "page": 12,
+        "inventoryKnown": true,
+        "referenceCost": 22044,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. Confirmar gramos o servicios del envase.",
+        "excelRow": 40,
+        "description": "Aminoácidos de Mutant. Hardcore BCAA. Presentación: 30 Servicios. Sabor: Watermelon."
+      }
+    },
+    {
+      "id": "NS-PRO-004",
+      "old": {
+        "id": "NS-PRO-004",
+        "sku": "NS-PRO-004",
+        "name": "Whey · Mutant · 5 lb",
+        "category": "Proteína",
+        "price": 94900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-PRO-004",
+        "sku": "NS-PRO-004",
+        "name": "Whey · Mutant · 5 lb",
+        "category": "Proteína",
+        "price": 94900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Whey",
+        "brand": "Mutant",
+        "flavor": "Chocolate",
+        "presentation": "5 lb",
+        "page": 5,
+        "inventoryKnown": true,
+        "referenceCost": 84876,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Completar sabor según la etiqueta.",
+        "excelRow": 41
+      },
+      "newMeta": {
+        "sourceName": "Whey",
+        "brand": "Mutant",
+        "flavor": "Chocolate",
+        "presentation": "5 lb",
+        "page": 5,
+        "inventoryKnown": true,
+        "referenceCost": 84876,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Completar sabor según la etiqueta.",
+        "excelRow": 41,
+        "description": "Proteína de Mutant. Whey. Presentación: 5 lb. Sabor: Chocolate."
+      }
+    },
+    {
+      "id": "NS-GAN-001",
+      "old": {
+        "id": "NS-GAN-001",
+        "sku": "NS-GAN-001",
+        "name": "Mass · Mutant · 6 lb",
+        "category": "Ganador de peso",
+        "price": 53900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-GAN-001",
+        "sku": "NS-GAN-001",
+        "name": "Mass · Mutant · 6 lb",
+        "category": "Ganador de peso",
+        "price": 53900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Mass",
+        "brand": "Mutant",
+        "flavor": "Cookies & Cream",
+        "presentation": "6 lb",
+        "page": 7,
+        "inventoryKnown": true,
+        "referenceCost": 37620,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar si corresponde a Mass o a Mass Extreme.",
+        "excelRow": 42
+      },
+      "newMeta": {
+        "sourceName": "Mass",
+        "brand": "Mutant",
+        "flavor": "Cookies & Cream",
+        "presentation": "6 lb",
+        "page": 7,
+        "inventoryKnown": true,
+        "referenceCost": 37620,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar si corresponde a Mass o a Mass Extreme.",
+        "excelRow": 42,
+        "description": "Ganador de peso de Mutant. Mass. Presentación: 6 lb. Sabor: Cookies & Cream."
+      }
+    },
+    {
+      "id": "NS-AMI-005",
+      "old": {
+        "id": "NS-AMI-005",
+        "sku": "NS-AMI-005",
+        "name": "Amino Energy · Optimum Nutrition · Por confirmar",
+        "category": "Aminoácidos",
+        "price": 45900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-AMI-005",
+        "sku": "NS-AMI-005",
+        "name": "Amino Energy · Optimum Nutrition · Por confirmar",
+        "category": "Aminoácidos",
+        "price": 45900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Amino Energy",
+        "brand": "Optimum Nutrition",
+        "flavor": "Tropical Sunrise",
+        "presentation": "Por confirmar",
+        "page": 13,
+        "inventoryKnown": true,
+        "referenceCost": 32076,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. La marca ofrece varias presentaciones; confirmar tamaño y versión.",
+        "excelRow": 43
+      },
+      "newMeta": {
+        "sourceName": "Amino Energy",
+        "brand": "Optimum Nutrition",
+        "flavor": "Tropical Sunrise",
+        "presentation": "Por confirmar",
+        "page": 13,
+        "inventoryKnown": true,
+        "referenceCost": 32076,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "El Excel agrupa existencias de sabores. El pedido/catálogo incluye otras variantes; no se inventó un reparto por sabor. La marca ofrece varias presentaciones; confirmar tamaño y versión.",
+        "excelRow": 43,
+        "description": "Aminoácidos de Optimum Nutrition. Amino Energy. Sabor: Tropical Sunrise."
+      }
+    },
+    {
+      "id": "NS-PRE-008",
+      "old": {
+        "id": "NS-PRE-008",
+        "sku": "NS-PRE-008",
+        "name": "CBUM Essential · RAW Nutrition · Por confirmar",
+        "category": "Preentreno",
+        "price": 51900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-PRE-008",
+        "sku": "NS-PRE-008",
+        "name": "CBUM Essential · RAW Nutrition · Por confirmar",
+        "category": "Preentreno",
+        "price": 51900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "CBUM Essential",
+        "brand": "RAW Nutrition",
+        "flavor": "Champion Mentality",
+        "presentation": "Por confirmar",
+        "page": 9,
+        "inventoryKnown": true,
+        "referenceCost": 34716,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar cantidad de servicios y versión Essential.",
+        "excelRow": 44
+      },
+      "newMeta": {
+        "sourceName": "CBUM Essential",
+        "brand": "RAW Nutrition",
+        "flavor": "Champion Mentality",
+        "presentation": "Por confirmar",
+        "page": 9,
+        "inventoryKnown": true,
+        "referenceCost": 34716,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar cantidad de servicios y versión Essential.",
+        "excelRow": 44,
+        "description": "Preentreno de RAW Nutrition. CBUM Essential. Sabor: Champion Mentality."
+      }
+    },
+    {
+      "id": "NS-PRE-009",
+      "old": {
+        "id": "NS-PRE-009",
+        "sku": "NS-PRE-009",
+        "name": "CBUM Charged · RAW Nutrition · Por confirmar",
+        "category": "Preentreno",
+        "price": 56900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-PRE-009",
+        "sku": "NS-PRE-009",
+        "name": "CBUM Charged · RAW Nutrition · Por confirmar",
+        "category": "Preentreno",
+        "price": 56900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "CBUM Charged",
+        "brand": "RAW Nutrition",
+        "flavor": "Blue Rathberry",
+        "presentation": "Por confirmar",
+        "page": 10,
+        "inventoryKnown": true,
+        "referenceCost": 39864,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar cantidad de servicios.",
+        "excelRow": 45
+      },
+      "newMeta": {
+        "sourceName": "CBUM Charged",
+        "brand": "RAW Nutrition",
+        "flavor": "Blue Rathberry",
+        "presentation": "Por confirmar",
+        "page": 10,
+        "inventoryKnown": true,
+        "referenceCost": 39864,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar cantidad de servicios.",
+        "excelRow": 45,
+        "description": "Preentreno de RAW Nutrition. CBUM Charged. Sabor: Blue Rathberry."
+      }
+    },
+    {
+      "id": "NS-PRO-005",
+      "old": {
+        "id": "NS-PRO-005",
+        "sku": "NS-PRO-005",
+        "name": "Isolate · RAW Nutrition · Por confirmar",
+        "category": "Proteína",
+        "price": 113900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-PRO-005",
+        "sku": "NS-PRO-005",
+        "name": "Isolate · RAW Nutrition · Por confirmar",
+        "category": "Proteína",
+        "price": 113900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Isolate",
+        "brand": "RAW Nutrition",
+        "flavor": "Nieve Napolitano",
+        "presentation": "Por confirmar",
+        "page": 6,
+        "inventoryKnown": true,
+        "referenceCost": 76033,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar peso neto.",
+        "excelRow": 46
+      },
+      "newMeta": {
+        "sourceName": "Isolate",
+        "brand": "RAW Nutrition",
+        "flavor": "Nieve Napolitano",
+        "presentation": "Por confirmar",
+        "page": 6,
+        "inventoryKnown": true,
+        "referenceCost": 76033,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar peso neto.",
+        "excelRow": 46,
+        "description": "Proteína de RAW Nutrition. Isolate. Sabor: Nieve Napolitano."
+      }
+    },
+    {
+      "id": "NS-OME-003",
+      "old": {
+        "id": "NS-OME-003",
+        "sku": "NS-OME-003",
+        "name": "Omega 3 · Ronnie Coleman Signature Series · Por confirmar",
+        "category": "Omega 3",
+        "price": 21900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-OME-003",
+        "sku": "NS-OME-003",
+        "name": "Omega 3 · Ronnie Coleman Signature Series · Por confirmar",
+        "category": "Omega 3",
+        "price": 21900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Omega 3",
+        "brand": "Ronnie Coleman Signature Series",
+        "flavor": "Sin Sabor",
+        "presentation": "Por confirmar",
+        "page": 3,
+        "inventoryKnown": true,
+        "referenceCost": 14800,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar unidades y concentración.",
+        "excelRow": 47
+      },
+      "newMeta": {
+        "sourceName": "Omega 3",
+        "brand": "Ronnie Coleman Signature Series",
+        "flavor": "Sin Sabor",
+        "presentation": "Por confirmar",
+        "page": 3,
+        "inventoryKnown": true,
+        "referenceCost": 14800,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar unidades y concentración.",
+        "excelRow": 47,
+        "description": "Omega 3 de Ronnie Coleman Signature Series. Omega 3."
+      }
+    },
+    {
+      "id": "NS-PRO-006",
+      "old": {
+        "id": "NS-PRO-006",
+        "sku": "NS-PRO-006",
+        "name": "Whey Isolate · SD Nutrition · 1 kg",
+        "category": "Proteína",
+        "price": 35900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-PRO-006",
+        "sku": "NS-PRO-006",
+        "name": "Whey Isolate · SD Nutrition · 1 kg",
+        "category": "Proteína",
+        "price": 35900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Whey Isolate",
+        "brand": "SD Nutrition",
+        "flavor": "Vainilla Ice Cream",
+        "presentation": "1 kg",
+        "page": 6,
+        "inventoryKnown": true,
+        "referenceCost": 24900,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "Excel Vainilla; pedido Luneta de Chocolate. Confirmar etiqueta. Marca identificada en distribuidor; cotejar etiqueta.",
+        "excelRow": 48
+      },
+      "newMeta": {
+        "sourceName": "Whey Isolate",
+        "brand": "SD Nutrition",
+        "flavor": "Vainilla Ice Cream",
+        "presentation": "1 kg",
+        "page": 6,
+        "inventoryKnown": true,
+        "referenceCost": 24900,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "Excel Vainilla; pedido Luneta de Chocolate. Confirmar etiqueta. Marca identificada en distribuidor; cotejar etiqueta.",
+        "excelRow": 48,
+        "description": "Proteína de SD Nutrition. Whey Isolate. Presentación: 1 kg. Sabor: Vainilla Ice Cream."
+      }
+    },
+    {
+      "id": "NS-PRE-010",
+      "old": {
+        "id": "NS-PRE-010",
+        "sku": "NS-PRE-010",
+        "name": "Joker · Terror Labz · 30 Servicios",
+        "category": "Preentreno",
+        "price": 51900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-PRE-010",
+        "sku": "NS-PRE-010",
+        "name": "Joker · Terror Labz · 30 Servicios",
+        "category": "Preentreno",
+        "price": 51900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Joker",
+        "brand": "Terror Labz",
+        "flavor": "Blood Orange",
+        "presentation": "30 Servicios",
+        "page": 10,
+        "inventoryKnown": true,
+        "referenceCost": 36168,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Marca identificada en distribuidor; confirmar servicios del envase.",
+        "excelRow": 49
+      },
+      "newMeta": {
+        "sourceName": "Joker",
+        "brand": "Terror Labz",
+        "flavor": "Blood Orange",
+        "presentation": "30 Servicios",
+        "page": 10,
+        "inventoryKnown": true,
+        "referenceCost": 36168,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Marca identificada en distribuidor; confirmar servicios del envase.",
+        "excelRow": 49,
+        "description": "Preentreno de Terror Labz. Joker. Presentación: 30 Servicios. Sabor: Blood Orange."
+      }
+    },
+    {
+      "id": "NS-PRO-007",
+      "old": {
+        "id": "NS-PRO-007",
+        "sku": "NS-PRO-007",
+        "name": "Unique Whey · Unique Nutrition · 5 lb",
+        "category": "Proteína",
+        "price": 52900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-PRO-007",
+        "sku": "NS-PRO-007",
+        "name": "Unique Whey · Unique Nutrition · 5 lb",
+        "category": "Proteína",
+        "price": 52900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Unique Whey",
+        "brand": "Unique Nutrition",
+        "flavor": "Chocolate",
+        "presentation": "5 lb",
+        "page": 6,
+        "inventoryKnown": true,
+        "referenceCost": 36600,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "Excel 3 unidades; pedido 2. Confirmar la tercera unidad y costo. Choco y Chocolate unificados por el usuario. Confirmar marca en etiqueta.",
+        "excelRow": 50
+      },
+      "newMeta": {
+        "sourceName": "Unique Whey",
+        "brand": "Unique Nutrition",
+        "flavor": "Chocolate",
+        "presentation": "5 lb",
+        "page": 6,
+        "inventoryKnown": true,
+        "referenceCost": 36600,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "Excel 3 unidades; pedido 2. Confirmar la tercera unidad y costo. Choco y Chocolate unificados por el usuario. Confirmar marca en etiqueta.",
+        "excelRow": 50,
+        "description": "Proteína de Unique Nutrition. Unique Whey. Presentación: 5 lb. Sabor: Chocolate."
+      }
+    },
+    {
+      "id": "NS-PRO-008",
+      "old": {
+        "id": "NS-PRO-008",
+        "sku": "NS-PRO-008",
+        "name": "Whey HD · BPI Sports · 4 lb",
+        "category": "Proteína",
+        "price": 154900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-PRO-008",
+        "sku": "NS-PRO-008",
+        "name": "Whey HD · BPI Sports · 4 lb",
+        "category": "Proteína",
+        "price": 154900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Whey HD",
+        "brand": "BPI Sports",
+        "flavor": "Chocolate",
+        "presentation": "4 lb",
+        "page": 6,
+        "inventoryKnown": true,
+        "referenceCost": 105554,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "Excel 3 unidades Chocolate; pedido 2 Milk & Cookies. Confirmar cantidad, variante y costo. Completar sabor según la etiqueta.",
+        "excelRow": 51
+      },
+      "newMeta": {
+        "sourceName": "Whey HD",
+        "brand": "BPI Sports",
+        "flavor": "Chocolate",
+        "presentation": "4 lb",
+        "page": 6,
+        "inventoryKnown": true,
+        "referenceCost": 105554,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "Excel 3 unidades Chocolate; pedido 2 Milk & Cookies. Confirmar cantidad, variante y costo. Completar sabor según la etiqueta.",
+        "excelRow": 51,
+        "description": "Proteína de BPI Sports. Whey HD. Presentación: 4 lb. Sabor: Chocolate."
+      }
+    },
+    {
+      "id": "NS-BAR-001",
+      "old": {
+        "id": "NS-BAR-001",
+        "sku": "NS-BAR-001",
+        "name": "Muscle Sandwich · Muscle Sandwich · 1 barra",
+        "category": "Barra proteica",
+        "price": 3900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-BAR-001",
+        "sku": "NS-BAR-001",
+        "name": "Muscle Sandwich · Muscle Sandwich · 1 barra",
+        "category": "Barra proteica",
+        "price": 3900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Muscle Sandwich",
+        "brand": "Muscle Sandwich",
+        "flavor": "Peanut Butter",
+        "presentation": "1 barra",
+        "page": 4,
+        "inventoryKnown": true,
+        "referenceCost": 2353,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar sabor y peso por barra.",
+        "excelRow": 52
+      },
+      "newMeta": {
+        "sourceName": "Muscle Sandwich",
+        "brand": "Muscle Sandwich",
+        "flavor": "Peanut Butter",
+        "presentation": "1 barra",
+        "page": 4,
+        "inventoryKnown": true,
+        "referenceCost": 2353,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": " Confirmar sabor y peso por barra.",
+        "excelRow": 52,
+        "description": "Barra proteica de Muscle Sandwich. Muscle Sandwich. Presentación: 1 barra. Sabor: Peanut Butter."
+      }
+    },
+    {
+      "id": "NS-CAR-001",
+      "old": {
+        "id": "NS-CAR-001",
+        "sku": "NS-CAR-001",
+        "name": "Carnigen · Evogen Nutrition · 30 Servicios",
+        "category": "Carnitina",
+        "price": 50900,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-CAR-001",
+        "sku": "NS-CAR-001",
+        "name": "Carnigen · Evogen Nutrition · 30 Servicios",
+        "category": "Carnitina",
+        "price": 50900,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Carnigen",
+        "brand": "Evogen Nutrition",
+        "flavor": "Sin Sabor",
+        "presentation": "30 Servicios",
+        "page": 13,
+        "inventoryKnown": true,
+        "referenceCost": 33087,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "Excel Sin Sabor, 30 servicios; pedido Tropic Thunder, 50 servicios. Confirmar versión: polvo, líquido u otra; no se asignó tamaño por defecto.",
+        "excelRow": 53
+      },
+      "newMeta": {
+        "sourceName": "Carnigen",
+        "brand": "Evogen Nutrition",
+        "flavor": "Sin Sabor",
+        "presentation": "30 Servicios",
+        "page": 13,
+        "inventoryKnown": true,
+        "referenceCost": 33087,
+        "costSource": "Pedido 0635262; referencia sin envío ni seguro",
+        "notes": "Excel Sin Sabor, 30 servicios; pedido Tropic Thunder, 50 servicios. Confirmar versión: polvo, líquido u otra; no se asignó tamaño por defecto.",
+        "excelRow": 53,
+        "description": "Carnitina de Evogen Nutrition. Carnigen. Presentación: 30 Servicios."
+      }
+    },
+    {
+      "id": "NS-GLU-001",
+      "old": {
+        "id": "NS-GLU-001",
+        "sku": "NS-GLU-001",
+        "name": "Glutamine · Optimum Nutrition · 1 kg",
+        "category": "Glutamina",
+        "price": 117500,
+        "minimum": 1
+      },
+      "new": {
+        "id": "NS-GLU-001",
+        "sku": "NS-GLU-001",
+        "name": "Glutamine · Optimum Nutrition · 1 kg",
+        "category": "Glutamina",
+        "price": 117500,
+        "minimum": 1
+      },
+      "oldMeta": {
+        "sourceName": "Glutamine",
+        "brand": "Optimum Nutrition",
+        "flavor": "",
+        "presentation": "1 kg",
+        "page": 13,
+        "inventoryKnown": false,
+        "referenceCost": null,
+        "notes": "Solo en catálogo: inventario y costo pendientes."
+      },
+      "newMeta": {
+        "sourceName": "Glutamine",
+        "brand": "Optimum Nutrition",
+        "flavor": "",
+        "presentation": "1 kg",
+        "page": 13,
+        "inventoryKnown": false,
+        "referenceCost": null,
+        "notes": "Solo en catálogo: inventario y costo pendientes.",
+        "description": "Glutamina. Presentación: 1 kg."
+      }
+    }
+  ],
+  "importWarnings": [
+    "Los saldos son por medio de pago, pendientes de conciliar con bancos.",
+    "Costos de referencia del Pedido 0635262, sin envío de $500 ni seguro de $398.24; no se inventó la cuenta de pago.",
+    "Excel: 169 unidades iniciales. Pedido: 168 incluyendo una muestra de regalo ausente en Excel. Unique y BPI tienen 3 unidades en Excel y 2 en el pedido. Se conserva el Excel.",
+    "Sabores agregados y presentaciones por confirmar: revisar notas de cada producto. Las imágenes conservan las variantes originales del PDF.",
+    "Las ventas no presentes en el Excel no se añadieron a partir de conversaciones. No hay registros de campañas ni direcciones en las fuentes.",
+    "Los lotes importados son agrupaciones administrativas sin caducidad informada.",
+    "Glutamina: solo catálogo, sin existencias ni costo confirmados.",
+    "VNS0009: fecha de entrega 29/09 anterior a fecha de venta 30/09; revisar en Excel.",
+    "VNS0009 conciliada: NS-VIT-001 (D3 + K2) $369 y NS-CAF-001 (Coffee Fit) $669; total $1,038."
+  ],
+  "release": "2026-09-30"
+}

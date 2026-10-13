@@ -1,0 +1,479 @@
+{
+  "release": "2026-10-02-v08",
+  "sales": [
+    {
+      "id": "VNS0001",
+      "created": "2026-09-17T12:00:00Z",
+      "customer": "Fernanda Guerrero",
+      "lines": [
+        {
+          "id": "line-14",
+          "sourceRow": 14,
+          "productId": "NS-PRE-001",
+          "name": "Venom Inferno · Dragon Pharma · 30 Servicios",
+          "qty": 1,
+          "unitPrice": 49900,
+          "discount": 0,
+          "unitCost": 42048,
+          "delivered": 1
+        },
+        {
+          "id": "line-15",
+          "sourceRow": 15,
+          "productId": "NS-PRE-006",
+          "name": "Psychotic Gold muestra · Insane Labz · 1 Servicio",
+          "qty": 2,
+          "unitPrice": 3000,
+          "discount": 0,
+          "unitCost": 1800,
+          "delivered": 2
+        },
+        {
+          "id": "line-16",
+          "sourceRow": 16,
+          "productId": "NS-BEB-001",
+          "name": "C4 Energy Zero Sugar · Cellucor · 1 Lata",
+          "qty": 1,
+          "unitPrice": 6000,
+          "discount": 0,
+          "unitCost": 4000,
+          "delivered": 1
+        }
+      ],
+      "payments": [
+        {
+          "id": "pay-14-transfer",
+          "accountId": "transfer",
+          "amount": 49900,
+          "fee": 0
+        },
+        {
+          "id": "pay-15-transfer",
+          "accountId": "transfer",
+          "amount": 6000,
+          "fee": 0
+        },
+        {
+          "id": "pay-16-transfer",
+          "accountId": "transfer",
+          "amount": 6000,
+          "fee": 0
+        }
+      ],
+      "total": 61900,
+      "cost": 49648
+    },
+    {
+      "id": "VNS0002",
+      "created": "2026-09-17T12:00:00Z",
+      "customer": "Jesús Ventura",
+      "lines": [
+        {
+          "id": "line-17",
+          "sourceRow": 17,
+          "productId": "NS-CRE-003",
+          "name": "Creatine · GAT Sport · 1 kg",
+          "qty": 1,
+          "unitPrice": 63900,
+          "discount": 0,
+          "unitCost": 55176,
+          "delivered": 1
+        }
+      ],
+      "payments": [
+        {
+          "id": "pay-17-transfer",
+          "accountId": "transfer",
+          "amount": 63900,
+          "fee": 0
+        }
+      ],
+      "total": 63900,
+      "cost": 55176
+    },
+    {
+      "id": "VNS0003",
+      "created": "2026-09-18T12:00:00Z",
+      "customer": "Alejandra Calderon",
+      "lines": [
+        {
+          "id": "line-18",
+          "sourceRow": 18,
+          "productId": "NS-CRE-004",
+          "name": "Creatine · GAT Sport · 300 g",
+          "qty": 1,
+          "unitPrice": 36900,
+          "discount": 0,
+          "unitCost": 26200,
+          "delivered": 1
+        }
+      ],
+      "payments": [
+        {
+          "id": "pay-18-transfer",
+          "accountId": "transfer",
+          "amount": 36900,
+          "fee": 0
+        }
+      ],
+      "total": 36900,
+      "cost": 26200
+    },
+    {
+      "id": "VNS0004",
+      "created": "2026-09-18T12:00:00Z",
+      "customer": "Fernando Chávez",
+      "lines": [
+        {
+          "id": "line-19",
+          "sourceRow": 19,
+          "productId": "NS-CRE-003",
+          "name": "Creatine · GAT Sport · 1 kg",
+          "qty": 1,
+          "unitPrice": 63900,
+          "discount": 0,
+          "unitCost": 55176,
+          "delivered": 1
+        }
+      ],
+      "payments": [
+        {
+          "id": "pay-19-transfer",
+          "accountId": "transfer",
+          "amount": 63900,
+          "fee": 0
+        }
+      ],
+      "total": 63900,
+      "cost": 55176
+    },
+    {
+      "id": "VNS0005",
+      "created": "2026-09-18T12:00:00Z",
+      "customer": "Jesús Salazar",
+      "lines": [
+        {
+          "id": "line-20",
+          "sourceRow": 20,
+          "productId": "NS-CRE-003",
+          "name": "Creatine · GAT Sport · 1 kg",
+          "qty": 1,
+          "unitPrice": 63900,
+          "discount": 0,
+          "unitCost": 55176,
+          "delivered": 1
+        }
+      ],
+      "payments": [
+        {
+          "id": "pay-20-transfer",
+          "accountId": "transfer",
+          "amount": 63900,
+          "fee": 0
+        }
+      ],
+      "total": 63900,
+      "cost": 55176
+    },
+    {
+      "id": "VNS0006",
+      "created": "2026-09-21T12:00:00Z",
+      "customer": "Fernanda Guerrero",
+      "lines": [
+        {
+          "id": "line-21",
+          "sourceRow": 21,
+          "productId": "NS-BAR-001",
+          "name": "Muscle Sandwich · Muscle Sandwich · 1 barra",
+          "qty": 4,
+          "unitPrice": 3900,
+          "discount": 0,
+          "unitCost": 2353,
+          "delivered": 4
+        }
+      ],
+      "payments": [
+        {
+          "id": "pay-21-card",
+          "accountId": "card",
+          "amount": 15600,
+          "fee": 633
+        }
+      ],
+      "total": 15600,
+      "cost": 9412
+    },
+    {
+      "id": "VNS0007",
+      "created": "2026-09-22T12:00:00Z",
+      "customer": "José Smart Fit Santin",
+      "lines": [
+        {
+          "id": "line-22",
+          "sourceRow": 22,
+          "productId": "NS-CRE-002",
+          "name": "Creatine · Dragon Pharma · 1 kg",
+          "qty": 1,
+          "unitPrice": 68900,
+          "discount": 0,
+          "unitCost": 46667,
+          "delivered": 1
+        }
+      ],
+      "payments": [
+        {
+          "id": "pay-22-card",
+          "accountId": "card",
+          "amount": 68900,
+          "fee": 2797
+        }
+      ],
+      "total": 68900,
+      "cost": 46667
+    },
+    {
+      "id": "VNS0008",
+      "created": "2026-09-23T12:00:00Z",
+      "customer": "Martín Smart-Fit",
+      "lines": [
+        {
+          "id": "line-23",
+          "sourceRow": 23,
+          "productId": "NS-PRE-005",
+          "name": "Psychotic Gold · Insane Labz · Por confirmar",
+          "qty": 1,
+          "unitPrice": 46900,
+          "discount": 0,
+          "unitCost": 37800,
+          "delivered": 1
+        }
+      ],
+      "payments": [
+        {
+          "id": "pay-23-transfer",
+          "accountId": "transfer",
+          "amount": 46900,
+          "fee": 0
+        }
+      ],
+      "total": 46900,
+      "cost": 37800
+    },
+    {
+      "id": "VNS0009",
+      "created": "2026-09-30T12:00:00Z",
+      "customer": "Cliente Gustavo",
+      "lines": [
+        {
+          "id": "line-24",
+          "sourceRow": 24,
+          "productId": "NS-VIT-001",
+          "name": "D3 + K2 · Evogen · 60 Servicios",
+          "qty": 1,
+          "unitPrice": 36900,
+          "discount": 0,
+          "unitCost": 24180,
+          "delivered": 1
+        },
+        {
+          "id": "line-25",
+          "sourceRow": 25,
+          "productId": "NS-CAF-001",
+          "name": "Coffee Fit · Advance Labs Nutrition · 60 servicios",
+          "qty": 1,
+          "unitPrice": 66900,
+          "discount": 0,
+          "unitCost": 44831,
+          "delivered": 1
+        }
+      ],
+      "payments": [
+        {
+          "id": "pay-24-cash",
+          "accountId": "cash",
+          "amount": 36900,
+          "fee": 0
+        },
+        {
+          "id": "pay-25-cash",
+          "accountId": "cash",
+          "amount": 66900,
+          "fee": 0
+        }
+      ],
+      "total": 103800,
+      "cost": 69011
+    },
+    {
+      "id": "VNS0010",
+      "created": "2026-09-30T12:00:00Z",
+      "customer": "Gustavo GGG",
+      "lines": [
+        {
+          "id": "line-26",
+          "sourceRow": 26,
+          "productId": "NS-BAR-001",
+          "name": "Muscle Sandwich · Muscle Sandwich · 1 barra",
+          "qty": 1,
+          "unitPrice": 3900,
+          "discount": 0,
+          "unitCost": 2353,
+          "delivered": 1
+        },
+        {
+          "id": "line-27",
+          "sourceRow": 27,
+          "productId": "NS-PRE-006",
+          "name": "Psychotic Gold muestra · Insane Labz · 1 Servicio",
+          "qty": 1,
+          "unitPrice": 3500,
+          "discount": 0,
+          "unitCost": 1800,
+          "delivered": 1
+        }
+      ],
+      "payments": [
+        {
+          "id": "pay-26-card",
+          "accountId": "card",
+          "amount": 3900,
+          "fee": 158
+        },
+        {
+          "id": "pay-27-card",
+          "accountId": "card",
+          "amount": 3500,
+          "fee": 142
+        }
+      ],
+      "total": 7400,
+      "cost": 4153
+    },
+    {
+      "id": "VNS0011",
+      "created": "2026-10-01T12:00:00Z",
+      "customer": "Gustavo GGG",
+      "lines": [
+        {
+          "id": "line-28",
+          "sourceRow": 28,
+          "productId": "NS-BAR-001",
+          "name": "Muscle Sandwich · Muscle Sandwich · 1 barra",
+          "qty": 2,
+          "unitPrice": 3900,
+          "discount": 0,
+          "unitCost": 2353,
+          "delivered": 2
+        }
+      ],
+      "payments": [
+        {
+          "id": "pay-28-cash",
+          "accountId": "cash",
+          "amount": 7800,
+          "fee": 0
+        }
+      ],
+      "total": 7800,
+      "cost": 4706
+    }
+  ],
+  "costs": {
+    "NS-CAF-001": 44831,
+    "NS-OME-001": 19400,
+    "NS-AMI-001": 32208,
+    "NS-BEB-001": 4000,
+    "NS-CRE-001": 29300,
+    "NS-CRE-002": 46667,
+    "NS-PRE-001": 42048,
+    "NS-PRO-001": 191200,
+    "NS-VIT-001": 24180,
+    "NS-SOP-001": 26460,
+    "NS-SOP-002": 22704,
+    "NS-OME-002": 19536,
+    "NS-CRE-003": 55176,
+    "NS-CRE-004": 26200,
+    "NS-PRE-002": 31680,
+    "NS-VIT-002": 33465,
+    "NS-VIT-003": 20234,
+    "NS-PRE-003": 41600,
+    "NS-AMI-002": 30400,
+    "NS-PRE-004": 35600,
+    "NS-PRE-005": 37800,
+    "NS-PRE-006": 1800,
+    "NS-AMI-003": 29900,
+    "NS-PRE-007": 40800,
+    "NS-PRO-002": 129492,
+    "NS-PRO-003": 104803,
+    "NS-AMI-004": 22044,
+    "NS-PRO-004": 84876,
+    "NS-GAN-001": 37620,
+    "NS-AMI-005": 32076,
+    "NS-PRE-008": 34716,
+    "NS-PRE-009": 39864,
+    "NS-PRO-005": 76033,
+    "NS-OME-003": 14800,
+    "NS-PRO-006": 24900,
+    "NS-PRE-010": 36168,
+    "NS-PRO-007": 36600,
+    "NS-PRO-008": 105554,
+    "NS-BAR-001": 2353,
+    "NS-CAR-001": 33087
+  },
+  "previousCosts": {
+    "NS-CAF-001": 44831,
+    "NS-OME-001": 19400,
+    "NS-AMI-001": 32208,
+    "NS-BEB-001": 4000,
+    "NS-CRE-001": 29300,
+    "NS-CRE-002": 46667,
+    "NS-PRE-001": 42048,
+    "NS-PRO-001": 191200,
+    "NS-VIT-001": 24180,
+    "NS-SOP-001": 26460,
+    "NS-SOP-002": 22704,
+    "NS-OME-002": 19536,
+    "NS-CRE-003": 55176,
+    "NS-CRE-004": 26200,
+    "NS-PRE-002": 31680,
+    "NS-VIT-002": 33465,
+    "NS-VIT-003": 20234,
+    "NS-PRE-003": 41600,
+    "NS-AMI-002": 30400,
+    "NS-PRE-004": 35600,
+    "NS-PRE-005": 37800,
+    "NS-PRE-006": 1800,
+    "NS-AMI-003": 29900,
+    "NS-PRE-007": 40800,
+    "NS-PRO-002": 129492,
+    "NS-PRO-003": 104803,
+    "NS-AMI-004": 22044,
+    "NS-PRO-004": 84876,
+    "NS-GAN-001": 37620,
+    "NS-AMI-005": 32076,
+    "NS-PRE-008": 34716,
+    "NS-PRE-009": 39864,
+    "NS-PRO-005": 76033,
+    "NS-OME-003": 14800,
+    "NS-PRO-006": 24900,
+    "NS-PRE-010": 36168,
+    "NS-PRO-007": 36600,
+    "NS-PRO-008": 105554,
+    "NS-BAR-001": 2353,
+    "NS-CAR-001": 33087
+  },
+  "summary": {
+    "sales": 11,
+    "revenue": 540900,
+    "cost": 413125,
+    "units": 20,
+    "delivered": 20,
+    "fees": 3730,
+    "payments": {
+      "cash": 111600,
+      "transfer": 337400,
+      "card": 91900
+    },
+    "netSales": 537170
+  }
+}
