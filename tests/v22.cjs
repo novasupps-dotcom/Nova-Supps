@@ -406,7 +406,57 @@ async function dispose(ui) {
   assert.equal(await updates.restartForUpdate(() => true), true);
   assert.equal(reloaded, 1);
   console.log(
-    "  ✓ Updates: una consulta cada 6 h, descarga única y reinicio impedido durante cobro",
+    "  ✓ Updates: una consulta cada 30 min, descarga única y reinicio impedido durante cobro",
+  );
+  // 2.5.3: la versión nueva se aplica sola al volver a la app tras 15 min (nunca a media venta).
+  {
+    assert.equal(updates.shouldAutoApply(true, 0, updates.AUTO_APPLY_AFTER_MS, () => true), true);
+    assert.equal(updates.shouldAutoApply(true, 0, updates.AUTO_APPLY_AFTER_MS - 1, () => true), false);
+    assert.equal(updates.shouldAutoApply(false, 0, updates.AUTO_APPLY_AFTER_MS, () => true), false);
+    assert.equal(updates.shouldAutoApply(true, null, updates.AUTO_APPLY_AFTER_MS, () => true), false);
+    assert.equal(updates.shouldAutoApply(true, 0, updates.AUTO_APPLY_AFTER_MS, () => false), false);
+    const { UpdateNotice } = require("../src/screens/UpdateNotice.tsx");
+    const realNow = Date.now;
+    let clock = realNow();
+    Date.now = () => clock;
+    let selling = true,
+      flushed = 0;
+    const notice = await mount(
+      React.createElement(UpdateNotice, {
+        b,
+        canRestart: () => !selling,
+        beforeRestart: () => {
+          flushed++;
+        },
+      }),
+    );
+    assert(text(notice.root).includes("Versión nueva lista") && text(notice.root).includes("Instalar ahora"), "aviso suave");
+    const state = async (st) => {
+      await act(async () => {
+        for (const f of Object.values(callbacks)) f(st);
+        await flush();
+      });
+    };
+    const before = reloaded;
+    await state("background");
+    clock += 5 * 60_000;
+    await state("active");
+    assert.equal(reloaded, before, "5 min fuera: no se reinicia");
+    await state("background");
+    clock += updates.AUTO_APPLY_AFTER_MS;
+    await state("active");
+    assert.equal(reloaded, before, "con venta abierta: no se reinicia");
+    selling = false;
+    await state("background");
+    clock += updates.AUTO_APPLY_AFTER_MS;
+    await state("active");
+    assert.equal(reloaded, before + 1, "tras 15 min fuera y sin venta: se aplica sola");
+    assert.equal(flushed, 1, "guarda lo pendiente antes de reiniciar");
+    Date.now = realNow;
+    await act(async () => notice.unmount());
+  }
+  console.log(
+    "  ✓ Updates 2.5.3: se aplica sola al volver tras 15 min, nunca con venta o cobro abiertos",
   );
   const {
     CameraScanner,

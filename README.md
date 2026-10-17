@@ -1,6 +1,8 @@
-# Nova Negocio · 2.5.2
+# Nova Negocio · 2.5.3
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
+
+**2.5.3 · Actualizaciones automáticas (versionCode 51):** cada versión llega sola a los teléfonos. La PC la sube a GitHub (`scripts/windows/`), GitHub Actions corre las pruebas y publica con EAS Update (canal `preview`), y la app la descarga y la aplica al volver a abrirla, nunca a media venta. Configuración única y detalles en `docs/ACTUALIZACIONES_AUTOMATICAS.md`.
 
 **2.5.2 (versionCode 50):** corrige «Property 'Buffer' doesn't exist» al mandar el catálogo con fotos PNG (Hermes no tiene Buffer): toda conversión a JPG pasa por `encodeJpegBytes` de `src/photos.ts`, una foto que falla ya no detiene el catálogo y `tests/hermes.cjs` prueba el envío completo sin Buffer.
 
@@ -150,7 +152,7 @@ El código vive en un repositorio **privado** de GitHub. `.gitignore` deja fuera
 
 - Nunca se suben: `signing/` (llave de firma), `nova-negocio-firebase-adminsdk-*.json`, `google-services.json`, `.env`, `node_modules/`, `build/`, `deliverables/` (APK), `Claude outputs/` y `_respaldo*/`. Estos se quedan solo en tu computadora: respáldalos aparte.
 - `eas build` sigue tomando `google-services.json` de la carpeta (usa `.easignore`, no `.gitignore`).
-- Después de cada actualización: GitHub Desktop → *Changes* → resumen «Nova Negocio X.Y.Z» → **Commit to master** → **Push origin**.
+- Cada versión se sube sola (tarea «Nova Negocio - Subir a GitHub», `scripts/windows/subir_a_github.ps1`) y GitHub la publica a los teléfonos si pasan las pruebas (`.github/workflows/actualizar-telefonos.yml`). Ver `docs/ACTUALIZACIONES_AUTOMATICAS.md`.
 
 ## Pruebas
 

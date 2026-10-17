@@ -3,7 +3,7 @@ import { type Outcome, type TerminalPayment } from "../mercadopago";
 import type { IconName } from "../icons";
 import { TILE } from "../theme";
 
-export const VERSION = "2.5.2";
+export const VERSION = "2.5.3";
 export const HOME = "Vender";
 
 export const PAGES = [

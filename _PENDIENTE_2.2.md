@@ -1,11 +1,17 @@
-# Nova Negocio 2.5.2 · 15-oct-2026
+# Nova Negocio 2.5.3 · 17-oct-2026
 
 Actualización de JavaScript sobre el APK nativo 2.2.4 (mismo runtime de expo-updates 2.2.4).
-APK: deliverables/Nova_Negocio_2.5.2_Android.apk · versión 2.5.2 / versionCode 50 · firma original 3b71f02d…ae94.
-Se generó sobre la 2.5.1 con scripts/package_android_js_native.py.
+APK de respaldo: deliverables/Nova_Negocio_2.5.3_Android.apk · versión 2.5.3 / versionCode 51 · firma original 3b71f02d…ae94.
+Se generó sobre la 2.5.2 con scripts/package_android_js_native.py. Desde la 2.5.3 las versiones llegan solas a los teléfonos (docs/ACTUALIZACIONES_AUTOMATICAS.md).
 
 PASO ÚNICO EN SUPABASE (lo corres tú): SQL Editor → pega supabase/migrations/2.5.0_catalogos.sql → Run.
 Crea el espacio público "catalogos" para los PDF. Sin esto, el catálogo se manda en texto y la app dice que falta.
+
+CONFIGURACIÓN ÚNICA PARA ACTUALIZACIONES AUTOMÁTICAS (la haces tú, ~10 min): docs/ACTUALIZACIONES_AUTOMATICAS.md
+1) Token de Expo como secreto EXPO_TOKEN en GitHub.  2) Git para Windows + doble clic en scripts\windows\instalar_subida_automatica.cmd.
+
+Hecho en 2.5.3: actualizaciones automáticas (GitHub Actions + EAS Update); la app revisa cada 30 min y aplica la versión nueva al
+volver a abrirla o tras 15 min fuera, nunca a media venta.
 
 Hecho en 2.5.2: corregido «Property 'Buffer' doesn't exist» al enviar el catálogo o crear el PDF con fotos PNG.
 

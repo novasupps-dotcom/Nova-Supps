@@ -1,0 +1,86 @@
+# Nova Negocio · cada vez que llega una versión a GitHub (rama master):
+#   1) corre todas las pruebas, y si pasan
+#   2) la publica por internet (EAS Update, canal "preview") y los teléfonos se actualizan solos.
+# Si una prueba falla, NO se publica nada y los teléfonos siguen con la versión anterior.
+# Configuración única: docs/ACTUALIZACIONES_AUTOMATICAS.md (secreto EXPO_TOKEN).
+name: Actualizar teléfonos
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "App.tsx"
+      - "index.ts"
+      - "src/**"
+      - "assets/**"
+      - "app.json"
+      - "eas.json"
+      - "package.json"
+      - "package-lock.json"
+      - "tests/**"
+      - "scripts/**"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+concurrency:
+  group: actualizar-telefonos
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  pruebas:
+    name: Pruebas
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Instalar
+        run: npm ci --no-audit --no-fund
+      - name: Revisar versión y runtime 2.2.4
+        run: node scripts/check_android_config.cjs --ota
+      - name: TypeScript
+        run: npx tsc --noEmit -p . --noUnusedLocals
+      - name: Todas las pruebas
+        run: npm run test:all
+
+  publicar:
+    name: Publicar a los teléfonos
+    needs: pruebas
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Revisar el token de Expo
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Falta el secreto EXPO_TOKEN en GitHub (docs/ACTUALIZACIONES_AUTOMATICAS.md, paso 1). No se publicó nada."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Instalar
+        run: npm ci --no-audit --no-fund
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Canal "preview" (el que usan los teléfonos)
+        run: eas channel:view preview --non-interactive > /dev/null 2>&1 || eas channel:create preview --non-interactive
+      - name: Publicar la versión
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          eas update --channel preview --environment preview --platform android \
+            --message "Nova Negocio $VERSION (${GITHUB_SHA::7})" --non-interactive
+          echo "### Publicada Nova Negocio $VERSION" >> "$GITHUB_STEP_SUMMARY"
+          echo "Los teléfonos la descargan solos y la instalan al volver a abrir la app." >> "$GITHUB_STEP_SUMMARY"
