@@ -4,7 +4,14 @@
 # Si una prueba falla, NO se publica nada y los teléfonos siguen con la versión anterior.
 # Configuración única: docs/ACTUALIZACIONES_AUTOMATICAS.md (secreto EXPO_TOKEN).
 name: Actualizar teléfonos
+name: Configurar Python
+  uses: actions/setup-python@v5
+  with:
+    python-version: '3.10'
 
+name: Instalar dependencias de Python
+  run: pip install openpyxl
+  
 on:
   push:
     branches: [master]
