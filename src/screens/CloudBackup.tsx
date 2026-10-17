@@ -1,6 +1,7 @@
 // 2.1 · Respaldo automático en la nube: estado, respaldar ahora y restaurar.
 import React, { useEffect, useState } from "react";
-import { Alert, Switch, Text, View } from "react-native";
+import { Alert, Switch, View } from "react-native";
+import { Text } from "../text";
 import type { Business } from "../business";
 import type { Cloud } from "../cloud";
 import {
@@ -70,9 +71,9 @@ export function CloudBackupCard({
   if (!cloud?.session)
     return (
       <Card>
-        <Text style={s.subtitle}>☁️ Respaldo automático en la nube</Text>
+        <Text style={s.subtitle}>Respaldo automático en la nube</Text>
         <Note>
-          Conecta la base en línea (Parámetros → Vendedores) para guardar una
+          Conecta la base en línea (Ajustes → Vendedores) para guardar una
           copia diaria de tu negocio en la nube.
         </Note>
       </Card>
@@ -92,7 +93,7 @@ export function CloudBackupCard({
     <Card tone={last?.at ? "ok" : undefined}>
       <View style={s.between}>
         <Text style={[s.subtitle, { flex: 1 }]}>
-          ☁️ Respaldo automático en la nube
+          Respaldo automático en la nube
         </Text>
         <Pill
           text={last?.at ? "Activo" : "Sin respaldo"}
@@ -120,7 +121,7 @@ export function CloudBackupCard({
         />
       </View>
       <Button
-        title={busy === "up" ? "Respaldando…" : "☁️ Respaldar ahora"}
+        icon="cloud-upload" title={busy === "up" ? "Respaldando…" : "Respaldar ahora"}
         disabled={!!busy}
         onPress={() =>
           void run("up", async () => {

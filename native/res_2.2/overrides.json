@@ -1,0 +1,12 @@
+{
+  "_nota": "2.2.6 · Reemplazos de imágenes y colores sobre el APK nativo 2.2.x, por nombre de recurso. {d} = densidad (mdpi…xxxhdpi). Las imágenes las genera scripts/make_brand_icons.py con el mismo tamaño que las originales.",
+  "files": {
+    "mipmap/ic_launcher": "ic_launcher_{d}.png",
+    "mipmap/ic_launcher_foreground": "ic_launcher_foreground_{d}.png",
+    "drawable/splashscreen_logo": "splash_{d}.png",
+    "drawable/notification_icon": "notification_{d}.png"
+  },
+  "colors": {
+    "color/notification_icon_color": "#D9252F"
+  }
+}

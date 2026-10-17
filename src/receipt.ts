@@ -2,6 +2,7 @@
 // El comprobante de tarjeta lo emite el negocio con los datos reales del pago
 // que reporta Mercado Pago (tarjeta, autorización y número de operación).
 import { money, localDay, customerView, type Row } from "./business";
+import { STORE_NAME } from "./theme";
 
 const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 export function fmtDateTime(iso?: string | null, withTime = true): string {
@@ -98,7 +99,7 @@ export function saleReceiptText(v: Row): string {
   const pays = (v.movements as Row[]).filter((x) => x.kind === "sale").map((x) => (x.amount < 0 ? `devolución ${money(-x.amount)}` : `${money(x.amount)} · ${x.account}`));
   const balance = Math.max(0, v.total - v.paid);
   return tidy([
-    "*GNS · Nova Negocio*",
+    `*${STORE_NAME}*`,
     `Comprobante ${folioOf(v)}`,
     fmtDateTime(v.dateOnly || v.created, false),
     v.customer ? `Cliente: ${v.customer}` : "",
@@ -119,7 +120,7 @@ export function cardReceiptText(v: Row, entry: Row): string {
   const isAbono = entry.kind === "abono";
   const balance = Math.max(0, v.total - v.paid);
   return tidy([
-    "*GNS · Nova Supps*",
+    `*${STORE_NAME}*`,
     "*Comprobante de pago con tarjeta* 💳",
     fmtDateTime(c.approvedAt || entry.at),
     `Folio ${folioOf(v)}${isAbono ? " · abono" : ""}`,

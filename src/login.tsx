@@ -3,13 +3,14 @@
 // de tu cuenta (el anterior se desconecta solo). Si olvidaste la contraseña, la
 // tienda te manda un correo con un código para poner una nueva.
 import React, { useEffect, useState } from "react";
-import { BackHandler, Image, ScrollView, Text, TextInput, View } from "react-native";
+import { BackHandler, Image, ScrollView, View } from "react-native";
+import { Text, TextInput } from "./text";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { Business } from "./business";
 import { Cloud, CloudError, INVITE_MESSAGES, type CloudConfig, type CloudSession } from "./cloud";
 import { deviceId } from "./device";
 import { storeCloud } from "./storeConfig";
-import { LOGO_HEADER, LOGO_HEADER_RATIO } from "./brand";
+import { LOGO_FULL, LOGO_FULL_RATIO } from "./brand";
 import { C, s, Button, Card, Note } from "./ui";
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -111,7 +112,7 @@ export function PasswordReset({ conf, initialEmail = "", onDone, onBack }: { con
         <View style={{ height: 10 }} />
         {field("Tu correo", email, setEmail, { kind: "email-address", placeholder: "tucorreo@gmail.com" })}
         {step === "email" ? (
-          <Button title={busy ? "Enviando…" : "📧 Enviarme el correo"} disabled={busy} onPress={() => void send()} />
+          <Button icon="mail" title={busy ? "Enviando…" : "Enviarme el correo"} disabled={busy} onPress={() => void send()} />
         ) : (
           <>
             {field("Código del correo", code, (v) => setCode(v.replace(/\D/g, "").slice(0, 10)), { kind: "number-pad", placeholder: "123456" })}
@@ -175,10 +176,10 @@ export function LoginScreen({ b, onLogged, onNewSeller }: { b: Business; onLogge
   return (
     <SafeAreaView style={s.safe}>
       <ScrollView automaticallyAdjustKeyboardInsets contentContainerStyle={[s.content, { paddingTop: 34 }]} keyboardShouldPersistTaps="handled">
-        <Image source={LOGO_HEADER} accessibilityLabel="GNS · Nova Negocio" resizeMode="contain" style={{ width: 280, height: 280 / LOGO_HEADER_RATIO, marginBottom: 20 }} />
-        <Text style={s.title}>Inicia sesión</Text>
-        <Note>¿Ya tienes cuenta (dueño o vendedor)? Entra con tu correo y tu contraseña. Este teléfono quedará como el de tu cuenta y el anterior se desconecta.</Note>
-        <View style={{ height: 10 }} />
+        <Image source={LOGO_FULL} accessibilityLabel="GGG · Nova Supps" resizeMode="contain" style={{ width: 220, height: 220 / LOGO_FULL_RATIO, marginBottom: 26, alignSelf: "center" }} />
+        <Text style={[s.title, { textAlign: "center" }]}>Inicia sesión</Text>
+        <Text style={[s.muted, { textAlign: "center", marginHorizontal: 12 }]}>Entra con tu correo y tu contraseña. Este teléfono quedará como el de tu cuenta.</Text>
+        <View style={{ height: 18 }} />
         {!!msg && (
           <View style={msg.bad ? s.errorBox : undefined}>
             <Text style={[s.body, { color: msg.bad ? C.red : C.green, marginBottom: 10 }]}>{msg.text}</Text>
@@ -190,7 +191,7 @@ export function LoginScreen({ b, onLogged, onNewSeller }: { b: Business; onLogge
         <Button title="¿Olvidaste tu contraseña?" secondary small disabled={busy} onPress={() => (setMsg(null), setMode("reset"))} />
         <View style={{ height: 22 }} />
         <Card>
-          <Text style={s.subtitle}>🧾 ¿Eres vendedor nuevo?</Text>
+          <Text style={s.subtitle}>¿Eres vendedor nuevo?</Text>
           <Note>Crea tu cuenta con el código de invitación que te dio el dueño.</Note>
           <Button title="Tengo un código de invitación" secondary small onPress={onNewSeller} />
         </Card>

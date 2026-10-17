@@ -471,7 +471,7 @@ function createFake() {
     const headers = init.headers || {};
     const auth = String(headers.Authorization || headers.authorization || "");
     const bearer = auth.replace(/^Bearer /, "");
-    const body = init.body ? JSON.parse(init.body) : undefined;
+    const body = typeof init.body === "string" && init.body ? JSON.parse(init.body) : undefined;
     if (url.startsWith("https://api.mercadopago.com")) {
       if (bearer !== state.mpToken && bearer !== "APP_USR-owner") return res(401, { code: "unauthorized", message: "invalid token" });
       return mpApi(method, url.slice("https://api.mercadopago.com".length), body);
@@ -563,6 +563,22 @@ function createFake() {
       return res(200, issue(users.find((u) => u.id === id)));
     }
     if (p === "/auth/v1/user") return uid && uid !== "service" ? res(200, { id: uid }) : res(401, { msg: "invalid JWT" });
+    // 2.5 · Storage: el dueño sube el catálogo en PDF al bucket público "catalogos".
+    if (p.startsWith("/storage/v1/object/public/")) {
+      const f = state.storage?.[p.slice("/storage/v1/object/public/".length)];
+      return f ? res(200, null) : res(400, { statusCode: "404", error: "not_found", message: "Object not found" });
+    }
+    if (p.startsWith("/storage/v1/object/") && method === "POST") {
+      const key = p.slice("/storage/v1/object/".length);
+      if (state.noBucket || !key.startsWith("catalogos/")) return res(400, { statusCode: "404", error: "Bucket not found", message: "Bucket not found" });
+      // Como public.is_owner_account(): dueño activo, sin revisar el teléfono (Storage no pasa x-device-id).
+      if (uid !== "service" && !T.members.some((m) => m.user_id === uid && m.active && m.role === "owner"))
+        return res(400, { statusCode: "403", error: "Unauthorized", message: "new row violates row-level security policy" });
+      state.storage = state.storage || {};
+      if (state.storage[key] && headers["x-upsert"] !== "true") return res(400, { statusCode: "409", error: "Duplicate", message: "The resource already exists" });
+      state.storage[key] = { bytes: Buffer.from(init.body), type: headers["Content-Type"] || headers["content-type"] };
+      return res(200, { Key: key, Id: "obj-" + Object.keys(state.storage).length });
+    }
     if (p.startsWith("/rest/v1/rpc/")) return rpc(p.slice(13), body || {}, uid);
     if (p.startsWith("/rest/v1/")) return rest(method, p.slice(9), qs, body, uid, headers.Prefer);
     if (p === "/functions/v1/cobro-terminal") {

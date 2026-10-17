@@ -4,8 +4,8 @@ const path = require("node:path");
 const fs = require("node:fs");
 const root = path.resolve(__dirname, "..");
 const unit = fs.readdirSync(path.join(root, "tests")).filter(f => f.endsWith(".test.ts")).map(f => path.join("tests", f));
-const suites = ["ui", "forms", "team", "lock", "charge", "cloud", "photos", "receipt", "v17", "screens", "iosphoto", "terminalnormal", "v21", "secure", "v22", "sql22"];
-const runs = [["--experimental-strip-types", "--test", ...unit], ...suites.map(s => ["tests/" + s + ".cjs"])];
+const suites = ["ui", "forms", "team", "lock", "charge", "cloud", "photos", "receipt", "v17", "screens", "iosphoto", "terminalnormal", "v21", "secure", "v22", "sql22", "hermes"];
+const runs = [["--experimental-strip-types", "--import", "./tests/ts-resolve.mjs", "--test", ...unit], ...suites.map(s => ["tests/" + s + ".cjs"])];
 for (const args of runs) {
   const result = spawnSync(process.execPath, args, { cwd: root, stdio: "inherit" });
   if (result.error) { console.error(result.error.message); process.exit(1); }

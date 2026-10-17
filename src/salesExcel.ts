@@ -52,8 +52,6 @@ export function salesSheets(b: Business, range: { from: string | null; to: strin
   const ids = new Set(sales.map((v) => v.id));
   const bps = b.feeBps();
   const phones = new Map(b.all("SELECT id,phone FROM customers").map((c) => [c.id, c.phone]));
-  const campaigns = new Map(b.all("SELECT id,name FROM campaigns").map((c) => [c.id, c.name]));
-  const locations = new Map(b.all("SELECT id,name FROM locations").map((c) => [c.id, c.name]));
   const lineMeta = b.settingsMap("line:");
   const lineCost = new Map(b.all("SELECT lineId,COALESCE(SUM(qty*cost),0) cost FROM allocations GROUP BY lineId").map((r) => [r.lineId, r.cost as number]));
   const lines = new Map<string, Row[]>();
@@ -121,8 +119,6 @@ export function salesSheets(b: Business, range: { from: string | null; to: strin
       v.customerId ? phones.get(v.customerId) || "" : "",
       seller,
       v.channel || "",
-      v.campaignId ? campaigns.get(v.campaignId) || "" : "",
-      v.locationId ? locations.get(v.locationId) || "" : "",
       ls.map((l) => `${l.qty}× ${l.name}`).join("; "),
       units,
       pesos(v.total - commission),
@@ -252,8 +248,6 @@ export function salesSheets(b: Business, range: { from: string | null; to: strin
         { header: "Teléfono", width: 14 },
         { header: "Vendedor", width: 14 },
         { header: "Canal", width: 12 },
-        { header: "Campaña", width: 14 },
-        { header: "Ubicación", width: 14 },
         { header: "Productos", width: 48 },
         { header: "Piezas", type: "int" },
         { header: "Tu precio", type: "money" },

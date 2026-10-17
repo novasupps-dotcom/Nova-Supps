@@ -2,11 +2,13 @@
 // El dueño los captura una vez, los asigna a cada vendedor y se muestran SOLO
 // cuando la forma de pago es transferencia, con un botón para mandarlos al cliente.
 import React from "react";
-import { Linking, Share, Text, View } from "react-native";
+import { STORE_NAME } from "./theme";
+import { Linking, Share, View } from "react-native";
+import { Text } from "./text";
 import { money, type Row } from "./business";
 import { C, s, Button, Card, Note } from "./ui";
 
-export type TransferAccount = { id: string; label: string; bank: string; holder: string; clabe: string; account: string; card: string; note: string; accountId?: string };
+export type TransferAccount = { id: string; label: string; bank: string; holder: string; clabe: string; account: string; card: string; note: string; accountId?: string; /** 2.5: el dueño no la ve al vender. */ ownerHidden?: boolean };
 export const TRANSFER_TEMPLATES: TransferAccount[] = [
   { id: "mercadopago", label: "Mercado Pago", bank: "Mercado Pago", holder: "", clabe: "", account: "", card: "", note: "" },
   { id: "banamex", label: "Banamex", bank: "Banamex", holder: "", clabe: "", account: "", card: "", note: "" },
@@ -44,12 +46,13 @@ export const cleanTransfer = (a: Row): TransferAccount => ({
   card: digits(a.card).slice(0, 16),
   note: String(a.note || "").trim().slice(0, 120),
   ...(a.accountId ? { accountId: String(a.accountId) } : {}),
+  ...(a.ownerHidden ? { ownerHidden: true } : {}),
 });
 const group = (d: string, size = 4) => d.replace(new RegExp(`(\\d{${size}})(?=\\d)`, "g"), "$1 ");
 
 /** Texto para mandar al cliente (WhatsApp u otra app). */
 export function transferText(list: TransferAccount[], amount: number | null, concept = ""): string {
-  const lines = ["*GNS · Nova Supps* · Datos para transferencia"];
+  const lines = [`*${STORE_NAME}* · Datos para transferencia`];
   if (amount) lines.push(`Total a pagar: *${money(amount)}*`);
   for (const a of list) {
     lines.push("", `*${a.label}*${a.bank && a.bank !== a.label ? ` (${a.bank})` : ""}`, `Titular: ${a.holder}`);
@@ -75,7 +78,7 @@ export function TransferInfo({ list, amount, phone, concept, emptyText }: { list
   const wa = String(phone || "").replace(/\D/g, "");
   return (
     <Card>
-      <Text style={s.subtitle}>🏦 Datos para transferencia</Text>
+      <Text style={s.subtitle}>Datos para transferencia</Text>
       {list.map((a) => (
         <View key={a.id} style={{ marginTop: 8 }}>
           <Text style={[s.body, { fontWeight: "700" }]}>{a.label}</Text>
@@ -88,9 +91,9 @@ export function TransferInfo({ list, amount, phone, concept, emptyText }: { list
       ))}
       <View style={{ height: 8 }} />
       {wa.length >= 10 ? (
-        <Button title="💬 Enviar datos por WhatsApp" small onPress={() => void Linking.openURL(`https://wa.me/${wa.length === 10 ? "52" + wa : wa}?text=${encodeURIComponent(text)}`).catch(() => {})} />
+        <Button icon="message-circle" title="Enviar datos por WhatsApp" small onPress={() => void Linking.openURL(`https://wa.me/${wa.length === 10 ? "52" + wa : wa}?text=${encodeURIComponent(text)}`).catch(() => {})} />
       ) : null}
-      <Button title="📤 Compartir datos con el cliente" secondary small onPress={() => void Share.share({ message: text }).catch(() => {})} />
+      <Button title="Compartir datos con el cliente" secondary small onPress={() => void Share.share({ message: text }).catch(() => {})} />
       <Note color={C.muted}>Confirma que el dinero llegó antes de entregar.</Note>
     </Card>
   );

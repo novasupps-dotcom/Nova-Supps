@@ -1,6 +1,6 @@
 // Avisos push por cuenta y teléfono; seguimientos locales a las 9:00.
 import { Platform } from "react-native";
-import type { Business, Row } from "./business";
+import { money, type Business, type Row } from "./business";
 import type { Cloud } from "./cloud";
 import { canPush, notifications, projectId } from "./native";
 
@@ -8,6 +8,7 @@ export type PushState =
   | "ok"
   | "off"
   | "inactive"
+  | "local_only"
   | "unavailable"
   | "no_project"
   | "denied"
@@ -18,6 +19,8 @@ export const PUSH_TEXT: Record<PushState, string> = {
   ok: "Activos en este teléfono.",
   off: "Los apagaste en este teléfono.",
   inactive: "Aún no están activos en este teléfono.",
+  local_only:
+    "Activos para tus ventas en este teléfono. Conecta tu cuenta para recibir también ventas de vendedores.",
   unavailable:
     "Los avisos estarán disponibles al instalar la nueva versión de Android.",
   no_project:
@@ -36,6 +39,7 @@ export function setupNotifications(
   onTap?: (data: Row) => void,
   onReceive?: (data: Row) => void,
   enabled = () => true,
+  b?: Business,
 ): () => void {
   const N = notifications();
   if (!N) return () => {};
@@ -43,12 +47,29 @@ export function setupNotifications(
   const subscriptions: { remove(): void }[] = [];
   try {
     N.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowBanner: enabled(),
-        shouldShowList: enabled(),
-        shouldPlaySound: enabled(),
-        shouldSetBadge: false,
-      }),
+      handleNotification: async (notification) => {
+        const content: { title?: string | null; data?: unknown } = notification?.request?.content || {};
+        const data = (content.data || {}) as Row;
+        let show = enabled();
+        if (b && data?.kind === "sale" && data.saleId) {
+          const key =
+            "remote:" +
+            data.saleId +
+            ":" +
+            (data.event ||
+              (/revisi[oó]n/i.test(content.title || "")
+                ? "review"
+                : "created"));
+          if (noticeSeen(b, key)) show = false;
+          else if (show) markNotice(b, key);
+        }
+        return {
+          shouldShowBanner: show,
+          shouldShowList: show,
+          shouldPlaySound: show,
+          shouldSetBadge: false,
+        };
+      },
     });
     if (Platform.OS === "android") {
       void N.setNotificationChannelAsync("ventas", {
@@ -135,6 +156,7 @@ async function doRegister(
       !ask &&
       previous?.user === user &&
       previous?.url === url &&
+      previous?.device === cloud.device &&
       Date.now() - Date.parse(previous.at || "") < SIX_HOURS
     )
       return "ok";
@@ -156,6 +178,7 @@ async function doRegister(
       token,
       user,
       url,
+      device: cloud.device,
       at: new Date().toISOString(),
     });
     b.setSetting("pushOff", null);
@@ -188,6 +211,7 @@ export async function autoRegisterPush(
   if (
     last?.user === cloud.userId &&
     last?.url === cloud.cfg.url &&
+    last?.device === cloud.device &&
     Date.now() - last.at < 3600_000
   )
     return last.state;
@@ -197,6 +221,7 @@ export async function autoRegisterPush(
   b.setSetting("pushAttempt", {
     user: cloud.userId,
     url: cloud.cfg.url,
+    device: cloud.device,
     at: Date.now(),
     state,
   });
@@ -246,6 +271,11 @@ export async function pushStatus(b: Business): Promise<PushState> {
   if (!projectId()) return "no_project";
   try {
     if (!(await N.getPermissionsAsync()).granted) return "denied";
+    if (Platform.OS === "android") {
+      const channel = await N.getNotificationChannelAsync("ventas");
+      if (channel && channel.importance === N.AndroidImportance.NONE)
+        return "denied";
+    }
   } catch {
     return "error";
   }
@@ -257,12 +287,147 @@ export async function pushStatus(b: Business): Promise<PushState> {
     saved?.token
   )
     return "ok";
+  if (b.setting("pushLocalEnabled", false)) return "local_only";
   return b.setting("pushAttempt", null)?.state === "schema_missing"
     ? "schema_missing"
     : "inactive";
 }
 
 type FollowUp = { id: string; name: string; nextDate?: string; archived?: any };
+const NOTICE_KEY = "saleNoticeSeen223";
+function noticeSeen(b: Business, key: string) {
+  return !!(b.setting(NOTICE_KEY, {}) || {})[key];
+}
+function markNotice(b: Business, key: string) {
+  const next = { ...b.setting(NOTICE_KEY, {}), [key]: Date.now() };
+  b.setSetting(
+    NOTICE_KEY,
+    Object.fromEntries(
+      Object.entries(next)
+        .sort(([, a], [, z]) => Number(z) - Number(a))
+        .slice(0, 300),
+    ),
+  );
+}
+export async function enableLocalNotices(
+  b: Business,
+  ask = true,
+): Promise<PushState> {
+  const N = notifications();
+  if (!N) return "unavailable";
+  try {
+    if (Platform.OS === "android")
+      await N.setNotificationChannelAsync("ventas", {
+        name: "Ventas y vendedores",
+        importance: N.AndroidImportance.HIGH,
+        sound: "default",
+        enableVibrate: true,
+      });
+    let permission = await N.getPermissionsAsync();
+    if (!permission.granted && ask && permission.canAskAgain !== false)
+      permission = await N.requestPermissionsAsync();
+    if (!permission.granted) return "denied";
+    if (Platform.OS === "android") {
+      const channel = await N.getNotificationChannelAsync("ventas");
+      if (channel && channel.importance === N.AndroidImportance.NONE)
+        return "denied";
+    }
+    b.setSetting("pushOff", null);
+    b.setSetting("pushLocalEnabled", true);
+    return "local_only";
+  } catch {
+    return "error";
+  }
+}
+export async function notifyOwnerSale(
+  b: Business,
+  sale: {
+    id: string;
+    total: number;
+    seller?: string;
+    method?: string;
+    remote?: boolean;
+  },
+): Promise<boolean> {
+  if (b.setting("pushOff", false)) return false;
+  const key = (sale.remote ? "remote:" : "owner:") + sale.id + ":created";
+  if (noticeSeen(b, key)) return true;
+  const N = notifications();
+  if (!N) return false;
+  try {
+    if (!(await N.getPermissionsAsync()).granted) return false;
+    // Una notificación push ya mostrada en segundo plano evita duplicarla al sincronizar.
+    if (sale.remote) {
+      const presented = await N.getPresentedNotificationsAsync();
+      if (presented.some((n) => n.request.content.data?.saleId === sale.id)) {
+        markNotice(b, key);
+        return true;
+      }
+    }
+    if (Platform.OS === "android")
+      await N.setNotificationChannelAsync("ventas", {
+        name: "Ventas y vendedores",
+        importance: N.AndroidImportance.HIGH,
+        sound: "default",
+        enableVibrate: true,
+      });
+    if (Platform.OS === "android") {
+      const channel = await N.getNotificationChannelAsync("ventas");
+      if (channel && channel.importance === N.AndroidImportance.NONE) {
+        b.setSetting(
+          "pushLocalError",
+          "El canal Ventas está desactivado en Android. Actívalo en Ajustes → Nova Negocio → Notificaciones.",
+        );
+        return false;
+      }
+    }
+    if (noticeSeen(b, key)) return true;
+    await N.scheduleNotificationAsync({
+      identifier: "venta-" + key,
+      content: {
+        title: sale.remote
+          ? "Nueva venta · " + (sale.seller || "Vendedor")
+          : "Venta registrada · Dueño",
+        body: money(sale.total) + (sale.method ? " · " + sale.method : ""),
+        sound: "default",
+        data: {
+          kind: "owner_sale_local",
+          saleId: sale.id,
+          source: sale.remote ? "seller" : "owner",
+        },
+      },
+      trigger: { channelId: "ventas" },
+    });
+    markNotice(b, key);
+    b.setSetting("pushLocalError", null);
+    return true;
+  } catch {
+    b.setSetting(
+      "pushLocalError",
+      "No se pudo mostrar el aviso de venta. Revisa el permiso y el canal Ventas en los ajustes de Android.",
+    );
+    return false;
+  }
+}
+export async function previewLocalNotice(b: Business): Promise<boolean> {
+  if (b.setting("pushOff", false))
+    throw new Error("Activa los avisos en este teléfono primero.");
+  const N = notifications();
+  if (!N || !(await N.getPermissionsAsync()).granted)
+    throw new Error(
+      "Permite las notificaciones de Nova Negocio en los ajustes de Android.",
+    );
+  await N.scheduleNotificationAsync({
+    content: {
+      title: "Avisos de Nova Negocio",
+      body: "Este teléfono puede mostrar tus avisos de venta.",
+      sound: "default",
+      data: { kind: "notice_preview" },
+    },
+    trigger: { channelId: "ventas" },
+  });
+  return true;
+}
 let scheduling: Promise<number> = Promise.resolve(0);
 export function scheduleFollowUps(
   list: FollowUp[],

@@ -14,3 +14,17 @@ _respaldo*/
 *.aab
 *.jks
 *.keystore
+# 2.5.2 · Repositorio en GitHub (privado): solo código. Nunca llaves, APK, respaldos ni archivos generados.
+android/.kotlin/
+ios/
+__pycache__/
+*.pyc
+*.idsig
+*.tgz
+*.tar
+*.part[0-9]*
+*.p12
+*.p8
+*.mobileprovision
+.DS_Store
+Thumbs.db

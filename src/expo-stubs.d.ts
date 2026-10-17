@@ -7,6 +7,8 @@ declare module "expo-file-system/legacy" {
   export function makeDirectoryAsync(uri: string, options?: { intermediates?: boolean }): Promise<void>;
   export function readDirectoryAsync(uri: string): Promise<string[]>;
   export function deleteAsync(uri: string, options?: { idempotent?: boolean }): Promise<void>;
+  export function getInfoAsync(uri: string, options?: any): Promise<{ exists: boolean; size?: number; uri?: string }>;
+  export function downloadAsync(uri: string, fileUri: string, options?: any): Promise<{ status: number; uri: string }>;
 }
 declare module "expo-sharing" {
   export function isAvailableAsync(): Promise<boolean>;

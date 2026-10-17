@@ -1,6 +1,53 @@
-# Nova Negocio · 2.2
+# Nova Negocio · 2.5.2
 
-App de GNS · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes, campañas y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
+App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
+
+**2.5.2 (versionCode 50):** corrige «Property 'Buffer' doesn't exist» al mandar el catálogo con fotos PNG (Hermes no tiene Buffer): toda conversión a JPG pasa por `encodeJpegBytes` de `src/photos.ts`, una foto que falla ya no detiene el catálogo y `tests/hermes.cjs` prueba el envío completo sin Buffer.
+
+**2.5.1 (versionCode 49):** en Ajustes → Formas de pago, el dueño elige qué formas de cobro aparecen en su carrito (por ejemplo, quitar «Transferencias»); las ventas y saldos anteriores no cambian. Se guarda en el ajuste local `hiddenPayAccounts`.
+
+**2.5.0 · Catálogo por WhatsApp y Formas de pago (versionCode 48, solo JavaScript sobre el APK nativo 2.2.4):**
+
+- Catálogo para clientes: se elige al cliente (o se escribe su número) y con un toque se abre su chat de WhatsApp con el enlace al PDF, que la app sube al espacio público `catalogos` de Supabase (`Cloud.uploadPublic`). La app avisa, guarda el envío (`catalogSends`) y lo muestra en la tarjeta del cliente. Sin internet o sin el SQL 2.5, se manda el catálogo en texto.
+- **Una sola vez:** correr `supabase/migrations/2.5.0_catalogos.sql` en el SQL Editor de Supabase (crea el bucket público y deja subir solo al dueño). `supabase/schema.sql` ya lo incluye para instalaciones nuevas.
+- PDF con el estilo de la app (`src/catalogPdf.ts`, `src/pdf.ts`): Inter incrustada (TrueType), esquinas redondeadas, logo centrado, 3 tarjetas por renglón, compresión Flate y todas las fotos: JPG, PNG con transparencia sobre blanco (`src/png.ts`) y otros formatos con el convertidor del teléfono.
+- Ajustes → **Formas de pago**: editar, eliminar y asignar cada cuenta (tú y cada vendedor) y elegir con qué cobra cada vendedor, en una página.
+
+**2.4.1 (versionCode 47):** barra del carrito en una sola línea en teléfonos angostos.
+
+**2.4.0 · UX premium: One UI 7 / iOS 26 (versionCode 46, solo JavaScript sobre el APK nativo 2.2.4):**
+
+- Tipografía Inter (SIL OFL) con espaciado óptico y números tabulares: `src/fontData.ts` (generado por `scripts/make_fonts.py`), `src/fonts.ts` la registra con ExpoFontLoader al abrir (máximo 1.5 s; si falla, letra del sistema) y `src/text.tsx` convierte el peso en la familia de Inter. Los TTF quedan en `assets/fonts/` para la próxima compilación nativa.
+- Esquinas grandes (tarjetas 24, botones cápsula), barra de pestañas flotante tipo cápsula con indicador, carrito negro flotante con «Cobrar», logos centrados en encabezado, inicio de sesión y bloqueo.
+- Vender y cobrar: carrito en tarjeta con selector − cantidad +, cliente como fila, formas de cobro como botones grandes con ícono, total destacado y un solo botón «Cobrar $…». Vendedor igual.
+- Stock: accesos rápidos (Nuevo producto, Escanear, Nueva entrada, Conteo); tarjetas que abren el detalle; detalle con Editar, Entrada y Conteo.
+- Clientes: buscador con botón de alta, iniciales, llamar/WhatsApp/editar como íconos y «Nueva venta».
+- Ventas: vendido hoy destacado, accesos rápidos (Corte de caja, Resumen, Nuevo gasto, Excel) y detalle de venta con acciones en lista.
+
+**2.3.0 · Rediseño minimalista estilo iOS para Android (versionCode 45, solo JavaScript sobre el APK nativo 2.2.4):**
+
+- Estilo nuevo en `src/theme.ts` y `src/ui.tsx`: fondo gris claro, tarjetas blancas sin bordes, texto negro y un solo acento (el rojo del logo). Botones redondeados, botones chicos con relleno suave, deshabilitados en gris, chips y buscador con relleno, avisos flotantes oscuros.
+- Íconos de línea (Lucide, licencia ISC) en lugar de emojis en pestañas, menús, botones y carrito: `src/icons.ts`, generado con `scripts/make_icons.py` como PNG embebidos que se pintan con `tintColor` (no requieren recursos nativos).
+- Navegación: cuatro pestañas (Vender, Ventas, Clientes, Stock) con títulos grandes; Ajustes (antes Parámetros) se abre con el engrane de arriba. En el vendedor: Vender, Stock, Mis ventas y Caja; Cuenta se abre con el ícono de persona. Pantallas internas con «‹ Anterior» y título centrado.
+- Ajustes como lista agrupada con íconos en cuadritos de color (como Ajustes de iPhone); funciones avanzadas e inicio con huella en la misma lista.
+- Formularios como hoja con «Cerrar» en color de acento; tarjetas de estado correcto en blanco (el estado lo dice la etiqueta).
+- Componentes nuevos: `Icon`, `IconButton`, `TextButton`, `AppHeader`, `TabBar`, `MenuList`.
+
+**2.2.6 · Rediseño, fase 2 (versionCode 44, JavaScript e imágenes de marca sobre el APK nativo 2.2.4):**
+
+- Ventas más sencilla: resumen compacto (vendido hoy, número de ventas y por cobrar), accesos en una fila (Corte de caja, Resumen, Gasto, Excel), filtros en una sola fila deslizable y cada venta con sus productos en una o dos líneas.
+- Parámetros: comisión en una tarjeta corta (tu precio → el cliente paga → recibes), avisos con estado y dos botones, huella o rostro con estado y menús más compactos.
+- Textos largos recortados en todas las pantallas; filtros (`Chips row`) en una fila deslizable en Clientes, Cobros, Reportes y Catálogo.
+- Vendedor: caja sin fondo verde y sin mensajes repetidos sin internet.
+- Ícono de la app, pantalla de inicio e ícono de avisos con el logo GGG · Nova Supps; color de avisos rojo de la marca. Se generan con `scripts/make_brand_icons.py` y se aplican sobre el APK con `native/res_2.2/overrides.json` (mismo nombre y tamaño de imagen, sin compilar).
+
+**2.2.5 · Lector con cámara y rediseño (versionCode 43, solo JavaScript sobre el APK nativo 2.2.4):**
+
+- Lector con cámara: lee al instante (sin la espera de 2.5 s), vibra y muestra el resultado en la misma pantalla. Cada lectura en Vender agrega una pieza; *Quitar una* y *Listo* sin salir. Un código que no está en el catálogo ofrece *Dar de alta o asignar* (se abre al cerrar el lector, sin encimar ventanas). En Producto, el lector llena el campo *Código de barras* y avisa si ya es de otro producto.
+- Reconocimiento de códigos (`src/barcodes.ts`): UPC-A = EAN-13 con cero = GTIN-14, UPC-E comprimido, GS1 con datos extra, Code 39 con asteriscos, dígitos con espacios, prefijos del lector y SKU con o sin guiones (solo si no es ambiguo).
+- Rediseño con los colores del logo oficial (rojo, dorado, negro y blanco) en `src/theme.ts`; logotipo GGG · Nova Supps en el encabezado, el inicio de sesión y el bloqueo; botones chicos con contorno para no saturar de rojo.
+- Se quitaron Campañas, Oportunidades, Compañías, Ubicaciones y Paquetes (pantallas, menús, campos y código). Los datos anteriores se conservan en la base y en los respaldos.
+- Limpieza: imports y cálculos sin uso (por ejemplo, seguimientos calculados en cada pantalla), pruebas unitarias que no corrían en Node 22, pruebas 2.2 desactualizadas.
 
 **2.2.0 · Código preparado para compilación nativa (versionCode 38):**
 
@@ -50,6 +97,18 @@ Historial completo en `docs/ACTUALIZACION_0.9.md`. Configuración y actualizaci�
 
 Sigue `docs/COMPILAR_ANDROID_EAS.md`: configurar Expo/Firebase → comprobar → compilar con EAS → refirmar localmente con `scripts/resign_apk.py`.
 
+### Cambios solo de JavaScript sobre el APK nativo 2.2.x (2.2.5 a 2.5.2)
+
+```bash
+npm ci
+npm run check && npm run test:all
+NODE_ENV=production npx expo export:embed --entry-file index.ts --platform android --dev false --bytecode --max-workers 2 --bundle-output build/index.android.bundle --assets-dest build/res
+python3 scripts/make_brand_icons.py   # solo si cambia el logo (requiere Pillow)
+python3 scripts/package_android_js_native.py /ruta/Nova_Negocio_2.5.1_Android.apk 2.5.2 50   # requiere apksigner, aapt2 y signing/
+```
+
+Genera un `app.manifest` nuevo de expo-updates para que el teléfono use este bundle, conserva el runtime nativo `2.2.4` (`runtimeVersion` fijo en `app.json`) y firma con la llave original. También reemplaza ícono, pantalla de inicio e ícono de avisos según `native/res_2.2/overrides.json` (por nombre de recurso, mismo tamaño). Si agregas módulos nativos o imágenes nuevas como archivo, hace falta compilar con EAS. Alternativa sin APK: `eas update --channel preview` (mismo runtime 2.2.4).
+
 ## Método anterior: APK solo JS sobre el runtime nativo 0.6
 
 ```bash
@@ -85,6 +144,14 @@ Se compila en la nube de Expo (EAS) desde tu computadora y se instala con TestFl
 | `supabase/functions/cobro-terminal/` | Función del servidor para cobrar y administrar usuarios |
 | `tests/` | Pruebas; `tests/fixtures/` tiene los datos de prueba (la app no trae datos) |
 
+## Repositorio en GitHub (privado)
+
+El código vive en un repositorio **privado** de GitHub. `.gitignore` deja fuera todo lo que no es código o es secreto:
+
+- Nunca se suben: `signing/` (llave de firma), `nova-negocio-firebase-adminsdk-*.json`, `google-services.json`, `.env`, `node_modules/`, `build/`, `deliverables/` (APK), `Claude outputs/` y `_respaldo*/`. Estos se quedan solo en tu computadora: respáldalos aparte.
+- `eas build` sigue tomando `google-services.json` de la carpeta (usa `.easignore`, no `.gitignore`).
+- Después de cada actualización: GitHub Desktop → *Changes* → resumen «Nova Negocio X.Y.Z» → **Commit to master** → **Push origin**.
+
 ## Pruebas
 
 - `npm test`: motor de negocio e importación.
@@ -92,6 +159,7 @@ Se compila en la nube de Expo (EAS) desde tu computadora y se instala con TestFl
   - `ui`, `forms`, `team`, `lock`, `charge`, `cloud`, `photos`, `receipt`.
   - `terminalnormal`: terminal en modo normal (vendedor y dueño cobran directo y ligan el pago).
   - `v21`: promociones (dueño, vendedor y servidor), lector de códigos, reportes, catálogo para clientes, respaldo en la nube y base en línea anterior a 2.1.
+  - `hermes`: catálogo por WhatsApp sin `Buffer` (como en Android con Hermes).
   - `iosphoto`: foto del producto en iPhone (Fotos, cámara, Archivos → JPG de 1024 px).
   - `v17`: precios originales, comisión que absorbe el cliente (2.0), Excel, avisos, venta por categoría, carrito y Parámetros.
 - `node tests/screens.cjs`: recorre todas las pantallas del dueño y falla si hay textos fuera de `<Text>`, valores rotos (NaN, undefined) o avisos de React.

@@ -189,6 +189,46 @@ export class Cloud {
   remove(table: string, filter: string) {
     return this.request(`/rest/v1/${table}?${filter}`, { method: "DELETE" });
   }
+  /**
+   * 2.5 · Sube un archivo a un espacio público de Storage (catálogo en PDF) y devuelve su
+   * enlace público. Solo el dueño puede subir (SQL 2.5); cualquiera con el enlace lo puede ver.
+   */
+  async uploadPublic(bucket: string, path: string, bytes: Uint8Array, contentType: string): Promise<string> {
+    await this.ensureFresh();
+    let res;
+    try {
+      res = await this.fetcher(`${this.cfg.url}/storage/v1/object/${bucket}/${path}`, {
+        method: "POST",
+        headers: {
+          apikey: this.cfg.anonKey,
+          Authorization: `Bearer ${this.session!.access_token}`,
+          "Content-Type": contentType,
+          "x-upsert": "false",
+          ...(this.device ? { "x-device-id": this.device } : {}),
+        },
+        body: bytes,
+      });
+    } catch {
+      throw new CloudError("Sin conexión a internet.", 0, "network");
+    }
+    if (!res.ok) {
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {}
+      const raw = String(data?.message || data?.error || "");
+      throw new CloudError(
+        /bucket not found/i.test(raw) || res.status === 404
+          ? "Falta activar el envío de catálogos: corre el SQL 2.5 en Supabase."
+          : res.status === 403 || res.status === 401 || /row-level|policy|unauthorized/i.test(raw)
+            ? "Tu base en línea aún no permite subir catálogos: corre el SQL 2.5 en Supabase."
+            : `La base en línea respondió ${res.status}${raw ? `: ${raw}` : ""}.`,
+        res.status,
+        "storage",
+      );
+    }
+    return `${this.cfg.url}/storage/v1/object/public/${bucket}/${path.split("/").map(encodeURIComponent).join("/")}`;
+  }
   /** Llama a una Edge Function; devuelve { ok, status, data } sin lanzar por errores HTTP. */
   async invoke(name: string, body: unknown): Promise<{ ok: boolean; status: number; data: any }> {
     await this.ensureFresh();

@@ -34,8 +34,8 @@ const text = (node) => (typeof node === "string" ? node : (node.children || []).
 const all = () => text(ui.root);
 const pressables = (pred) => ui.root.findAll((n) => n.type === "Pressable" && typeof n.props.onPress === "function" && pred(n));
 async function press(label) { const c = pressables((n) => text(n).includes(label)); assert(c.length, label); await act(async () => c[c.length - 1].props.onPress()); }
-async function pressExact(label) { const c = pressables((n) => text(n).trim() === label && !n.props.disabled); assert(c.length, label); await act(async () => c[0].props.onPress()); }
-async function tab(label) { const c = pressables((n) => text(n).trim().endsWith(" " + label) || text(n).trim() === label); assert(c.length, label); await act(async () => c[c.length - 1].props.onPress()); }
+async function pressExact(label) { let c = pressables((n) => text(n).trim() === label && !n.props.disabled); if (!c.length) c = pressables((n) => n.props.accessibilityLabel === label && !n.props.disabled); assert(c.length, label); await act(async () => c[0].props.onPress()); }
+async function tab(label) { let c = pressables((n) => text(n).trim().endsWith(" " + label) || text(n).trim() === label); if (!c.length) c = pressables((n) => n.props.accessibilityLabel === label); if (!c.length && label === "Ajustes") { const v = pressables((n) => n.props.accessibilityState && "selected" in n.props.accessibilityState && text(n).trim() === "Vender"); if (v.length) await act(async () => v[v.length - 1].props.onPress()); c = pressables((n) => n.props.accessibilityLabel === label); } assert(c.length, label); await act(async () => c[c.length - 1].props.onPress()); }
 async function pressLabel(label) { const c = pressables((n) => n.props.accessibilityLabel === label); assert(c.length, label); await act(async () => c[0].props.onPress()); }
 const tiles = () => ui.root.findAll((n) => n.type === "Pressable" && /^Agregar /.test(n.props.accessibilityLabel || "") && !/^Agregar otra/.test(n.props.accessibilityLabel)).map((n) => n.props.accessibilityLabel.slice(8));
 const flush = async (ms = 50) => act(async () => { await new Promise((r) => setTimeout(r, ms)); });
@@ -101,7 +101,7 @@ const day = (n) => addDays(require("../src/business.ts").today(), n);
   const pick = pwo.find((p) => p.available > 1);
   await pressLabel("Agregar " + pick.name);
   await pressLabel("Agregar otra de " + pick.name);
-  assert(all().includes("🛒 Carrito · 2 piezas"), "la barra del carrito muestra lo agregado");
+  assert(all().includes("Carrito · 2 piezas"), "la barra del carrito muestra lo agregado");
   assert.equal(ui.root.findAll((n) => n.type === "Text" && n.props.style && n.props.style.backgroundColor === undefined && text(n).trim() === "2").length > 0, true, "la foto muestra 2 en la venta");
   await pressLabel("Quitar una de " + pick.name);
   assert(all().includes(`${pick.name}`));
@@ -112,11 +112,11 @@ const day = (n) => addDays(require("../src/business.ts").today(), n);
   assert(tiles().includes(snack.name), "la búsqueda encuentra en todas las categorías");
   // El carrito: productos, cliente, forma de cobro y desglose en una sola pantalla.
   await pressLabel("Abrir carrito");
-  assert(all().includes("🛒 Tu carrito · 1 pieza") && all().includes("Solo lo ves tú") && all().includes("Total a cobrar"), "carrito con desglose del dueño");
+  assert(all().includes("Tu carrito · 1 pieza") && all().includes("Solo lo ves tú") && all().includes("Total a cobrar"), "carrito con desglose del dueño");
   assert(!ui.root.findAll((n) => /^Categoría /.test(n.props.accessibilityLabel || "")).length, "el carrito no repite el catálogo");
   await pressExact("Cerrar");
   assert(ui.root.findAll((n) => n.props.accessibilityLabel === "Abrir carrito").length, "cerrar no vacía el carrito");
-  await pressExact("🗑 Vaciar carrito");
+  await pressExact("Vaciar carrito");
   console.log("  ✓ venta por categoría (Creatinas, Proteínas, PWO, Snacks, Vitaminas…) con fotos, sin lista");
 
   // ---------- 4. Excel de ventas ----------
@@ -125,7 +125,7 @@ const day = (n) => addDays(require("../src/business.ts").today(), n);
   const pTotal = grossUp(p.price);
   b.sell([{ productId: p.id, qty: 1 }], pTotal, pTotal, card, null, null, "Mostrador", false, null, { amount: pTotal - p.price, bps: 406 });
   await tab("Ventas");
-  await press("📥 Descargar Excel de ventas");
+  await pressExact("Excel");
   await pressExact("Todo");
   await press("Descargar Excel · Todo");
   for (let i = 0; i < 5; i++) await flush(30);
@@ -160,13 +160,13 @@ print(json.dumps({'sheets':wb.sheetnames,'hdr':hdr,'n':len(rows),'last':[str(x) 
 
   // ---------- 5. 1.8 · Carrito de compras ----------
   await tab("Stock");
-  const inCart = () => pressables((n) => text(n).trim() === "🛒 Al carrito" && !n.props.disabled);
+  const inCart = () => pressables((n) => text(n).trim() === "Al carrito" && !n.props.disabled);
   const s0 = b.sales().length;
   await act(async () => inCart()[0].props.onPress());
   await act(async () => inCart()[0].props.onPress());
-  assert(all().includes("🛒 Carrito · 2 piezas"), "Stock manda al carrito sin abrir la venta");
+  assert(all().includes("Carrito · 2 piezas"), "Stock manda al carrito sin abrir la venta");
   assert(!ui.root.findAll((n) => n.type === "Modal").some((m) => m.props.visible), "no obliga a llenar la venta");
-  assert(all().includes("🛒 En el carrito: 1"));
+  assert(all().includes("En el carrito: 1"));
   await pressLabel("Abrir carrito");
   const cardName = b.all("SELECT name FROM accounts WHERE kind='Tarjeta'")[0].name;
   await pressExact(cardName);
@@ -174,7 +174,7 @@ print(json.dumps({'sheets':wb.sheetnames,'hdr':hdr,'n':len(rows),'last':[str(x) 
   const cash = b.all("SELECT name FROM accounts WHERE kind='Efectivo'")[0].name;
   await pressExact(cash);
   assert(all().includes("Comisión que absorbe el cliente"), "efectivo: también la absorbe el cliente");
-  await pressExact("Cobrar y confirmar venta");
+  await press("Cobrar $");
   for (let i = 0; i < 3; i++) await flush(20);
   assert.equal(b.sales().length, s0 + 1, "venta registrada desde el carrito");
   assert(!ui.root.findAll((n) => n.props.accessibilityLabel === "Abrir carrito").length, "el carrito queda vacío después de cobrar");
@@ -195,7 +195,7 @@ print(json.dumps({'sheets':wb.sheetnames,'hdr':hdr,'n':len(rows),'last':[str(x) 
   await tab("Stock");
   await act(async () => inCart()[0].props.onPress());
   const barText = text(pressables((n) => n.props.accessibilityLabel === "Abrir carrito")[0]);
-  const one = b.stock().find((x) => all().includes("🛒 En el carrito: 1") && x.available > 0 && barText.includes(money(grossUp(x.price))));
+  const one = b.stock().find((x) => all().includes("En el carrito: 1") && x.available > 0 && barText.includes(money(grossUp(x.price))));
   assert(one, "la barra del carrito muestra el precio al cliente: " + barText);
   await pressLabel("Abrir carrito");
   const bank = b.all("SELECT name FROM accounts WHERE kind='Banco'")[0].name;
@@ -203,7 +203,7 @@ print(json.dumps({'sheets':wb.sheetnames,'hdr':hdr,'n':len(rows),'last':[str(x) 
   assert(all().includes("Comisión que absorbe el cliente"), "transferencia también");
   assert(!ui.root.findAll((n) => n.type === "Switch" && n.props.accessibilityLabel === "Sumar comisión").length, "2.0: sin interruptor");
   const s1 = b.sales().length;
-  await pressExact("🗑 Vaciar carrito");
+  await pressExact("Vaciar carrito");
   assert(!ui.root.findAll((n) => n.type === "Modal").some((m) => m.props.visible), "cierra el cobro");
   assert(!ui.root.findAll((n) => n.props.accessibilityLabel === "Abrir carrito").length, "carrito vacío");
   assert.equal(b.sales().length, s1, "no registra nada");
@@ -211,7 +211,7 @@ print(json.dumps({'sheets':wb.sheetnames,'hdr':hdr,'n':len(rows),'last':[str(x) 
   console.log("  ✓ 2.0: el cliente absorbe la comisión con cualquier forma de pago; vaciar carrito desde el cobro");
 
   // ---------- 6. Módulo de comisión ----------
-  await tab("Parámetros");
+  await tab("Ajustes");
   assert(all().includes("Comisión que absorbe el cliente") && all().includes("El cliente paga") && all().includes("$1,042.32") && all().includes("Recibes"));
   await pressExact("Cambiar porcentaje");
   const rate = ui.root.findAll((n) => n.type === "TextInput" && n.props.accessibilityLabel === "Comisión (%) *")[0];

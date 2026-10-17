@@ -1,4 +1,4 @@
-# Nova Negocio 2.2 · Android con Expo y Firebase
+# Nova Negocio 2.2.3 · Android con Expo y Firebase
 
 La 2.2 añade lector con cámara, avisos, almacén seguro y actualizaciones. Necesita una compilación nativa nueva. El APK 2.1 es el instalable anterior y no contiene esos módulos.
 
@@ -16,7 +16,7 @@ eas update:configure
 
 Introduce tú mismo las credenciales y códigos que solicite Expo. Conserva `extra.eas.projectId` y `owner` en `app.json`.
 
-Después de configurar actualizaciones, comprueba que la app conserve versión **2.2.0**, `android.versionCode` **38**, `android.googleServicesFile` **./google-services.json**, `runtimeVersion: { policy: "appVersion" }`, `updates.checkAutomatically: "NEVER"` y `updates.fallbackToCacheTimeout: 0`. La URL de actualizaciones debe ser `https://u.expo.dev/` seguida del identificador real de tu proyecto.
+Después de configurar actualizaciones, comprueba que la app conserve versión **2.2.3**, `android.versionCode` **41**, `android.googleServicesFile` **./google-services.json**, `runtimeVersion: { policy: "appVersion" }`, `updates.checkAutomatically: "NEVER"` y `updates.fallbackToCacheTimeout: 0`. La URL de actualizaciones debe ser `https://u.expo.dev/` seguida del identificador real de tu proyecto.
 
 `eas.json` ya usa `appVersionSource: local`, perfil APK `preview`, canal `preview` y credenciales de firma de Expo.
 
@@ -34,7 +34,7 @@ Los avisos pasan por Expo y Firebase e incluyen nombre del vendedor, monto, tipo
 
 ## 3. Actualizar la base en línea
 
-`supabase/schema.sql` incluye la instalación completa y las actualizaciones 2.1 y 2.2. Abre tu proyecto en Supabase → SQL Editor y carga el archivo completo. **Tú das Run**. Es repetible y conserva los registros existentes. Los avisos necesitan `pg_net`; si no está disponible, el SQL lo indica y las ventas siguen funcionando.
+`supabase/schema.sql` incluye la instalación completa y las actualizaciones 2.1, 2.2 y 2.2.3. Abre tu proyecto en Supabase → SQL Editor y carga el archivo completo. **Tú das Run**. Es repetible y conserva los registros existentes. Los avisos necesitan `pg_net`; si no está disponible, el SQL lo indica y las ventas siguen funcionando.
 
 La función `cobro-terminal` conserva el flujo anterior; estas correcciones no requieren publicarla de nuevo.
 
@@ -43,12 +43,10 @@ La función `cobro-terminal` conserva el flujo anterior; estas correcciones no r
 ```powershell
 npm run android:config
 npm run check
-npm run test:all
 ```
 
 La comprobación local revisa Expo, URL de actualizaciones, Firebase, paquete, versión y canal. Revisa también que la clave FCM V1 esté cargada en `eas credentials`.
 
-La prueba del Excel usa Python con `openpyxl`. Si falta, configura Python y ejecuta `python -m pip install openpyxl`. Puedes indicar el ejecutable de pruebas con `$env:NOVA_TEST_PYTHON='C:\ruta\python.exe'`.
 
 ## 5. Compilar en EAS
 
@@ -58,21 +56,21 @@ eas build -p android --profile preview
 
 Permite que Expo genere o use **su propia llave de compilación**. La llave original de Nova está en `signing/` y debe permanecer en tu PC. No la importes a EAS. `.easignore` excluye firma, credenciales, APK, fuentes archivadas y cuentas de servicio.
 
-Descarga el APK con otro nombre, por ejemplo **Nova_2.2_EAS.apk**. Aún tiene la firma de Expo y debe refirmarse antes de instalarlo encima de la app actual.
+Descarga el APK con otro nombre, por ejemplo **Nova_2.2.3_EAS.apk**. Aún tiene la firma de Expo y debe refirmarse antes de instalarlo encima de la app actual.
 
 ## 6. Refirmar con la llave original
 
 Instala Android SDK Build Tools recientes (`zipalign`, `aapt`, `apksigner`) y un JDK. Define `ANDROID_HOME` y `JAVA_HOME` o indica las rutas con las opciones del script.
 
 ```powershell
-python scripts/resign_apk.py 'C:\ruta\Nova_2.2_EAS.apk'
+python scripts/resign_apk.py 'C:\ruta\Nova_2.2.3_EAS.apk'
 ```
 
-El script lee localmente `signing/credentials.json` y `signing/nova-release.jks`. Verifica el APK 2.1 de referencia, paquete, versión, código 38, alineación a 16 KB y firmas v1, v2 y v3. El certificado final debe ser:
+El script lee localmente `signing/credentials.json` y `signing/nova-release.jks`. Verifica el APK 2.1 de referencia, paquete, versión, código 41, alineación a 16 KB y firmas v1, v2 y v3. El certificado final debe ser:
 
 `3b71f02d1463b877e7f20dd3141e150e10e5c60e40c2198ba98dadd10207ae94`
 
-Guarda el resultado como **deliverables/Nova_Negocio_2.2_Android.apk** e informa su SHA-256. Si el nombre ya existe, se detiene: elige otro con `--out`. Nunca sobrescribe un APK anterior ni imprime contraseñas.
+Guarda el resultado como **deliverables/Nova_Negocio_2.2.3_Android.apk** e informa su SHA-256. Si el nombre ya existe, se detiene: elige otro con `--out`. Nunca sobrescribe un APK anterior ni imprime contraseñas.
 
 ## 7. Instalar y probar en teléfonos
 
@@ -80,7 +78,7 @@ Guarda el resultado como **deliverables/Nova_Negocio_2.2_Android.apk** e informa
 2. En dueño y vendedores, toca **Sincronizar ahora / Actualizar ahora**.
 3. Activa **Avisos en este teléfono** en Parámetros del dueño y Cuenta del vendedor. Da el permiso de Android.
 4. Comprueba los avisos con una venta del vendedor, un cierre de caja y una venta rechazada.
-5. Lee un código con 📷. Debe agregar una pieza mientras el código permanece frente a la cámara, avisar si no está en el catálogo y respetar existencias. Para otra pieza igual, retira el código o toca el botón del lector.
+5. Lee un código con 📷. En Stock, la cámara se cierra y abre la vista previa. En Vender, un código reconocido agrega una pieza al carrito automáticamente y muestra el producto. Si el código del fabricante no está vinculado, se consulta en línea; la asociación automática exige una coincidencia clara.
 6. En Producto → Más detalles, prueba guardar el código y **Tomar foto**; comprueba la imagen guardada.
 7. Prueba un cobro real en la terminal en modo normal y **Ya cobré**. Esta comprobación necesita teléfono, terminal y cuenta real.
 
@@ -100,6 +98,12 @@ La app consulta al abrir y volver a primer plano, como máximo cada 6 horas. Des
 
 ## Pendientes que necesitan tu cuenta o teléfono
 
-Crear Expo/Firebase, cargar FCM V1, dar Run al SQL, compilar, refirmar y probar en teléfonos. La tarjeta de recompensas necesita definir sus reglas contigo; TestFlight sigue pendiente de Apple Developer.
+La entrega 2.2 ya tiene Expo/Firebase configurados, FCM V1 cargado, SQL 2.2 ejecutado según confirmó el usuario y APK generado y firmado localmente. Pendiente: instalar y probar en teléfonos. Ver INSTALAR_ANDROID_2.2.md. La tarjeta de recompensas necesita definir sus reglas contigo; TestFlight sigue pendiente de Apple Developer.
 
 Referencias: [Expo Notifications](https://docs.expo.dev/versions/v55.0.0/sdk/notifications/), [runtime de EAS Update](https://docs.expo.dev/eas-update/runtime-versions/), [apksigner](https://developer.android.com/tools/apksigner).
+
+Guía de avisos y alta por código de esta actualización: [AVISOS_Y_LECTOR_2.2.3.md](AVISOS_Y_LECTOR_2.2.3.md).
+
+Lector automático de esta entrega: [LECTOR_AUTOMATICO_2.2.3.md](LECTOR_AUTOMATICO_2.2.3.md). Para vendedores sobre una base 2.2 existente, ejecutar solamente `supabase/migrations/2.2.2_lector.sql` y sincronizar. El usuario pulsa Run.
+
+Guía actual de código, foto, carrito y avisos del dueño: [LECTOR_Y_AVISOS_2.2.3.md](LECTOR_Y_AVISOS_2.2.3.md). Los avisos de ventas del dueño se solicitan localmente al completar la operación.

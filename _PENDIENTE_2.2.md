@@ -1,26 +1,59 @@
-# Nova Negocio 2.2 · Fuente corregida y validada · 12-oct-2026
+# Nova Negocio 2.5.2 · 15-oct-2026
 
-Las correcciones de código están terminadas y verificadas. Ver docs/VALIDACION_2.2.md.
+Actualización de JavaScript sobre el APK nativo 2.2.4 (mismo runtime de expo-updates 2.2.4).
+APK: deliverables/Nova_Negocio_2.5.2_Android.apk · versión 2.5.2 / versionCode 50 · firma original 3b71f02d…ae94.
+Se generó sobre la 2.5.1 con scripts/package_android_js_native.py.
 
-- Fuente 2.2.0 / versionCode 38.
-- SecureStore integrado, migración conservando credenciales y escrituras atómicas.
-- Avisos y seguimientos integrados; SQL de permisos y triggers probado localmente.
-- Lector con cámara, código del producto y fotos de Android.
-- Actualizaciones con reinicio protegido durante cobros.
-- Pantallas separadas, tabla de cobros y Parámetros en cuatro secciones.
-- Configuración, script de refirma local, pruebas portables y documentación.
+PASO ÚNICO EN SUPABASE (lo corres tú): SQL Editor → pega supabase/migrations/2.5.0_catalogos.sql → Run.
+Crea el espacio público "catalogos" para los PDF. Sin esto, el catálogo se manda en texto y la app dice que falta.
 
-Pendiente para generar el APK instalable:
-1. Crear las cuentas y proyectos de Expo y Firebase (el usuario confirmó que aún no existen).
-2. Ejecutar eas init / eas update:configure y conservar projectId y owner.
-3. Poner google-services.json real en la raíz y configurar FCM V1 con eas credentials.
-4. El usuario carga schema.sql en Supabase y da Run; no se ejecutó en producción.
-5. Compilar con EAS, descargar el APK y refirmar localmente con scripts/resign_apk.py.
-6. Instalar encima de 2.1 y probar avisos, cámara y un cobro real con Ya cobré.
+Hecho en 2.5.2: corregido «Property 'Buffer' doesn't exist» al enviar el catálogo o crear el PDF con fotos PNG.
 
-No existe aún un APK 2.2 entregable. La fuente y el bundle de prueba no sustituyen la compilación nativa.
+Hecho en 2.5.1: Ajustes → Formas de pago → «Tú (dueño) · en tu carrito»: tocar una forma (p. ej. Transferencias) la quita
+o la pone al cobrar. Siempre queda al menos una. Las ventas y saldos anteriores no cambian.
 
-Guía: docs/COMPILAR_ANDROID_EAS.md.
-Tarjeta de recompensas: pendiente de definir reglas.
-iPhone/TestFlight: pendiente de cuenta Apple Developer.
+Hecho en 2.5.0:
+- Catálogo para clientes: eliges al cliente (o escribes su número) y con un toque se abre su chat de WhatsApp con el
+  enlace al PDF. La app avisa «Catálogo enviado a …», lo guarda en «Últimos envíos» y en la tarjeta del cliente.
+  Atajo en Clientes (ícono de libro). Sin internet o sin el SQL 2.5: se manda el catálogo en texto.
+- PDF con el estilo de la app: letra Inter, logo centrado, tarjetas redondeadas, 3 por renglón, todas las fotos
+  (JPG, PNG con fondo transparente sobre blanco, WebP con el convertidor del teléfono) y agotados marcados.
+- Ajustes → Formas de pago (antes «Datos para transferencia»): editar y eliminar cada cuenta, elegir quién la usa
+  (tú y cada vendedor) y con qué cobra cada vendedor (efectivo, tarjeta, transferencia), todo en una página.
 
+Hecho en 2.4.1: barra del carrito en una sola línea.
+
+Hecho en 2.4.0 (UX premium, One UI 7 / iOS 26):
+- Letra Inter, esquinas grandes, barra de pestañas flotante y logos centrados.
+- Vender y cobrar en menos pasos (carrito, cliente, forma de cobro con botones grandes, «Cobrar $…»).
+- Stock, Clientes y Ventas con accesos rápidos y tarjetas más limpias; detalle de venta con acciones en lista.
+
+Hecho en 2.3.0 (rediseño minimalista estilo iOS):
+- Fondo gris claro, tarjetas blancas, texto negro y el rojo del logo como único acento.
+- Íconos de línea en lugar de emojis (src/icons.ts, scripts/make_icons.py).
+- Cuatro pestañas con títulos grandes; Ajustes con el engrane de arriba (vendedor: Cuenta con el ícono de persona).
+- Ajustes como lista agrupada con íconos; formularios como hoja con «Cerrar».
+
+
+Hecho en 2.2.6 (fase 2 del rediseño):
+- Ventas: resumen compacto, accesos en una fila, filtros deslizables y productos de cada venta a la vista.
+- Parámetros: comisión, avisos y huella en tarjetas cortas; menús más compactos.
+- Textos largos recortados; filtros en una sola fila en Clientes, Cobros, Reportes y Catálogo.
+- Vendedor: caja más limpia y sin mensajes repetidos sin internet.
+- Ícono, pantalla de inicio e ícono de avisos con el logo GGG · Nova Supps (scripts/make_brand_icons.py).
+
+Hecho en 2.2.5:
+- Lector con cámara rápido y claro (sin espera de 2.5 s, resultado y acciones en el lector, alta sin encimar ventanas).
+- Reconocimiento de códigos: UPC-E, EAN/UPC/GTIN-14, GS1, Code 39, espacios y SKU sin guiones (src/barcodes.ts).
+- Rediseño minimalista con los colores del logo oficial (src/theme.ts) y logotipo GGG · Nova Supps (src/brand.ts).
+- Se quitaron Campañas, Oportunidades, Compañías, Ubicaciones y Paquetes (los datos viejos se conservan).
+
+Pendiente en teléfonos:
+1. Correr el SQL 2.5 (arriba). Instalar la 2.5.2 encima de la 2.5.1 y revisar que Ajustes (engrane) diga "Nova Negocio 2.5.2".
+2. Mandar el catálogo a un cliente de prueba (tu propio número): debe abrir su chat con el enlace y el PDF debe abrir con fotos.
+3. En Ajustes → Formas de pago, quitar/poner una cuenta a un vendedor y revisar que la vea (o no) al elegir Transferencia.
+4. Probar el lector en Vender (cada lectura agrega una pieza), en Stock → Escanear producto y en Producto → Leer código.
+5. Pendientes anteriores: cobro real con Ya cobré en modo normal; avisos en dueño y vendedores.
+6. Confirmar el nombre de la tienda en comprobantes y catálogo: "GGG · Nova Supps".
+
+En la próxima compilación nativa con EAS, app.json ya usa assets/logo/icono_app.png, native/splash.png y el color de avisos #D9252F.

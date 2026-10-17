@@ -388,12 +388,13 @@ $$;
 -- 2.1: categoría de venta (para promociones) y código de barras (lector) publicados por el dueño.
 alter table public.catalog add column if not exists segment text not null default '';
 alter table public.catalog add column if not exists barcode text not null default '';
+alter table public.catalog add column if not exists scan_data jsonb not null default '{}';
 drop function if exists public.seller_catalog();
 create or replace function public.seller_catalog()
-returns table (product_id text, sku text, name text, brand text, category text, price integer, available integer, image_key text, segment text, barcode text)
+returns table (product_id text, sku text, name text, brand text, category text, price integer, available integer, image_key text, segment text, barcode text, scan_data jsonb)
 language sql stable security definer set search_path = public as $$
   select c.product_id, c.sku, c.name, c.brand, c.category, c.price,
-         greatest(0, c.available - public.pending_qty(c.product_id))::int, c.image_key, c.segment, c.barcode
+         greatest(0, c.available - public.pending_qty(c.product_id))::int, c.image_key, c.segment, c.barcode, c.scan_data
   from public.catalog c
   where public.is_member() and not c.archived
   order by c.name;
@@ -984,3 +985,36 @@ create trigger members_push after insert on public.members for each row execute 
 revoke all on function public.save_push_token(text, text), public.delete_push_token(), public.send_push(uuid[], text, text, jsonb), public.push_money(integer),
   public.notify_sale(), public.notify_closing(), public.notify_member() from public, anon, authenticated;
 grant execute on function public.save_push_token(text, text), public.delete_push_token() to authenticated;
+
+-- 2.5 · Catálogo en PDF por WhatsApp: espacio público "catalogos" (solo el dueño sube).
+create or replace function public.is_owner_account() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.members
+    where user_id = auth.uid() and role = 'owner' and active
+  );
+$$;
+revoke all on function public.is_owner_account() from public, anon;
+grant execute on function public.is_owner_account() to authenticated;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('catalogos', 'catalogos', true, 26214400, array['application/pdf'])
+on conflict (id) do update
+  set public = excluded.public,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists catalogos_owner_insert on storage.objects;
+create policy catalogos_owner_insert on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'catalogos' and public.is_owner_account());
+
+drop policy if exists catalogos_owner_select on storage.objects;
+create policy catalogos_owner_select on storage.objects
+  for select to authenticated
+  using (bucket_id = 'catalogos' and public.is_owner_account());
+
+drop policy if exists catalogos_owner_delete on storage.objects;
+create policy catalogos_owner_delete on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'catalogos' and public.is_owner_account());

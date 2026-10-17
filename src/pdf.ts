@@ -1,8 +1,16 @@
-// PDF mínimo en JavaScript (sin módulos nativos): páginas A4, texto con Helvetica
-// (codificación WinAnsi: acentos y ñ) e imágenes JPG incrustadas tal cual (DCTDecode).
+// PDF en JavaScript (sin módulos nativos): páginas A4, letra Inter incrustada (TrueType,
+// codificación WinAnsi: acentos y ñ) o Helvetica, imágenes JPG tal cual (DCTDecode) o RGB
+// comprimidas (FlateDecode), rectángulos redondeados y recorte. 2.5: contenido comprimido.
+import { zlibSync } from "fflate";
 
-export type PdfImage = { id: string; width: number; height: number; bytes: Uint8Array };
+export type PdfImage =
+  | { id: string; width: number; height: number; bytes: Uint8Array; kind?: "jpeg" }
+  /** Píxeles RGB sin comprimir (3 bytes por pixel). */
+  | { id: string; width: number; height: number; bytes: Uint8Array; kind: "rgb" };
+type RGB = [number, number, number];
 type Op = string;
+export type FontMetrics = { widths: number[]; ascent: number; descent: number; capHeight: number; bbox: number[] };
+type FontDef = { key: string; name: string; ttf?: Uint8Array; metrics?: FontMetrics; base14?: string };
 
 /** Ancho y alto de un JPG (marcador SOF); null si no es un JPG válido. */
 export function jpegSize(bytes: Uint8Array): { width: number; height: number } | null {
@@ -24,17 +32,26 @@ export function jpegSize(bytes: Uint8Array): { width: number; height: number } |
   return null;
 }
 
-const WIN: Record<string, number> = { "€": 0x80, "‚": 0x82, "„": 0x84, "…": 0x85, "‘": 0x91, "’": 0x92, "“": 0x93, "”": 0x94, "•": 0x95, "–": 0x96, "—": 0x97, "™": 0x99, "−": 0x2d };
-/** Texto → bytes WinAnsi escapados para un string de PDF. */
-function pdfText(text: string): string {
-  let out = "";
+const WIN: Record<string, number> = { "€": 0x80, "‚": 0x82, "„": 0x84, "…": 0x85, "‘": 0x91, "’": 0x92, "“": 0x93, "”": 0x94, "•": 0x95, "–": 0x96, "—": 0x97, "™": 0x99, "−": 0x2d, "→": 0x3e };
+const WIN_CODES = new Set(Object.values(WIN));
+/** Código WinAnsi de cada letra (? si no existe). */
+function winCodes(text: string): number[] {
+  const out: number[] = [];
   for (const ch of text.normalize("NFC")) {
     let code = WIN[ch] ?? ch.charCodeAt(0);
-    if (code > 0xff || (code >= 0x80 && code < 0xa0 && !Object.values(WIN).includes(code))) code = 0x3f; // ?
-    const c = String.fromCharCode(code);
-    out += c === "(" || c === ")" || c === "\\" ? "\\" + c : code < 0x20 ? " " : c;
+    if (code > 0xff || (code >= 0x80 && code < 0xa0 && !WIN_CODES.has(code))) code = 0x3f;
+    out.push(code < 0x20 ? 0x20 : code);
   }
   return out;
+}
+/** Texto → string de PDF escapado. */
+function pdfString(text: string): string {
+  return winCodes(text)
+    .map((code) => {
+      const c = String.fromCharCode(code);
+      return c === "(" || c === ")" || c === "\\" ? "\\" + c : c;
+    })
+    .join("");
 }
 /** Ancho aproximado de un texto en Helvetica (para cortar renglones). */
 export function textWidth(text: string, size: number, bold = false): number {
@@ -42,14 +59,14 @@ export function textWidth(text: string, size: number, bold = false): number {
   for (const ch of text) w += /[il.,;:'|!]/.test(ch) ? 0.28 : /[mwMW@]/.test(ch) ? 0.83 : /[A-Z0-9$]/.test(ch) ? 0.64 : ch === " " ? 0.28 : 0.52;
   return w * size * (bold ? 1.06 : 1);
 }
-/** Corta un texto en renglones que quepan en `width` (máximo `lines`; el último con "…"). */
-export function wrap(text: string, size: number, width: number, lines = 2, bold = false): string[] {
-  const words = text.split(/\s+/).filter(Boolean);
+/** Corta un texto en renglones (máximo `lines`; el último con "…") según una función de ancho. */
+function wrapWith(measure: (s: string) => number, text: string, width: number, lines: number): string[] {
+  const words = String(text || "").split(/\s+/).filter(Boolean);
   const out: string[] = [];
   let cur = "";
   for (const w of words) {
     const next = cur ? cur + " " + w : w;
-    if (textWidth(next, size, bold) <= width) cur = next;
+    if (measure(next) <= width) cur = next;
     else {
       if (cur) out.push(cur);
       cur = w;
@@ -59,51 +76,117 @@ export function wrap(text: string, size: number, width: number, lines = 2, bold 
   if (out.length > lines) {
     const kept = out.slice(0, lines);
     let last = kept[lines - 1];
-    while (last.length > 1 && textWidth(last + "…", size, bold) > width) last = last.slice(0, -1);
+    while (last.length > 1 && measure(last + "…") > width) last = last.slice(0, -1);
     kept[lines - 1] = last.trimEnd() + "…";
     return kept;
   }
   return out;
 }
+export function wrap(text: string, size: number, width: number, lines = 2, bold = false): string[] {
+  return wrapWith((s) => textWidth(s, size, bold), text, width, lines);
+}
+const f = (n: number) => (Math.round(n * 100) / 100).toString();
+const color = (c: RGB) => c.map((v) => (Math.round(v * 1000) / 1000).toString()).join(" ");
 
 export class PdfDoc {
   readonly W = 595.28;
   readonly H = 841.89;
   private pages: Op[][] = [];
   private images = new Map<string, PdfImage>();
+  private fonts: FontDef[] = [
+    { key: "F1", name: "Helvetica", base14: "Helvetica" },
+    { key: "F2", name: "Helvetica-Bold", base14: "Helvetica-Bold" },
+  ];
   private cur: Op[] | null = null;
+  /** Registra una letra TrueType (Inter); se usa con text(..., { font: key }). */
+  addFont(key: string, name: string, ttf: Uint8Array, metrics: FontMetrics) {
+    this.fonts = this.fonts.filter((x) => x.key !== key);
+    this.fonts.push({ key, name, ttf, metrics });
+  }
+  private fontOf(key?: string, bold?: boolean): FontDef {
+    return this.fonts.find((x) => x.key === (key || (bold ? "F2" : "F1"))) || this.fonts[0];
+  }
+  /** Ancho real del texto con la letra elegida (Helvetica: aproximado). */
+  measure(text: string, size: number, opts: { font?: string; bold?: boolean; tracking?: number } = {}): number {
+    const font = this.fontOf(opts.font, opts.bold);
+    const codes = winCodes(text);
+    const track = (opts.tracking ?? 0) * Math.max(0, codes.length - 1);
+    if (!font.metrics) return textWidth(text, size, opts.bold) + track;
+    let w = 0;
+    for (const c of codes) w += font.metrics.widths[c - 32] || 500;
+    return (w / 1000) * size + track;
+  }
+  wrap(text: string, size: number, width: number, lines = 2, opts: { font?: string; bold?: boolean } = {}): string[] {
+    return wrapWith((s) => this.measure(s, size, opts), text, width, lines);
+  }
   addPage() {
     this.cur = [];
     this.pages.push(this.cur);
+  }
+  /** Vuelve a una página ya creada (para numerarlas al final). */
+  setPage(i: number) {
+    this.cur = this.pages[i] ?? this.cur;
   }
   private op(s: string) {
     if (!this.cur) this.addPage();
     this.cur!.push(s);
   }
-  /** Texto con la esquina inferior izquierda en (x, y) medidos desde ARRIBA de la página. */
-  text(x: number, yTop: number, text: string, size = 10, opts: { bold?: boolean; color?: [number, number, number]; align?: "left" | "center" | "right"; width?: number } = {}) {
-    const [r, g, b] = opts.color ?? [0.07, 0.09, 0.15];
+  /** Texto con la línea base en (x, yTop) medida desde ARRIBA de la página. */
+  text(
+    x: number,
+    yTop: number,
+    text: string,
+    size = 10,
+    opts: { bold?: boolean; font?: string; color?: RGB; align?: "left" | "center" | "right"; width?: number; tracking?: number } = {},
+  ) {
+    const font = this.fontOf(opts.font, opts.bold);
     let dx = x;
     if (opts.align && opts.align !== "left" && opts.width) {
-      const w = textWidth(text, size, opts.bold);
+      const w = this.measure(text, size, opts);
       dx = opts.align === "center" ? x + (opts.width - w) / 2 : x + opts.width - w;
     }
-    this.op(`BT ${r.toFixed(3)} ${g.toFixed(3)} ${b.toFixed(3)} rg /${opts.bold ? "F2" : "F1"} ${size} Tf ${dx.toFixed(2)} ${(this.H - yTop).toFixed(2)} Td (${pdfText(text)}) Tj ET`);
+    // El espaciado entre letras (Tc) se queda puesto en la página: siempre se fija.
+    const tc = `${f(opts.tracking ?? 0)} Tc `;
+    this.op(`BT ${color(opts.color ?? [0.07, 0.07, 0.09])} rg /${font.key} ${f(size)} Tf ${tc}${f(dx)} ${f(this.H - yTop)} Td (${pdfString(text)}) Tj ET`);
   }
-  rect(x: number, yTop: number, w: number, h: number, opts: { fill?: [number, number, number]; stroke?: [number, number, number] } = {}) {
+  private roundPath(x: number, yTop: number, w: number, h: number, r: number): string {
     const y = this.H - yTop - h;
-    if (opts.fill) this.op(`${opts.fill.map((v) => v.toFixed(3)).join(" ")} rg ${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re f`);
-    if (opts.stroke) this.op(`0.6 w ${opts.stroke.map((v) => v.toFixed(3)).join(" ")} RG ${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re S`);
+    r = Math.max(0, Math.min(r, w / 2, h / 2));
+    const k = r * 0.5523;
+    if (!r) return `${f(x)} ${f(y)} ${f(w)} ${f(h)} re`;
+    return [
+      `${f(x + r)} ${f(y)} m`,
+      `${f(x + w - r)} ${f(y)} l`,
+      `${f(x + w - r + k)} ${f(y)} ${f(x + w)} ${f(y + r - k)} ${f(x + w)} ${f(y + r)} c`,
+      `${f(x + w)} ${f(y + h - r)} l`,
+      `${f(x + w)} ${f(y + h - r + k)} ${f(x + w - r + k)} ${f(y + h)} ${f(x + w - r)} ${f(y + h)} c`,
+      `${f(x + r)} ${f(y + h)} l`,
+      `${f(x + r - k)} ${f(y + h)} ${f(x)} ${f(y + h - r + k)} ${f(x)} ${f(y + h - r)} c`,
+      `${f(x)} ${f(y + r)} l`,
+      `${f(x)} ${f(y + r - k)} ${f(x + r - k)} ${f(y)} ${f(x + r)} ${f(y)} c h`,
+    ].join(" ");
   }
-  /** Imagen JPG ajustada dentro de la caja (sin deformarla). */
-  image(img: PdfImage, x: number, yTop: number, boxW: number, boxH: number) {
+  /** Rectángulo (con esquinas redondeadas si `radius`). */
+  rect(x: number, yTop: number, w: number, h: number, opts: { fill?: RGB; stroke?: RGB; radius?: number; line?: number } = {}) {
+    const path = this.roundPath(x, yTop, w, h, opts.radius ?? 0);
+    if (opts.fill) this.op(`${color(opts.fill)} rg ${path} f`);
+    if (opts.stroke) this.op(`${f(opts.line ?? 0.6)} w ${color(opts.stroke)} RG ${path} S`);
+  }
+  /** Línea horizontal fina. */
+  hline(x: number, yTop: number, w: number, c: RGB, width = 0.5) {
+    const y = this.H - yTop;
+    this.op(`${f(width)} w ${color(c)} RG ${f(x)} ${f(y)} m ${f(x + w)} ${f(y)} l S`);
+  }
+  /** Imagen ajustada dentro de la caja (sin deformarla); con `radius`, recortada redondeada. */
+  image(img: PdfImage, x: number, yTop: number, boxW: number, boxH: number, opts: { radius?: number; cover?: boolean } = {}) {
     this.images.set(img.id, img);
-    const k = Math.min(boxW / img.width, boxH / img.height);
+    const k = opts.cover ? Math.max(boxW / img.width, boxH / img.height) : Math.min(boxW / img.width, boxH / img.height);
     const w = img.width * k,
       h = img.height * k;
     const px = x + (boxW - w) / 2,
       py = this.H - yTop - boxH + (boxH - h) / 2;
-    this.op(`q ${w.toFixed(2)} 0 0 ${h.toFixed(2)} ${px.toFixed(2)} ${py.toFixed(2)} cm /${img.id} Do Q`);
+    const clip = opts.radius || opts.cover ? `${this.roundPath(x, yTop, boxW, boxH, opts.radius ?? 0)} W n ` : "";
+    this.op(`q ${clip}${f(w)} 0 0 ${f(h)} ${f(px)} ${f(py)} cm /${img.id} Do Q`);
   }
   get pageCount() {
     return this.pages.length;
@@ -119,37 +202,61 @@ export class PdfDoc {
       chunks.push(u);
       size += u.length;
     };
+    let next = 1;
+    const alloc = () => next++;
     const obj = (n: number, body: (string | Uint8Array)[]) => {
       offsets[n] = size;
       push(enc(`${n} 0 obj\n`));
       for (const part of body) push(typeof part === "string" ? enc(part) : part);
       push(enc("\nendobj\n"));
     };
+    const stream = (n: number, dict: string, data: Uint8Array, compress = true) => {
+      const body = compress ? zlibSync(data, { level: 6 }) : data;
+      obj(n, [`<< ${dict}${compress ? " /Filter /FlateDecode" : ""} /Length ${body.length} >>\nstream\n`, body, "\nendstream"]);
+    };
     push(enc("%PDF-1.4\n%\xe2\xe3\xcf\xd3\n"));
-    const imgs = [...this.images.values()];
-    // 1 catálogo · 2 páginas · 3 Helvetica · 4 Helvetica-Bold · 5 info · imágenes · páginas y contenidos
-    const imgBase = 6;
-    const pageBase = imgBase + imgs.length;
-    const xobjects = imgs.map((im, i) => `/${im.id} ${imgBase + i} 0 R`).join(" ");
-    obj(1, ["<< /Type /Catalog /Pages 2 0 R >>"]);
-    obj(2, [`<< /Type /Pages /Count ${this.pages.length} /Kids [${this.pages.map((_, i) => `${pageBase + i * 2} 0 R`).join(" ")}] >>`]);
-    obj(3, ["<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"]);
-    obj(4, ["<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"]);
-    obj(5, [`<< /Title (${pdfText(title)}) /Producer (Nova Negocio) >>`]);
-    imgs.forEach((im, i) =>
-      obj(imgBase + i, [`<< /Type /XObject /Subtype /Image /Width ${im.width} /Height ${im.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${im.bytes.length} >>\nstream\n`, im.bytes, "\nendstream"]),
-    );
+    const catalog = alloc(),
+      pagesId = alloc(),
+      info = alloc();
+    const fontIds = new Map<string, number>();
+    for (const font of this.fonts) fontIds.set(font.key, alloc());
+    const imageIds = new Map<string, number>();
+    for (const img of this.images.values()) imageIds.set(img.id, alloc());
+    const pageIds = this.pages.map(() => [alloc(), alloc()]);
+    obj(catalog, [`<< /Type /Catalog /Pages ${pagesId} 0 R >>`]);
+    obj(pagesId, [`<< /Type /Pages /Count ${this.pages.length} /Kids [${pageIds.map(([p]) => `${p} 0 R`).join(" ")}] >>`]);
+    obj(info, [`<< /Title (${pdfString(title)}) /Producer (Nova Negocio) >>`]);
+    for (const font of this.fonts) {
+      const id = fontIds.get(font.key)!;
+      if (font.base14) {
+        obj(id, [`<< /Type /Font /Subtype /Type1 /BaseFont /${font.base14} /Encoding /WinAnsiEncoding >>`]);
+        continue;
+      }
+      const m = font.metrics!;
+      const desc = alloc(),
+        file = alloc();
+      obj(id, [`<< /Type /Font /Subtype /TrueType /BaseFont /${font.name} /FirstChar 32 /LastChar 255 /Widths [${m.widths.join(" ")}] /Encoding /WinAnsiEncoding /FontDescriptor ${desc} 0 R >>`]);
+      obj(desc, [`<< /Type /FontDescriptor /FontName /${font.name} /Flags 32 /FontBBox [${m.bbox.join(" ")}] /ItalicAngle 0 /Ascent ${m.ascent} /Descent ${m.descent} /CapHeight ${m.capHeight} /StemV 80 /FontFile2 ${file} 0 R >>`]);
+      stream(file, `/Length1 ${font.ttf!.length}`, font.ttf!);
+    }
+    for (const img of this.images.values()) {
+      const id = imageIds.get(img.id)!;
+      const dict = `/Type /XObject /Subtype /Image /Width ${img.width} /Height ${img.height} /ColorSpace /DeviceRGB /BitsPerComponent 8`;
+      if (img.kind === "rgb") stream(id, dict, img.bytes);
+      else obj(id, [`<< ${dict} /Filter /DCTDecode /Length ${img.bytes.length} >>\nstream\n`, img.bytes, "\nendstream"]);
+    }
+    const fonts = this.fonts.map((x) => `/${x.key} ${fontIds.get(x.key)} 0 R`).join(" ");
+    const xobjects = [...this.images.values()].map((im) => `/${im.id} ${imageIds.get(im.id)} 0 R`).join(" ");
     this.pages.forEach((ops, i) => {
-      const content = enc(ops.join("\n"));
-      const n = pageBase + i * 2;
-      obj(n, [`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${this.W} ${this.H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << ${xobjects} >> >> /Contents ${n + 1} 0 R >>`]);
-      obj(n + 1, [`<< /Length ${content.length} >>\nstream\n`, content, "\nendstream"]);
+      const [p, c] = pageIds[i];
+      obj(p, [`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${this.W} ${this.H}] /Resources << /Font << ${fonts} >> /XObject << ${xobjects} >> >> /Contents ${c} 0 R >>`]);
+      stream(c, "", enc(ops.join("\n")));
     });
-    const total = pageBase + this.pages.length * 2;
+    const total = next;
     const xref = size;
     let table = `xref\n0 ${total}\n0000000000 65535 f \n`;
-    for (let n = 1; n < total; n++) table += `${String(offsets[n]).padStart(10, "0")} 00000 n \n`;
-    push(enc(table + `trailer\n<< /Size ${total} /Root 1 0 R /Info 5 0 R >>\nstartxref\n${xref}\n%%EOF\n`));
+    for (let n = 1; n < total; n++) table += `${String(offsets[n] ?? 0).padStart(10, "0")} 00000 n \n`;
+    push(enc(table + `trailer\n<< /Size ${total} /Root ${catalog} 0 R /Info ${info} 0 R >>\nstartxref\n${xref}\n%%EOF\n`));
     const out = new Uint8Array(size);
     let p = 0;
     for (const c of chunks) {

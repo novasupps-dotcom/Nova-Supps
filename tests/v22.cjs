@@ -415,14 +415,29 @@ async function dispose(ui) {
   } = require("../src/scanner.tsx");
   let ticks = 0;
   const gate = createScanGate(() => ticks);
-  assert.equal(gate.accept("123"), true);
-  ticks = 1000;
-  assert.equal(gate.accept("123"), false);
-  ticks = 2300;
-  assert.equal(gate.accept("123"), false);
-  ticks = 4000;
-  assert.equal(gate.accept("123"), true);
-  assert.equal(gate.accept("xyz"), true);
+  // EAN-13 con verificador: basta una lectura; mientras sigue frente a la cámara no se repite.
+  assert.equal(gate.feed("7501234567893"), "7501234567893");
+  ticks = 300;
+  assert.equal(gate.feed("7501234567893"), "");
+  ticks = 1200;
+  assert.equal(gate.feed("07501234567893"), "", "UPC/EAN equivalente no cuenta doble");
+  ticks = 3000; // salió del cuadro más de 1.5 s y volvió: otra pieza
+  assert.equal(gate.feed("7501234567893"), "7501234567893");
+  // SKU sin verificador: dos lecturas iguales seguidas.
+  assert.equal(gate.feed("NS-VIT-001"), "");
+  ticks = 3200;
+  assert.equal(gate.feed("NS-VIT-001"), "NS-VIT-001");
+  ticks = 3300;
+  assert.equal(gate.feed("NS-PRO-002"), "");
+  ticks = 4500;
+  assert.equal(gate.feed("NS-PRO-002"), "", "lecturas demasiado separadas no confirman");
+  ticks = 4700;
+  assert.equal(gate.feed("NS-PRO-002"), "NS-PRO-002");
+  gate.again();
+  ticks = 4800;
+  assert.equal(gate.feed("NS-PRO-002"), "", "otra vez: vuelve a pedir confirmación");
+  ticks = 4900;
+  assert.equal(gate.feed("NS-PRO-002"), "NS-PRO-002");
   assert.equal(SCAN_TYPES.length, 7);
   let scans = 0,
     closed = 0;
@@ -447,28 +462,32 @@ async function dispose(ui) {
   assert.equal(cameraRequests, 1);
   const view = ui.root.findByType("CameraView");
   await act(async () => {
-    await view.props.onBarcodeScanned({ data: "123" });
-    await view.props.onBarcodeScanned({ data: "123" });
+    await view.props.onBarcodeScanned({ data: "7501234567893" });
+    await view.props.onBarcodeScanned({ data: "7501234567893" });
+    await flush();
   });
-  assert.equal(scans, 1);
+  assert.equal(scans, 1, "una lectura inmediata, sin esperar 2.5 s");
+  assert.ok(text(ui.toJSON()).includes("Agregado 7501234567893"), "el resultado se ve en el lector");
   await dispose(ui);
   const { ProductGrid } = require("../src/ui.tsx");
   let qty = 0;
+  const unknown = [];
   ui = await mount(
     React.createElement(ProductGrid, {
       products: [
         {
           id: "p",
-          sku: "GNS001",
-          barcode: "123",
+          sku: "GNS-001",
+          barcode: "042100005264",
           name: "Proteína",
           price: 50000,
         },
       ],
       qtyOf: () => qty,
-      limitOf: () => 1,
+      limitOf: () => 2,
       onAdd: () => qty++,
       onRemove: () => qty--,
+      onInventoryCode: (code) => unknown.push(code),
       segment: "Todos",
       onSegment: () => {},
     }),
@@ -480,14 +499,25 @@ async function dispose(ui) {
     await flush();
   });
   const scanner = ui.root.findByType(CameraScanner);
-  assert.equal(scanner.props.onScan("unknown").bad, true);
-  assert.equal(scanner.props.onScan("123").bad, undefined);
+  const tools = { closed: 0, after: null, updates: [], close(after) { this.closed++; this.after = after; }, update(r) { this.updates.push(r); } };
+  const miss = scanner.props.onScan("ABC-999", tools);
+  assert.equal(miss.bad, true);
+  assert.ok(miss.actions.some((a) => a.label === "Dar de alta o asignar"));
+  miss.actions.find((a) => a.label === "Dar de alta o asignar").onPress();
+  assert.equal(tools.closed, 1);
+  tools.after();
+  assert.deepEqual(unknown, ["ABC-999"], "dar de alta abre el formulario después de cerrar el lector");
+  // UPC-E leído por la cámara = UPC-A guardado; SKU sin guiones también.
+  assert.equal(scanner.props.onScan("04252614", tools).bad, false);
   assert.equal(qty, 1);
-  assert.equal(scanner.props.onScan("123").bad, true);
-  assert.equal(qty, 1);
+  assert.equal(scanner.props.onScan("gns001", tools).text, "Agregado: Proteína");
+  assert.equal(qty, 2);
+  const full = scanner.props.onScan("042100005264", tools);
+  assert.equal(full.bad, true, "sin más existencias no agrega");
+  assert.equal(qty, 2);
   await dispose(ui);
   console.log(
-    "  ✓ Cámara: permisos, siete formatos, lectura continua, catálogo y límite de existencias",
+    "  ✓ Cámara: lectura inmediata, sin repetir, SKU confirmado, UPC-E/EAN/SKU sin guiones, alta sin encimar ventanas y límite de existencias",
   );
   U.isEnabled = false;
   b.setSetting("appRole", "owner");
@@ -497,14 +527,14 @@ async function dispose(ui) {
   const App = require("../App.tsx").default;
   ui = await mount(React.createElement(App));
   assert.ok(text(ui.toJSON()).includes("Avisos en este teléfono"));
-  assert.ok(text(ui.toJSON()).includes("Nova Negocio 2.2.0"));
+  assert.ok(text(ui.toJSON()).includes("Nova Negocio " + require("../src/screens/ownerShared.ts").VERSION));
   await dispose(ui);
   for (const name of names) global.__NOVA_NATIVE[name] = false;
   assert.equal(native.canScan(), false);
   assert.equal(require("../src/secure.ts").secureStore(), null);
   assert.equal(await push.registerPush(b, cloud, true), "unavailable");
   ui = await mount(React.createElement(App));
-  assert.ok(text(ui.toJSON()).includes("Parámetros"));
+  assert.ok(text(ui.toJSON()).includes("Ajustes"));
   await dispose(ui);
   console.log(
     "  ✓ Pantalla del dueño, versión 2.2 y compatibilidad con runtime anterior sin módulos nativos",

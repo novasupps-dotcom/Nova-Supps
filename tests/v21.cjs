@@ -34,7 +34,7 @@ function text(node){if(typeof node==='string')return node;return (node.children|
 const H=(ui)=>({
  all:()=>text(ui.root),
  btn:(label)=>ui.root.findAll(n=>n.type==='Pressable'&&text(n).trim()===label&&typeof n.props.onPress==='function'),
- async press(label,i=0){let c=this.btn(label);if(!c.length)c=ui.root.findAll(n=>n.type==='Pressable'&&text(n).includes(label)&&typeof n.props.onPress==='function').slice(-1);assert(c.length,'botón '+label);await act(async()=>c[i].props.onPress());},
+ async press(label,i=0){if(label==='Ajustes'&&!ui.root.findAll(n=>n.type==='Pressable'&&(n.props.accessibilityLabel==='Ajustes'||text(n).trim()==='Ajustes')).length){const v=ui.root.findAll(n=>n.type==='Pressable'&&n.props.accessibilityState&&'selected' in n.props.accessibilityState&&text(n).trim()==='Vender');if(v.length)await act(async()=>v[v.length-1].props.onPress());}if(label==='Cuenta'&&!ui.root.findAll(n=>n.type==='Pressable'&&n.props.accessibilityLabel==='Cuenta').length&&text(ui.root).includes('Cerrar sesión'))return;let c=this.btn(label);if(!c.length)c=ui.root.findAll(n=>n.type==='Pressable'&&n.props.accessibilityLabel===label&&typeof n.props.onPress==='function');if(!c.length)c=ui.root.findAll(n=>n.type==='Pressable'&&text(n).includes(label)&&typeof n.props.onPress==='function').slice(-1);assert(c.length,'botón '+label);await act(async()=>c[i].props.onPress());},
  async pressLike(re){const c=ui.root.findAll(n=>n.type==='Pressable'&&re.test(text(n))&&typeof n.props.onPress==='function');assert(c.length,'botón '+re);await act(async()=>c[c.length-1].props.onPress());},
  async code(label,raw){for(const ch of raw){const i=ui.root.findAll(n=>n.type==='TextInput'&&n.props.accessibilityLabel===label);assert(i.length,'campo '+label);await act(async()=>i[0].props.onChangeText(String(i[0].props.value||'')+ch));}},
  // 2.0.1: Vender tiene dos pantallas: productos (fotos) y carrito. add() elige el producto y abre el carrito.
@@ -52,12 +52,12 @@ const flush=async(n=6,ms=15)=>{for(let i=0;i<n;i++)await act(async()=>{await new
  const ob=require('./seed.cjs')(O.db);ob.setSetting('appRole','owner');
  let owner;current=O.db;await act(async()=>{owner=renderer.create(React.createElement(App))});await flush();const o=H(owner);
  ob.setSetting('mpConfig',{token:'APP_USR-owner',terminalId:'NEWLAND_N950__X',terminalLabel:'N950',enabled:true});
- await o.press('Parámetros');await o.press('Invitar, formas de pago y sincronizar');assert(o.all().includes('Vende con varios teléfonos'));
+ await o.press('Ajustes');await o.press('Invitar, formas de pago y sincronizar');assert(o.all().includes('Vende con varios teléfonos'));
  await o.type('Tu nombre','Emmanuel');await o.type('Tu correo *','dueno@gns.mx');await o.type('Contraseña (mínimo 6) *','secreto1');
  await o.press('Crear cuenta de dueño');await flush(10);
  assert(o.all().includes('Base en línea'),'conectado');assert(fake.T.members.some(m=>m.role==='owner'&&m.name==='Emmanuel'));assert(fake.T.catalog.length>30,'catálogo publicado');
  await o.sw();await flush(8);assert.equal(fake.T.config.find(c=>c.key==='terminal').value.enabled,true,'terminal habilitada para vendedores');
- fake.state.signupDisabled=true;await o.type('Nombre del vendedor *','Luis');await o.press('🎟️ Crear código de invitación');await flush(4);const code=fake.T.invites[0].code;const pretty=`GNS-${code.slice(3,7)}-${code.slice(7)}`;assert(o.all().includes(pretty),'muestra el código');await o.press('📨 Enviar por WhatsApp');const invite=shared.at(-1).message;assert(invite.includes(pretty)&&!invite.includes('supabase'),'mensaje con código corto');
+ fake.state.signupDisabled=true;await o.type('Nombre del vendedor *','Luis');await o.press('Crear código de invitación');await flush(4);const code=fake.T.invites[0].code;const pretty=`GNS-${code.slice(3,7)}-${code.slice(7)}`;assert(o.all().includes(pretty),'muestra el código');await o.press('Enviar por WhatsApp');const invite=shared.at(-1).message;assert(invite.includes(pretty)&&!invite.includes('supabase'),'mensaje con código corto');
  console.log('  ✓ dueño conecta, publica catálogo, habilita terminal e invita');
  // ---------- Vendedor ----------
  let seller;current=S.db;await act(async()=>{seller=renderer.create(React.createElement(App))});await flush();const s=H(seller);
@@ -69,34 +69,34 @@ const flush=async(n=6,ms=15)=>{for(let i=0;i<n;i++)await act(async()=>{await new
  await o.press('Actualizar lista');await flush();
  const {grossUp,saleSegment}=require('../src/business.ts');const client=(x)=>grossUp(x,406);
  // ---------- 1. Promoción 2x1 en Creatinas (dueño) ----------
- await o.press('Parámetros');await o.press('Promociones');assert(o.all().includes('Aún no tienes promociones'));
+ await o.press('Ajustes');await o.press('Promociones');assert(o.all().includes('Aún no tienes promociones'));
  await o.press('＋ Nueva promoción');await o.type('Nombre que verá el cliente *','2x1 Creatinas');
  await o.press('Una categoría');await o.press('Creatinas');
  assert(o.all().includes('lleva 2 y paga 1'),'ejemplo de la promoción');assert(o.all().includes('debajo de su costo'),'avisa que el 2x1 queda debajo del costo');okScreen(owner,'dueño · editor de promoción');
  await o.press('Guardar promoción');await flush(8);
  assert.equal(ob.promos().length,1);const promo=ob.promos()[0];assert.deepEqual([promo.kind,promo.n,promo.m,promo.target,promo.ref],['nxm',2,1,'segment','Creatinas']);
- assert(o.all().includes('🏷️ 2x1 Creatinas')&&o.all().includes('2x1'),'lista de promociones');
- await o.press('🔄 Sincronizar ahora').catch(()=>{});
- await o.press('Parámetros');await o.press('Invitar, formas de pago y sincronizar');await o.press('🔄 Sincronizar ahora');await flush(10);
+ assert(o.all().includes('2x1 Creatinas')&&o.all().includes('2x1'),'lista de promociones');
+ await o.press('Sincronizar ahora').catch(()=>{});
+ await o.press('Ajustes');await o.press('Invitar, formas de pago y sincronizar');await o.press('Sincronizar ahora');await flush(10);
  assert.equal(fake.T.config.find(c=>c.key==='promos').value.list.length,1,'promociones publicadas al servidor');
  const cre=ob.stock().filter(p=>!p.archived&&saleSegment(p)==='Creatinas'&&p.available>=4).sort((a,b)=>a.name<b.name?-1:1)[0];assert(cre,'creatina con existencias');
  assert.equal(fake.T.catalog.find(c=>c.product_id===cre.id).segment,'Creatinas','categoría publicada');
  console.log('  ✓ el dueño crea la promoción 2x1 por categoría y se publica');
  // ---------- 2. El dueño vende 2 → paga 1 ----------
  await o.press('Vender');await o.type('Buscar producto',cre.name);
- assert(owner.root.findAll(n=>n.type==='Text'&&String(text(n)).includes('🏷️ 2x1')).length,'la foto muestra la promoción');
+ assert(owner.root.findAll(n=>n.type==='Text'&&String(text(n)).includes('2x1')).length,'la foto muestra la promoción');
  {const add=owner.root.findAll(n=>n.props.accessibilityLabel==='Agregar '+cre.name&&typeof n.props.onPress==='function');await act(async()=>add[0].props.onPress());}
  {const more=owner.root.findAll(n=>n.props.accessibilityLabel==='Agregar otra de '+cre.name&&typeof n.props.onPress==='function');await act(async()=>more[0].props.onPress());}
  {const cart=owner.root.findAll(n=>n.props.accessibilityLabel==='Abrir carrito'&&typeof n.props.onPress==='function');await act(async()=>cart[0].props.onPress());}
  const cash=ob.all("SELECT name FROM accounts WHERE kind='Efectivo'")[0].name;await o.press(cash);
  assert(o.all().includes('Descuento · 2x1 Creatinas'),'el cobro muestra la promoción');assert(o.all().includes('Se permite porque tú la configuraste'),'aviso de venta debajo del costo por promoción');okScreen(owner,'dueño · carrito con promoción');
- const n0=ob.sales().length;await o.press('Cobrar y confirmar venta');await flush(10);
+ const n0=ob.sales().length;await o.press('Cobrar $');await flush(10);
  assert.equal(ob.sales().length,n0+1,'venta del dueño con promoción');
  {const v=ob.saleDetail(ob.sales()[0].id);assert.equal(v.total,client(cre.price),'2x1: paga una (con la comisión)');assert.equal(v.lines[0].discount,cre.price,'el renglón guarda el descuento');assert.deepEqual(v.promos,[{name:'2x1 Creatinas',amount:cre.price}]);
   const receipt=require('../src/receipt.ts').saleReceiptText(v);assert(receipt.includes('Descuento')&&!/Comisi[oó]n/.test(receipt),'comprobante con descuento: '+receipt);}
  console.log('  ✓ dueño: 2 piezas de creatina → paga 1 (más la comisión), comprobante con descuento');
  // ---------- 3. El vendedor ve y cobra lo mismo que el servidor ----------
- await s.press('Cuenta');await s.press('🔄 Actualizar ahora');await flush(8);await s.press('Vender');
+ await s.press('Cuenta');await s.press('Actualizar ahora');await flush(8);await s.press('Vender');
  await s.add(cre.name);{const plus=seller.root.findAll(n=>n.props.accessibilityLabel==='Agregar una');await act(async()=>plus[0].props.onPress());}
  assert(s.all().includes('Descuento · 2x1 Creatinas'),'el vendedor ve la promoción');assert(s.all().includes(money(client(cre.price))),'total con la promoción');okScreen(seller,'vendedor · carrito con promoción');
  fake.T.legacy20=true;const nSales=fake.T.sales.length;await s.press('Efectivo');await s.press('Registrar venta');await flush(8);
@@ -104,7 +104,7 @@ const flush=async(n=6,ms=15)=>{for(let i=0;i<n;i++)await act(async()=>{await new
  await s.press('Efectivo');await s.press('Registrar venta');await flush(8);
  const sv=fake.T.sales.at(-1);assert.equal(sv.status,'pendiente','el total del vendedor cuadra con el servidor: '+sv.error);assert.equal(sv.total,client(cre.price));assert.equal(sv.promo,cre.price);assert.equal(sv.items[0].promo,'2x1 Creatinas');
  {const r=require('../src/sellerCore.ts').receiptSale((new Business(S.db).setting('sellerToday',null)?.rows||[]).find(x=>x.id===sv.id)||{...sv,promo:cre.price});const cv=require('../src/business.ts').customerView(r);assert.equal(cv.total,client(cre.price));assert(cv.discount>0,'el comprobante del vendedor muestra el descuento');}
- await o.press('Parámetros');await o.press('Invitar, formas de pago y sincronizar');await o.press('🔄 Sincronizar ahora');await flush(12);
+ await o.press('Ajustes');await o.press('Invitar, formas de pago y sincronizar');await o.press('Sincronizar ahora');await flush(12);
  {const v=ob.sales().find(x=>x.seller==='Luis');assert(v,'el dueño registra la venta del vendedor');const d=ob.saleDetail(v.id);assert.equal(d.total,client(cre.price));assert.equal(d.lines[0].discount,cre.price);}
  console.log('  ✓ vendedor: la misma promoción, el servidor confirma el total y el dueño la registra');
  // ---------- 3b. Lector de códigos (USB/Bluetooth: escribe el código y manda Enter) ----------
@@ -114,16 +114,16 @@ const flush=async(n=6,ms=15)=>{for(let i=0;i<n;i++)await act(async()=>{await new
   await o.press('Vender');await scan(owner,'  '+other.sku.toLowerCase()+' ');
   assert.equal(owner.root.findAll(n=>n.type==='TextInput'&&n.props.accessibilityLabel==='Buscar producto')[0].props.value,'','limpia el buscador para el siguiente código');
   assert(o.all().includes('Carrito · 1 pieza'),'el dueño agrega con el lector (SKU): '+o.all().slice(-400));
-  await scan(owner,'NO-EXISTE-123');assert(o.all().includes('Carrito · 1 pieza'),'código desconocido no agrega nada');
+  await scan(owner,'NO-EXISTE-123');assert(o.all().includes('Carrito · 1 pieza'),'código desconocido no agrega nada');assert(o.all().includes('NO-EXISTE-123 no está en el catálogo')&&o.all().includes('Dar de alta o asignar'),'avisa y ofrece darlo de alta');await o.press('Cerrar aviso');
   // Vendedor: código de barras publicado por el dueño.
   fake.T.catalog.find(c=>c.product_id===other.id).barcode='7501234567890';
-  await s.press('Cuenta');await s.press('🔄 Actualizar ahora');await flush(8);await s.press('Vender');
+  await s.press('Cuenta');await s.press('Actualizar ahora');await flush(8);await s.press('Vender');
   {const back=s.btn('‹ Agregar más productos');if(back.length)await act(async()=>back[0].props.onPress());}
   await scan(seller,'7501234567890');
   assert(seller.root.findAll(n=>n.props.accessibilityLabel==='Ver carrito').length&&s.all().includes('Ver carrito · 1 pieza'),'el vendedor agrega con el lector (código de barras): '+s.all().slice(-300));}
  console.log('  ✓ lector de códigos: SKU o código de barras + Enter agrega al carrito (dueño y vendedor)');
  // ---------- 4. Reportes ----------
- await o.press('Parámetros');await o.press('Reportes');
+ await o.press('Ajustes');await o.press('Reportes');
  {const t=o.all();assert(t.includes('Por producto')&&t.includes(cre.name)&&t.includes('Por vendedor')&&t.includes('Luis')&&t.includes('Tú (dueño)')&&t.includes('Promociones')&&t.includes('2x1 Creatinas'),'reporte: '+t.slice(0,600));}
  {const {salesReport}=require('../src/reports.ts');const {exportRange}=require('../src/salesExcel.ts');const r=salesReport(ob,exportRange('Este mes'));
   const p=r.products.find(x=>x.productId===cre.id);assert.equal(p.units,4);assert.equal(p.revenue,2*cre.price,'importe en tu precio (con 2x1)');assert.equal(p.discount,2*cre.price);
@@ -132,32 +132,52 @@ const flush=async(n=6,ms=15)=>{for(let i=0;i<n;i++)await act(async()=>{await new
  okScreen(owner,'dueño · Reportes');
  console.log('  ✓ reportes por producto, por vendedor y de promociones (pantalla y Excel)');
  // ---------- 5. Catálogo para clientes ----------
- await o.press('Parámetros');await o.press('Catálogo para clientes');
+ await o.press('Ajustes');await o.press('Catálogo para clientes');
  await o.type('WhatsApp de la tienda para pedidos (10 dígitos)','55 1234 5678');
  await o.press('Creatinas');
- await o.press('💬 Compartir mensaje de WhatsApp');await flush(2);
- assert(!shared.at(-1).message.includes(cre.name+' —'),'sin existencias no sale en el catálogo');
- {const sw=owner.root.findAll(n=>n.type==='Switch'&&n.props.accessibilityLabel==='Incluir productos sin existencias');await act(async()=>sw[0].props.onValueChange(true));}
- await o.press('💬 Compartir mensaje de WhatsApp');await flush(2);
- {const msg=shared.at(-1).message;assert(msg.includes('*Creatinas*')&&msg.includes(cre.name)&&msg.includes(money(client(cre.price)))&&msg.includes('🏷️ 2x1')&&msg.includes('Pedidos por WhatsApp: 55 1234 5678'),'mensaje: '+msg);assert(!msg.includes('*Proteínas*'),'solo la categoría elegida');}
+ const outSwitch=()=>owner.root.findAll(n=>n.type==='Switch'&&n.props.accessibilityLabel==='Incluir productos sin existencias')[0];
+ assert.equal(outSwitch().props.value,true,'2.5: los agotados se incluyen marcados');await act(async()=>outSwitch().props.onValueChange(false));
+ await o.press('Compartir mensaje de WhatsApp');await flush(2);
+ assert(!shared.at(-1).message.includes(cre.name+' —'),'sin existencias no sale si se apaga');
+ await act(async()=>outSwitch().props.onValueChange(true));
+ await o.press('Compartir mensaje de WhatsApp');await flush(2);
+ {const msg=shared.at(-1).message;assert(msg.includes(`${cre.name} — `)&&msg.includes('(agotado)'),'agotado marcado');assert(msg.includes('*Creatinas*')&&msg.includes(cre.name)&&msg.includes(money(client(cre.price)))&&msg.includes('🏷️ 2x1')&&msg.includes('Pedidos por WhatsApp: 55 1234 5678'),'mensaje: '+msg);assert(!msg.includes('*Proteínas*'),'solo la categoría elegida');}
  assert.equal(ob.setting('storeWhatsapp',''),'5512345678');okScreen(owner,'dueño · Catálogo para clientes');
- await o.press('📄 Crear PDF con fotos');for(let i=0;i<6;i++)await flush(6);
+ await o.press('Crear PDF con fotos');for(let i=0;i<6;i++)await flush(6);
  {const f=Object.keys(written).find(u=>/Catalogo_Nova_.*\.pdf$/.test(u));assert(f,'PDF guardado');const pdf=Buffer.from(written[f].v,'base64');assert.equal(pdf.slice(0,5).toString(),'%PDF-');
   const dir=fs.mkdtempSync(require('path').join(require('os').tmpdir(),'cat-'));fs.writeFileSync(dir+'/c.pdf',pdf);
   try{const info=require('child_process').execFileSync('pdfinfo',[dir+'/c.pdf']).toString();assert(/Pages:\s+\d+/.test(info),'pdf válido');}catch(e){if(e.code!=='ENOENT')throw e}
   assert(pdf.includes('/DCTDecode'),'con fotos');assert.equal(sharedFiles.at(-1).o.mimeType,'application/pdf');}
  console.log('  ✓ catálogo para clientes: mensaje de WhatsApp por categoría y PDF con fotos y promociones');
+ // 2.5: se elige al cliente y el PDF le llega a su WhatsApp (enlace en la nube); la app avisa y lo registra
+ await o.press('Clientes');for(const [n,t] of [['Ana López','5511122233'],['Beto Ruiz','']]){await o.press('Nuevo cliente');await o.type('Nombre *',n);if(t)await o.type('Teléfono (opcional)',t);await o.press('Guardar');await flush(2);}
+ assert(ob.customers().some(c=>c.name==='Beto Ruiz'),'clientes creados');await o.type('Buscar nombre o teléfono','Ana');await flush(2);await o.press('Enviar catálogo a Ana López');await flush(2);
+ assert(o.all().includes('Ana López')&&o.all().includes('WhatsApp 55 1112 2233'),'cliente elegido: '+o.all().slice(0,400));okScreen(owner,'dueño · Catálogo para un cliente');
+ {const nOpen=opened.length;await o.press('Enviar catálogo a Ana por WhatsApp');for(let i=0;i<8;i++)await flush(6);
+  const u=opened.at(-1);assert(opened.length===nOpen+1&&u.startsWith('https://wa.me/525511122233?text='),'abre el chat de Ana: '+u);const msg=decodeURIComponent(u.split('text=')[1]);
+  const key=Object.keys(fake.state.storage||{}).find(k=>/^catalogos\/catalogo-.*\.pdf$/.test(k));assert(key,'PDF subido');assert.equal(fake.state.storage[key].bytes.slice(0,5).toString(),'%PDF-');assert.equal(fake.state.storage[key].type,'application/pdf');
+  assert(msg.includes('Hola Ana')&&msg.includes(`${fake.BASE}/storage/v1/object/public/${key}`),'mensaje con el enlace: '+msg);
+  const sends=ob.setting('catalogSends',[]);assert.equal(sends[0].name,'Ana López');assert(sends[0].url.endsWith(key));assert(sends[0].count>0);
+  assert(o.all().includes('Catálogo enviado a Ana López'),'avisa que se envió');assert(o.all().includes('Últimos envíos'));}
+ await o.press('Clientes');await o.type('Buscar nombre o teléfono','Ana');await flush(2);assert(o.all().includes('Catálogo enviado ·'),'la tarjeta del cliente lo muestra');
+ // Cliente sin número: se escribe y se guarda. Si falta el SQL 2.5 (sin bucket), se manda en texto y dice qué falta.
+ fake.state.noBucket=true;await o.type('Buscar nombre o teléfono','Beto');await flush(2);await o.press('Enviar catálogo a Beto Ruiz');await flush(2);
+ await o.type('WhatsApp del cliente (10 dígitos)','55 4444 5555');await o.press('Enviar catálogo a Beto por WhatsApp');for(let i=0;i<8;i++)await flush(6);
+ {const u=opened.at(-1);assert(u.startsWith('https://wa.me/525544445555?text='),'número escrito: '+u);const msg=decodeURIComponent(u.split('text=')[1]);assert(msg.includes('Pedidos por WhatsApp'),'en texto: '+msg);
+  assert(o.all().includes('corre el SQL 2.5'),'dice qué falta');assert.equal(ob.customers().find(c=>c.name==='Beto Ruiz').phone,'5544445555','guarda el número');}
+ fake.state.noBucket=false;
+ console.log('  ✓ 2.5: catálogo a un cliente: PDF en la nube y su chat de WhatsApp con el enlace; se avisa y se registra (y en texto si falta el SQL)');
  // ---------- 6. Respaldo en la nube ----------
  assert.ok(fake.T.owner_backups.some(x=>x.complete),'la sincronización ya hizo el respaldo automático del día');
  const auto=fake.T.owner_backups.find(x=>x.complete);assert(auto.parts>=1&&fake.T.owner_backup_parts.filter(p=>p.backup_id===auto.id).length===auto.parts);
- await o.press('Parámetros');await o.press('Respaldo y Excel');await flush(6);
+ await o.press('Ajustes');await o.press('Respaldo y Excel');await flush(6);
  assert(o.all().includes('Respaldo automático en la nube')&&o.all().includes('Último respaldo'),'tarjeta de respaldo en la nube');
  const sales1=ob.sales().length;
- await o.press('☁️ Respaldar ahora');for(let i=0;i<4;i++)await flush(6);
+ await o.press('Respaldar ahora');for(let i=0;i<4;i++)await flush(6);
  assert(o.all().includes('Respaldo guardado en la nube'));okScreen(owner,'dueño · Respaldo en la nube');assert.equal(fake.T.owner_backups.filter(x=>x.complete).length,2);
  // Algo cambia en el teléfono… y se restaura el respaldo más reciente.
  ob.saveCustomer({name:'Cliente borrable',phone:'5599999999'});const cust1=ob.customers().length;
- await o.press('Parámetros');await o.press('Respaldo y Excel');await flush(4);
+ await o.press('Ajustes');await o.press('Respaldo y Excel');await flush(4);
  {const r=owner.root.findAll(n=>n.type==='Pressable'&&text(n).trim()==='Restaurar'&&typeof n.props.onPress==='function');assert(r.length>=2,'lista de respaldos');await act(async()=>r[0].props.onPress());
   const dlg=alerts.at(-1);assert.equal(dlg[0],'Restaurar respaldo');await act(async()=>dlg[2].find(x=>x.text==='Restaurar').onPress());for(let i=0;i<6;i++)await flush(6);}
  const ob2=new Business(O.db);assert.equal(ob2.customers().length,cust1-1,'restaurado: sin el cliente nuevo');assert.equal(ob2.sales().length,sales1,'mismas ventas');
@@ -189,10 +209,10 @@ const flush=async(n=6,ms=15)=>{for(let i=0;i<n;i++)await act(async()=>{await new
  console.log('  ✓ respaldo en la nube: automático al sincronizar, manual, restaurar con copia previa, verificación y últimos 10');
  // ---------- 7. Base en línea sin el schema 2.1: la sincronización no se detiene ----------
  {const ob3=new Business(O.db);ob3.setSetting('cloudPub',null);fake.T.legacyCatalog=true;for(const c of fake.T.catalog){delete c.segment;delete c.barcode;}
-  await o.press('Parámetros');await o.press('Invitar, formas de pago y sincronizar');await o.press('🔄 Sincronizar ahora');await flush(10);
+  await o.press('Ajustes');await o.press('Invitar, formas de pago y sincronizar');await o.press('Sincronizar ahora');await flush(10);
   assert(!o.all().includes('Con error'),'sincroniza con la base anterior: '+o.all().slice(0,400));assert.equal(ob3.setting('cloudNeedsSchema21',null),true);assert(o.all().includes('supabase/schema.sql (2.1)'),'avisa que actualice la base');
   assert(fake.T.catalog.every(c=>!('segment' in c)),'publicado sin las columnas nuevas');
-  fake.T.legacyCatalog=false;await o.press('🔄 Sincronizar ahora');await flush(10);
+  fake.T.legacyCatalog=false;await o.press('Sincronizar ahora');await flush(10);
   assert.equal(ob3.setting('cloudNeedsSchema21',null),null,'base actualizada: quita el aviso');assert(!o.all().includes('supabase/schema.sql (2.1)'));
   assert.equal(fake.T.catalog.find(c=>c.product_id===cre.id).segment,'Creatinas','vuelve a publicar todo con categoría');okScreen(owner,'dueño · Base en línea');}
  console.log('  ✓ base en línea anterior a 2.1: sincroniza sin las columnas nuevas, avisa y se corrige sola al actualizar');

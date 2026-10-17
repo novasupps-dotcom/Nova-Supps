@@ -123,15 +123,6 @@ test("compras consumen caja pero no son gasto operativo duplicado", () => {
   assert.equal(b.metrics().expenses, 0);
   assert.equal(b.stock()[0].stock, 7);
 });
-test("campañas miden venta atribuida y gasto único", () => {
-  const { b, a, p } = setup();
-  const c = b.addCampaign("Reel", "Instagram", "REEL01");
-  b.movement("expense", a, 1000, "Anuncio", c);
-  b.sell([{ productId: p, qty: 1 }], 36900, 36900, a, null, c, "Instagram");
-  assert.equal(b.campaigns()[0].revenue, 36900);
-  assert.equal(b.campaigns()[0].spend, 1000);
-  assert.equal(b.metrics().result, 15900);
-});
 test("componentes repetidos no permiten sobreventa", () => {
   const { b, a, p } = setup();
   assert.throws(() =>
@@ -149,23 +140,6 @@ test("componentes repetidos no permiten sobreventa", () => {
     ),
   );
   assert.equal(b.stock()[0].stock, 5);
-});
-test("paquete consume cada componente", () => {
-  const { b, a, p } = setup();
-  const q = b.addProduct("BAR", "Barra", "Snack", 10000, 1);
-  b.receive(q, "A", "", 2, 5000, null);
-  const bundle = b.addBundle("Combo", 44000, [
-    { productId: p, qty: 1 },
-    { productId: q, qty: 1 },
-  ]);
-  const items = b.all(
-    "SELECT productId,qty FROM bundle_items WHERE bundleId=?",
-    bundle,
-  );
-  b.sell(items as any, 44000, 44000, a, null, null, "Paquete");
-  assert.equal(b.stock().find((r) => r.id === p)?.stock, 4);
-  assert.equal(b.stock().find((r) => r.id === q)?.stock, 1);
-  assert.equal(b.metrics().gross, 19000);
 });
 test("restauración completa y rollback de respaldo roto", () => {
   const { b, a, p } = setup();
@@ -268,33 +242,24 @@ test("fallo de referencia revierte compra y venta", () => {
   assert.equal(b.balance(a), 100000);
 });
 
-test('altas rápidas y ubicación son atómicas; una ubicación inválida no deja producto huérfano',()=>{
+test('altas rápidas son atómicas: un alta inválida no deja producto huérfano',()=>{
  const {b}=setup();const before=b.stock().length;
- assert.throws(()=>b.quickProduct({name:'Nuevo',price:10000,qty:2,cost:5000,locationId:'missing'}));
+ assert.throws(()=>b.quickProduct({name:'Nuevo',price:10000,qty:2}));
  assert.equal(b.stock().length,before);
- const company=b.saveCompany({name:'Nova Supps',kind:'Mi negocio'});
- const location=b.saveLocation({name:'Almacén',kind:'Almacén',companyId:company});
- const p=b.quickProduct({name:'Nuevo',price:10000,qty:2,cost:5000,locationId:location,companyId:company});
+ const p=b.quickProduct({name:'Nuevo',price:10000,qty:2,cost:5000});
  assert.match(b.stock().find(x=>x.id===p)!.sku,/^NS-AUTO-/);
- assert.equal(b.lots().find(l=>l.productId===p)!.locationId,location);
- const location2=b.saveLocation({name:'Tienda',kind:'Tienda',companyId:company});
- assert.throws(()=>b.sell([{productId:p,qty:1}],10000,0,null,b.saveCustomer({name:'Cliente'}),null,'Mostrador',false,location2));
- assert.equal(b.stock().find(x=>x.id===p)!.available,2);
- const customer=b.customers()[0];
- b.sell([{productId:p,qty:1}],10000,0,null,customer.id,null,'Mostrador',false,location);
+ const customer=b.saveCustomer({name:'Cliente'});
+ b.sell([{productId:p,qty:1}],10000,0,null,customer,null,'Mostrador');
  assert.equal(b.stock().find(x=>x.id===p)!.available,1);
 });
 
-test('corregir seguimiento de venta conserva importe, fecha, costo y stock; campaña actualizable',()=>{
+test('corregir seguimiento de venta conserva importe, fecha, costo y stock',()=>{
  const {b,a,p}=setup();
- const campaign=b.saveCampaign({name:'Septiembre',channel:'Instagram',status:'Activa',budget:10000});
  const saleId=b.sell([{productId:p,qty:1}],36900,36900,a,null,null,'Mostrador');
  const before=b.sales()[0],qty=b.stock()[0].stock;
- b.updateSaleDetails(saleId,{channel:'Instagram',campaignId:campaign,notes:'Seguimiento'});
+ b.updateSaleDetails(saleId,{channel:'Instagram',notes:'Seguimiento'});
  const after=b.sales()[0];for(const key of ['total','cost','paid','created'])assert.equal(after[key],before[key]);
- assert.equal(b.stock()[0].stock,qty);assert.equal(b.campaigns()[0].revenue,36900);
- b.saveCampaign({...b.campaigns()[0],name:'Septiembre final',status:'Finalizada',budget:15000});
- assert.equal(b.campaigns()[0].status,'Finalizada');assert.equal(b.campaigns()[0].revenue,36900);
+ assert.equal(after.channel,'Instagram');assert.equal(after.notes,'Seguimiento');assert.equal(b.stock()[0].stock,qty);
 });
 
 test('comisión solo para nuevos cobros con tarjeta y una vez por abono',()=>{
@@ -306,12 +271,10 @@ test('comisión solo para nuevos cobros con tarjeta y una vez por abono',()=>{
  assert.equal(b.all("SELECT * FROM ledger WHERE kind='expense'").length,2);
 });
 
-test('respaldo v2 conserva compañías, ubicaciones y relaciones y se puede restaurar de nuevo',()=>{
- const {b}=setup();const company=b.saveCompany({name:'Proveedor',kind:'Proveedor'});
- const location=b.saveLocation({name:'Sucursal',kind:'Tienda',companyId:company});
- const customer=b.saveCustomer({name:'Ana',companyId:company,locationId:location});
+test('respaldo v2 se puede restaurar de nuevo sin romper referencias',()=>{
+ const {b}=setup();const customer=b.saveCustomer({name:'Ana'});
  const raw=b.backup();b.restore(raw);b.restore(raw);
- assert.equal(b.companies()[0].name,'Proveedor');assert.equal(b.customers().find(c=>c.id===customer)!.locationId,location);
+ assert.equal(b.customers().find(c=>c.id===customer)!.name,'Ana');
  assert.equal(b.all('PRAGMA foreign_key_check').length,0);
 });
 
@@ -385,7 +348,8 @@ test('1.9: regresa los precios al precio original una sola vez (respaldos 1.7/1.
  const {upliftPrice}=await import('../src/business.ts');
  const {b,p}=setup();
  const before=b.one('SELECT price FROM products WHERE id=?',p).price;const q=b.addProduct('GAT-301','Proteína 1 kg','Proteína',59900,2);
- const bundle=b.addBundle('Combo',50000,[{productId:p,qty:1},{productId:q,qty:1}]);
+ // Paquete creado con una versión anterior (la 2.2.5 ya no los da de alta, pero los conserva).
+ const bundle='combo-viejo';b.run('INSERT INTO bundles VALUES(?,?,?)',bundle,'Combo',50000);
  const price=(id:string)=>b.one('SELECT price FROM products WHERE id=?',id).price;
  // Simula un teléfono 1.7/1.8: precios +4.06% con la marca y los precios anteriores.
  b.run('UPDATE products SET price=? WHERE id=?',upliftPrice(before),p);b.run('UPDATE bundles SET price=? WHERE id=?',upliftPrice(50000),bundle);
@@ -430,7 +394,7 @@ test('1.0: ajuste de inventario por conteo (baja FEFO, respeta caducidad, sube c
  const s=b.periodSummary('2000-01-01','2000-01-02');assert.equal(s.orders,0);
 });
 
-test("1.5.1: 'disponibles' coincide con lo que una venta puede tomar (apartados y ubicación)", () => {
+test("1.5.1: 'disponibles' coincide con lo que una venta puede tomar (apartados)", () => {
   const { b, a, p } = setup();
   // Apartado (entrega pendiente) mayor que un lote: no debe "prestar" unidades de otro cálculo.
   b.receive(p, "B", "2030-01-01", 1, 20000, null);
@@ -443,14 +407,4 @@ test("1.5.1: 'disponibles' coincide con lo que una venta puede tomar (apartados 
   if (shown > 0) b.sell([{ productId: p, qty: shown }], 36900 * shown, 36900 * shown, a, null, null, "Mostrador");
   assert.equal(b.stock().find((x) => x.id === p)!.available, 0);
   assert.ok(lotA);
-  // Con ubicación: solo cuenta lo asignado ahí y el mensaje lo explica.
-  const loc = b.saveLocation({ name: "Tienda centro", kind: "Tienda", companyId: null, address: "", notes: "", active: 1 });
-  b.receive(p, "C", "2030-01-01", 3, 20000, null);
-  assert.equal(b.sellable(p), 3);
-  assert.equal(b.sellable(p, loc), 0);
-  assert.throws(() => b.sell([{ productId: p, qty: 1 }], 36900, 36900, a, null, null, "Mostrador", false, loc), /ubicación elegida solo hay 0/);
-  b.assignLot(b.all("SELECT id FROM lots WHERE productId=? AND label='C'", p)[0].id, loc);
-  assert.equal(b.sellable(p, loc), 3);
-  b.sell([{ productId: p, qty: 2 }], 73800, 73800, a, null, null, "Mostrador", false, loc);
-  assert.equal(b.stock().find((x) => x.id === p)!.available, 1);
 });

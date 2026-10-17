@@ -59,7 +59,7 @@ Reglas de seguridad:
 - Para quitarle el acceso: **Desactivar** (puedes volver a **Activar**).
 - **Eliminar usuario** (en cada vendedor y en *Cuentas sin acceso a la tienda*): borra la cuenta con su correo y datos de registro. Sus ventas y cierres de caja se conservan. El correo queda libre para darlo de alta otra vez con un código nuevo.
 - **Puede cobrar con:** en cada vendedor eliges Tarjeta (terminal), Efectivo y/o Transferencia. Al vender, la **tarjeta en la terminal viene elegida por omisión**. El servidor rechaza cualquier forma de pago que no le hayas permitido.
-- **Datos para transferencia:** en **Más → Datos para transferencia** capturas tus cuentas (Mercado Pago, Banamex…: titular, CLABE, cuenta o tarjeta). En **Equipo** eliges cuáles ve cada vendedor. Aparecen SOLO cuando se elige *Transferencia* al vender (en tu teléfono y en el del vendedor), con botón para mandárselos al cliente por WhatsApp. Cada dato se liga a una cuenta de la app (*Se registra en la cuenta*); si el vendedor tiene más de una cuenta asignada, al vender elige a cuál le pagaron y la venta cae en esa cuenta. En **Ventas → Forma de cobro** filtras Efectivo, cada banco y Terminal.
+- **Datos para transferencia:** en **Ajustes → Formas de pago** capturas tus cuentas (Mercado Pago, Banamex…: titular, CLABE, cuenta o tarjeta). En **Equipo** eliges cuáles ve cada vendedor. Aparecen SOLO cuando se elige *Transferencia* al vender (en tu teléfono y en el del vendedor), con botón para mandárselos al cliente por WhatsApp. Cada dato se liga a una cuenta de la app (*Se registra en la cuenta*); si el vendedor tiene más de una cuenta asignada, al vender elige a cuál le pagaron y la venta cae en esa cuenta. En **Ventas → Forma de cobro** filtras Efectivo, cada banco y Terminal.
 - **Comisión de tarjeta:** desde la 1.7 va incluida en el precio de catálogo, igual para todos los vendedores y con cualquier forma de pago (ya no hay opción por vendedor).
 - **Cierres de caja:** el vendedor, en la pestaña **Caja**, ve lo que vendió desde su último cierre (productos, unidades, total y por forma de pago) y toca **Cerrar caja**. El cierre queda guardado en el servidor y nadie (ni él ni tú) lo puede cambiar o borrar. Tú los ves en **Equipo → 🧮 Cierres de caja**.
 
@@ -165,13 +165,13 @@ Si ya tenías la 1.1.0 o 1.1.1 funcionando:
 2. **Edge Functions → cobro-terminal → Code** → reemplaza todo por el nuevo `index.ts` → **Deploy** (Verify JWT apagado).
 3. Configura los **Correos de recuperación de contraseña** (sección de arriba).
 4. Instala la **1.4.0** en tu teléfono y en el de cada vendedor.
-5. Captura tus **Datos para transferencia** (Más) y asígnalos en **Equipo**.
+5. Captura tus cuentas en **Ajustes → Formas de pago** y elige ahí quién usa cada una (tú y cada vendedor).
 
 ### Actualizar a 1.5
 
 1. **SQL Editor** → pega de nuevo **todo** `supabase/schema.sql` → **Run**.
 2. Instala la **1.5.1** en tu teléfono y en el de cada vendedor.
-3. En **Más → Datos para transferencia**, abre cada dato (Mercado Pago, Banamex) → *Editar* → revisa *Se registra en la cuenta* → **Guardar datos**.
+3. En **Ajustes → Formas de pago**, abre cada dato (Mercado Pago, Banamex) → *Editar* → revisa *Se registra en la cuenta* → **Guardar datos**.
 
 ### Actualizar a 1.6 (débito, crédito y MSI · reemplazada por la 1.7: sáltala)
 

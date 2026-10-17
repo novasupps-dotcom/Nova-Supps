@@ -1,6 +1,6 @@
 {
   "name": "nova-negocio",
-  "version": "2.2.0",
+  "version": "2.5.2",
   "private": true,
   "main": "index.ts",
   "scripts": {
@@ -8,7 +8,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "check": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "test": "node --experimental-strip-types --import ./tests/ts-resolve.mjs --test tests/*.test.ts",
     "test:ui": "node tests/ui.cjs",
     "test:forms": "node tests/forms.cjs",
     "test:photos": "node tests/photos.cjs",

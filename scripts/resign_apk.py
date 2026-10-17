@@ -69,7 +69,7 @@ def signer_command(tool, java=None):
 def run(command, env=None):
     result = subprocess.run(command, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if result.returncode:
-        raise ValueError("Falló la herramienta Android: " + (result.stderr or result.stdout).strip())
+        raise ValueError("Falló " + Path(command[0]).name + " (código " + str(result.returncode) + "): " + (result.stderr or result.stdout).strip())
     return result.stdout + result.stderr
 
 
@@ -99,12 +99,21 @@ def main(argv=None):
     env = {**os.environ, "NOVA_STORE_PASSWORD": credentials["password"], "NOVA_KEY_PASSWORD": credentials.get("keyPassword", credentials["password"])}
     with tempfile.TemporaryDirectory(prefix="nova-resign-", dir=os.environ.get("NOVA_SIGN_SCRATCH")) as scratch:
         aligned, signed = Path(scratch) / "aligned.apk", Path(scratch) / "signed.apk"
-        run([aligner, "-P", "16", "-f", "4", str(source), str(aligned)])
+        # Conserva la estructura de un APK que EAS ya alineó correctamente.
+        # Evita una reescritura innecesaria y el fallo de zipalign 36 en Windows.
+        try:
+            run([aligner, "-c", "-P", "16", "4", str(source)])
+        except ValueError:
+            run([aligner, "-P", "16", "-f", "4", str(source), str(aligned)])
+        else:
+            shutil.copyfile(source, aligned)
         run(signer + ["sign", "--ks", str(ROOT / "signing/nova-release.jks"), "--ks-key-alias", credentials["alias"],
                       "--ks-pass", "env:NOVA_STORE_PASSWORD", "--key-pass", "env:NOVA_KEY_PASSWORD",
                       "--v1-signing-enabled", "true", "--v2-signing-enabled", "true", "--v3-signing-enabled", "true", "--v4-signing-enabled", "false",
                       "--out", str(signed), str(aligned)], env)
-        verified = run(signer + ["verify", "--verbose", "--print-certs", str(signed)])
+        # Con minSdk >= 24, apksigner omite v1 en su comprobación predeterminada.
+        # El rango 23+ verifica las tres firmas sin cambiar el mínimo de la app.
+        verified = run(signer + ["verify", "--verbose", "--print-certs", "--min-sdk-version", "23", str(signed)])
         if certificate(verified) != EXPECTED_CERT:
             raise ValueError("El certificado final no coincide con el original. No se entrega el APK.")
         for scheme in (1, 2, 3):

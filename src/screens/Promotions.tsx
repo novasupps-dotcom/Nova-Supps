@@ -1,7 +1,8 @@
 // 2.1 · Promociones por parámetro (pantalla del dueño). Se aplican solas al vender,
 // en tu teléfono y en el de los vendedores (el servidor hace el mismo cálculo).
 import React, { useMemo, useState } from "react";
-import { Alert, Switch, Text, TextInput, View } from "react-native";
+import { Alert, Switch, View } from "react-native";
+import { Text, TextInput } from "../text";
 import {
   money,
   PROMO_KINDS,
@@ -208,17 +209,13 @@ export function PromotionsPage({
       {b.setting(NEEDS_SCHEMA_21, null) === true && (
         <Note color={C.amber}>{SCHEMA_21_NOTE}</Note>
       )}
-      <Note>
-        Se aplican solas al vender, en tu teléfono y en el de tus vendedores. Si
-        a un producto le tocan varias, se usa la que más descuenta (no se
-        acumulan). Si escribes un precio especial en la venta, manda tu precio.
-      </Note>
+      <Note>Se aplican solas al vender (también a tus vendedores). Si aplican varias, gana la de mayor descuento. Un precio especial en la venta tiene prioridad.</Note>
       {promos.map((p) => {
         const live = promoLive(p, day);
         return (
           <Card key={p.id} tone={live ? "ok" : undefined}>
             <View style={s.between}>
-              <Text style={[s.subtitle, { flex: 1 }]}>{`🏷️ ${p.name}`}</Text>
+              <Text style={[s.subtitle, { flex: 1 }]}>{`${p.name}`}</Text>
               <Pill text={promoTag(p)} tone={live ? "ok" : "neutral"} />
             </View>
             <Note>{`${PROMO_KINDS[p.kind]} · ${promoTarget(p, products)}`}</Note>
@@ -382,7 +379,7 @@ export function PromotionsPage({
             return (
               <Note
                 color={C.amber}
-              >{`⚠️ Con esta promoción ${low.length === 1 ? "1 producto queda" : `${low.length} productos quedan`} debajo de su costo (por ejemplo ${x.name}: te cuesta ${money(x.cost)} y cobrarías ${money(x.unit)} por pieza). Al vender se permitirá porque tú la configuraste.`}</Note>
+              >{`Con esta promoción ${low.length === 1 ? "1 producto queda" : `${low.length} productos quedan`} debajo de su costo (por ejemplo ${x.name}: te cuesta ${money(x.cost)} y cobrarías ${money(x.unit)} por pieza). Al vender se permitirá porque tú la configuraste.`}</Note>
             );
           })()}
           {!!err && <Note color={C.red}>{err}</Note>}

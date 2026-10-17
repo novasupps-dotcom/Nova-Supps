@@ -1,6 +1,7 @@
 // 2.1 · Reportes por producto, por vendedor y de promociones.
 import React, { useMemo, useState } from "react";
-import { Share, Text, View } from "react-native";
+import { Share, View } from "react-native";
+import { Text } from "../text";
 import { money, type Business } from "../business";
 import { salesReport, type SalesReport } from "../reports";
 import { EXPORT_PERIODS, exportRange, type ExportPeriod } from "../salesExcel";
@@ -74,6 +75,7 @@ export function ReportsPage({ b, version }: { b: Business; version: number }) {
   return (
     <>
       <Chips
+        row
         options={EXPORT_PERIODS.map((p) => ({ id: p, name: p }))}
         value={period}
         onChange={(v) => setPeriod(v as ExportPeriod)}
@@ -108,6 +110,7 @@ export function ReportsPage({ b, version }: { b: Business; version: number }) {
         <>
           <Text style={s.section}>Por producto</Text>
           <Chips
+            row
             options={SORTS.map((x) => ({ id: x.id, name: x.name }))}
             value={sort}
             onChange={(v) => setSort(v as Sort)}
@@ -161,7 +164,7 @@ export function ReportsPage({ b, version }: { b: Business; version: number }) {
             </>
           )}
           <Button
-            title="📤 Compartir reporte"
+            icon="share-2" title="Compartir reporte"
             secondary
             onPress={() =>
               void Share.share({ message: reportText(report, period) }).catch(
@@ -169,11 +172,7 @@ export function ReportsPage({ b, version }: { b: Business; version: number }) {
               )
             }
           />
-          <Note>
-            El detalle venta por venta está en el Excel (Parámetros → Respaldo y
-            Excel), que ahora también trae las hojas «Por producto» y «Por
-            vendedor».
-          </Note>
+          <Note>El detalle venta por venta está en el Excel (Ajustes → Respaldo y Excel).</Note>
         </>
       )}
     </>

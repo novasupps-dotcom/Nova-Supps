@@ -19,9 +19,6 @@ export type OwnerPageContext = {
   data: {
     products: any[];
     customers: Row[];
-    campaigns: any[];
-    companies: Row[];
-    locations: Row[];
     accounts: Row[];
     sales: any[];
     lots: Row[];
@@ -41,7 +38,11 @@ export type OwnerPageContext = {
   b: Business | null;
   currentPeriod: string;
   setPeriod: (p: string) => void;
-  excelCard: () => React.JSX.Element;
+  excelCard: (label?: string) => React.JSX.Element;
+  /** El cuadro de Excel está abierto (se muestra completo debajo del resumen). */
+  excelOpen: boolean;
+  /** Abre el panel del Excel de ventas. */
+  openExcel: () => void;
   byMethodCard: (ps: Row) => React.JSX.Element;
   resultCard: (ps: Row) => React.JSX.Element;
   line: (
@@ -102,7 +103,6 @@ export type OwnerPageContext = {
   confirmDeleteAllCancelled: (list: Row[]) => void;
   setSaleDetailId: React.Dispatch<React.SetStateAction<string>>;
   openSale: (values?: Record<string, string>, items?: Cart) => void;
-  editCampaign: (c: Row) => void;
   corteDay: string;
   setCorteDay: React.Dispatch<React.SetStateAction<string>>;
   revision: number;

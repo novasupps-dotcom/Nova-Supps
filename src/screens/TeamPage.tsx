@@ -1,11 +1,17 @@
 import React from "react";
-import { Alert, Switch, Text, TextInput, View } from "react-native";
+import { Alert, Switch, View } from "react-native";
+import { Text, TextInput } from "../text";
 import { localDay, money, type Row } from "../business";
 import { formatShortCode } from "../cloud";
 import { loginHere } from "../login";
 import { detachPush } from "../push";
 import { storeCloud } from "../storeConfig";
-import { NEEDS_SCHEMA_21, SCHEMA_21_NOTE } from "../sync";
+import {
+  NEEDS_SCHEMA_21,
+  SCHEMA_21_NOTE,
+  NEEDS_SCAN_SCHEMA,
+  SCAN_SCHEMA_NOTE,
+} from "../sync";
 import { type TransferAccount } from "../transfer";
 import {
   Button,
@@ -15,7 +21,6 @@ import {
   Note,
   Pill,
   fmtDay,
-  followUpsDue,
   s,
 } from "../ui";
 import type { Body, OwnerPageContext } from "./ownerContext";
@@ -59,20 +64,8 @@ export function renderTeamPage(ctx: OwnerPageContext): Body | null {
   } = ctx;
   const d = data!;
   const {
-    products,
-    customers,
-    campaigns,
-    companies,
-    locations,
     accounts,
-    sales,
-    lots,
-    m,
   } = d;
-  const low = products.filter(
-    (p) => !p.archived && p.inventoryKnown && p.available <= p.minimum,
-  );
-  const soon = followUpsDue(customers);
   if (page === "Equipo") {
     const cfg = b!.setting("cloudConfig", null);
     const cloud = getCloud();
@@ -115,18 +108,8 @@ export function renderTeamPage(ctx: OwnerPageContext): Body | null {
             <>
               <Card>
                 <Text style={s.subtitle}>Vende con varios teléfonos</Text>
-                <Note>
-                  Tus vendedores usan esta misma app en su celular: ven precios
-                  y existencias, dan de alta clientes y venden a precio de
-                  lista. Sus ventas llegan aquí y este teléfono sigue siendo la
-                  caja central con todos los datos y permisos.
-                </Note>
-                <Note>
-                  Primero crea tu base gratuita en supabase.com siguiendo la
-                  guía “Configurar vendedores” (carpeta docs del proyecto).
-                  Luego copia aquí la URL del proyecto y la clave pública
-                  (publishable).
-                </Note>
+                <Note>Tus vendedores venden desde su celular con esta app. Sus ventas llegan a este teléfono, que es la caja central.</Note>
+                <Note>Crea tu base gratuita en supabase.com (guía «Configurar vendedores») y pega aquí la URL del proyecto y la clave pública.</Note>
               </Card>
               <Text style={s.section}>Conectar este teléfono como dueño</Text>
               <Card>
@@ -186,11 +169,14 @@ export function renderTeamPage(ctx: OwnerPageContext): Body | null {
                 {!!cloudStatus && !cloudStatus.ok && (
                   <Note color={C.red}>{cloudStatus.text}</Note>
                 )}
+                {b!.setting(NEEDS_SCAN_SCHEMA, null) === true && (
+                  <Note color={C.amber}>{SCAN_SCHEMA_NOTE}</Note>
+                )}
                 {b!.setting(NEEDS_SCHEMA_21, null) === true && (
                   <Note color={C.amber}>{SCHEMA_21_NOTE}</Note>
                 )}
                 <Button
-                  title={teamBusy ? "Sincronizando…" : "🔄 Sincronizar ahora"}
+                  icon="refresh-cw" title={teamBusy ? "Sincronizando…" : "Sincronizar ahora"}
                   disabled={teamBusy}
                   onPress={() => void runSync(true)}
                 />
@@ -343,13 +329,13 @@ export function renderTeamPage(ctx: OwnerPageContext): Body | null {
                       </Note>
                       <Note color={m.device_id ? C.muted : C.amber}>
                         {m.device_id
-                          ? `📱 Teléfono registrado${m.device_at ? ` el ${fmtDay(localDay(m.device_at))}` : ""}`
-                          : "📱 Esperando que entre en su teléfono nuevo"}
+                          ? `Teléfono registrado${m.device_at ? ` el ${fmtDay(localDay(m.device_at))}` : ""}`
+                          : "Esperando que entre en su teléfono nuevo"}
                       </Note>
                     </View>
                     <View style={{ width: "100%" }}>
                       {!!emailOf(m.user_id) && (
-                        <Note>{`✉️ ${emailOf(m.user_id)}`}</Note>
+                        <Note>{`${emailOf(m.user_id)}`}</Note>
                       )}
                       <Text style={[s.label, { marginTop: 6 }]}>
                         Puede cobrar con
@@ -412,8 +398,7 @@ export function renderTeamPage(ctx: OwnerPageContext): Body | null {
                         if (!all.length)
                           return (
                             <Note>
-                              Captura tus datos en Parámetros → Datos para
-                              transferencia.
+                              Captura tus datos en Ajustes → Formas de pago.
                             </Note>
                           );
                         const ids: string[] = Array.isArray(m.transfer_ids)
@@ -460,10 +445,10 @@ export function renderTeamPage(ctx: OwnerPageContext): Body | null {
                       })()}
                     </View>
                     <Button
-                      title={
+                      icon="calculator" title={
                         sellerCuts?.userId === m.user_id
                           ? "Ocultar cierres"
-                          : "🧮 Cierres de caja"
+                          : "Cierres de caja"
                       }
                       secondary
                       small
@@ -556,10 +541,10 @@ export function renderTeamPage(ctx: OwnerPageContext): Body | null {
                       </>
                     )}
                     <Button
-                      title={
+                      icon="key-round" title={
                         pwFor?.userId === m.user_id
                           ? "Cancelar contraseña"
-                          : "🔑 Nueva contraseña"
+                          : "Nueva contraseña"
                       }
                       secondary
                       small
@@ -572,7 +557,7 @@ export function renderTeamPage(ctx: OwnerPageContext): Body | null {
                       }
                     />
                     <Button
-                      title="🗑 Eliminar usuario"
+                      icon="trash-2" title="Eliminar usuario"
                       danger
                       small
                       onPress={() =>
@@ -650,7 +635,7 @@ export function renderTeamPage(ctx: OwnerPageContext): Body | null {
                             </Note>
                           </View>
                           <Button
-                            title="🗑 Eliminar"
+                            icon="trash-2" title="Eliminar"
                             danger
                             small
                             onPress={() =>
@@ -678,27 +663,17 @@ export function renderTeamPage(ctx: OwnerPageContext): Body | null {
                   disabled={teamBusy}
                   onPress={() => void teamAction(async () => {})}
                 />
-                <Note>
-                  El vendedor solo puede vender a precio de lista y de contado,
-                  ver existencias y precios (sin costos), dar de alta clientes y
-                  ver sus propias ventas del día. No puede eliminar, cancelar,
-                  devolver ni ver tus reportes.
-                </Note>
+                <Note>El vendedor vende a precio de lista, ve existencias (sin costos), da de alta clientes y ve sus ventas del día. No cancela, no devuelve ni ve reportes.</Note>
               </Card>
               <Text style={s.section}>Invitar vendedor</Text>
               <Card>
-                <Note>
-                  Crea un código personal (GNS-XXXX-XXXX) y mándaselo con el
-                  APK. Es la única forma de crear una cuenta: sirve una sola
-                  vez, vence en 7 días y la cuenta queda ligada a su teléfono.
-                  Puedes revocarlo antes de que lo use.
-                </Note>
+                <Note>Código personal de un solo uso para crear la cuenta del vendedor. Vence en 7 días y queda ligado a su teléfono.</Note>
                 {cf("inviteName", "Nombre del vendedor *", {
                   placeholder: "Luis",
                 })}
                 <Button
-                  title={
-                    teamBusy ? "Creando…" : "🎟️ Crear código de invitación"
+                  icon="tag" title={
+                    teamBusy ? "Creando…" : "Crear código de invitación"
                   }
                   disabled={teamBusy}
                   onPress={() => void createInvite()}
@@ -716,7 +691,7 @@ export function renderTeamPage(ctx: OwnerPageContext): Body | null {
                     </Text>
                     <Note>{`Vence el ${fmtDay(localDay(newInvite.expires))} · un solo uso`}</Note>
                     <Button
-                      title="📨 Enviar por WhatsApp"
+                      icon="send" title="Enviar por WhatsApp"
                       onPress={() =>
                         shareInvite(
                           newInvite.code,
@@ -837,7 +812,7 @@ export function renderTeamPage(ctx: OwnerPageContext): Body | null {
                 <Note>
                   {mpCfg?.terminalId
                     ? `Terminal: ${mpCfg.terminalLabel || mpCfg.terminalId}`
-                    : "Primero configura tu terminal en Parámetros → Terminal Mercado Pago."}
+                    : "Primero configura tu terminal en Ajustes → Terminal Mercado Pago."}
                 </Note>
                 <Note>
                   La clave de Mercado Pago vive en tu servidor (función

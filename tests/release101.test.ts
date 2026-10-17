@@ -180,13 +180,10 @@ test("consultas agregadas devuelven lo mismo que antes", () => {
   const b = imported();
   const sales = b.sales();
   for (const s of sales) assert.equal(s.paid, b.one("SELECT COALESCE(SUM(amount),0) n FROM ledger WHERE ref=? AND kind='sale'", s.id).n);
-  const camp = b.addCampaign("Apertura", "Instagram", "AP1");
   const p = b.stock().find((x) => x.available > 0)!;
   const cash = b.accounts().find((a) => a.kind === "Efectivo")!.id;
-  b.sell([{ productId: p.id, qty: 1 }], p.price, p.price, cash, null, camp, "Instagram", true);
-  b.movement("expense", cash, 1000, "Anuncio", camp);
-  const c = b.campaigns().find((x) => x.id === camp)!;
-  assert.equal(c.revenue, p.price);
-  assert.equal(c.spend, 1000);
-  assert.deepEqual(b.bundles(), []);
+  const before = b.stock().find((x) => x.id === p.id)!.available;
+  b.sell([{ productId: p.id, qty: 1 }], p.price, p.price, cash, null, null, "Instagram", true);
+  assert.equal(b.stock().find((x) => x.id === p.id)!.available, before - 1);
+  assert.equal(b.sales()[0].paid, p.price);
 });

@@ -1,8 +1,10 @@
 import React from "react";
-import { Pressable, Switch, Text, View } from "react-native";
+import { Switch, View } from "react-native";
+import { Text } from "../text";
 import { cardFee, feeLabel, grossUp, localDay, money } from "../business";
 import { deviceId } from "../device";
-import { Button, C, Card, Note, Pill, fmtDay, followUpsDue, s } from "../ui";
+import { Button, C, Card, MenuList, Note, Pill, fmtDay, s } from "../ui";
+import { TILE } from "../theme";
 import { CloudBackupCard } from "./CloudBackup";
 import { CustomerCatalogPage } from "./CustomerCatalog";
 import type { Body, OwnerPageContext } from "./ownerContext";
@@ -10,7 +12,6 @@ import {
   ADVANCED_MENU,
   SETTINGS_MENU,
   VERSION,
-  minus,
   type MenuItem,
 } from "./ownerShared";
 import { PromotionsPage } from "./Promotions";
@@ -22,7 +23,6 @@ export function renderParameters(ctx: OwnerPageContext): Body | null {
     page,
     b,
     excelCard,
-    line,
     go,
     open,
     exportBackup,
@@ -35,31 +35,21 @@ export function renderParameters(ctx: OwnerPageContext): Body | null {
     previousBackup,
     restoreFromCloud,
     lockApi,
+    filters,
   } = ctx;
   const d = data!;
-  const {
-    products,
-    customers,
-    campaigns,
-    companies,
-    locations,
-    accounts,
-    sales,
-    lots,
-    m,
-  } = d;
-  const low = products.filter(
-    (p) => !p.archived && p.inventoryKnown && p.available <= p.minimum,
-  );
-  const soon = followUpsDue(customers);
   if (page === "Catálogo para clientes")
     return {
       scroll: (
         <CustomerCatalogPage
           b={b!}
           products={data!.products}
+          customers={data!.customers}
           feeBps={data!.feeBps}
           notify={notify}
+          getCloud={getCloud}
+          initialCustomerId={filters["Catálogo para clientes"] || ""}
+          onSent={refresh}
         />
       ),
     };
@@ -86,10 +76,8 @@ export function renderParameters(ctx: OwnerPageContext): Body | null {
           <Card>
             <Text style={s.subtitle}>Tus datos viven en este teléfono</Text>
             <Note>
-              Guarda una copia fuera de la app (Drive, OneDrive, correo o
-              WhatsApp) antes de cambiar de equipo o desinstalar. El respaldo
-              incluye tus registros y fotos añadidas; las imágenes originales
-              vienen con la app.
+              Guarda una copia fuera de la app (Drive, correo o WhatsApp) antes
+              de cambiar de teléfono o desinstalar.
             </Note>
             <View style={{ height: 8 }} />
             <Pill
@@ -120,7 +108,7 @@ export function renderParameters(ctx: OwnerPageContext): Body | null {
               llenar el teléfono.
             </Note>
             <View style={{ height: 8 }} />
-            {excelCard()}
+            {excelCard("Descargar Excel de ventas")}
           </Card>
           <CloudBackupCard
             b={b!}
@@ -134,60 +122,43 @@ export function renderParameters(ctx: OwnerPageContext): Body | null {
     };
   const advancedOn = !!b!.setting("advancedModules", false);
   const menuRows = (items: MenuItem[]) => (
-    <Card>
-      {items.map((item, i) => (
-        <Pressable
-          key={item.page}
-          accessibilityRole="button"
-          onPress={() => go(item.page)}
-          style={[
-            s.menuRow,
-            i === items.length - 1 && { borderBottomWidth: 0 },
-          ]}
-        >
-          <Text style={s.menuIcon}>{item.icon}</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={[s.body, { fontWeight: "700" }]}>{item.title}</Text>
-            <Note>{item.desc}</Note>
-          </View>
-          <Text style={{ color: C.muted, fontSize: 20 }}>›</Text>
-        </Pressable>
-      ))}
-    </Card>
+    <MenuList
+      items={items.map((item) => ({
+        key: item.page,
+        title: item.title,
+        desc: item.desc,
+        icon: item.icon,
+        tint: item.tint,
+        onPress: () => go(item.page),
+      }))}
+    />
   );
   const ex = 100000;
+  const pays = grossUp(ex, d.feeBps);
+  const stat = (label: string, value: string, color?: string) => (
+    <View style={{ flex: 1 }}>
+      <Text style={{ color: C.muted, fontSize: 13 }}>{label}</Text>
+      <Text style={[s.body, { fontWeight: "600", color: color || C.ink }]}>
+        {value}
+      </Text>
+    </View>
+  );
   return {
     scroll: (
       <>
         <Text style={s.section}>Cobros</Text>
         <Card>
           <View style={s.between}>
-            <View style={{ flex: 1 }}>
-              <Text style={[s.body, { fontWeight: "700" }]}>
-                Comisión que absorbe el cliente
-              </Text>
-              <Note>
-                Con cualquier forma de pago. Tú recibes tu precio completo.
-              </Note>
-            </View>
+            <Text style={[s.body, { fontWeight: "600", flex: 1 }]}>
+              Comisión que absorbe el cliente
+            </Text>
             <Text style={s.price}>{feeLabel(d.feeBps)}</Text>
           </View>
-          {line(`Tu precio`, money(ex))}
-          {line("El cliente paga", money(grossUp(ex, d.feeBps)), {
-            bold: true,
-          })}
-          {line(
-            `Mercado Pago descuenta ${feeLabel(d.feeBps)}`,
-            minus(cardFee(grossUp(ex, d.feeBps), d.feeBps)),
-            { color: C.red },
-          )}
-          {line(
-            "Recibes",
-            money(
-              grossUp(ex, d.feeBps) - cardFee(grossUp(ex, d.feeBps), d.feeBps),
-            ),
-            { bold: true, color: C.green },
-          )}
+          <View style={[s.row, { marginVertical: 8 }]}>
+            {stat("Tu precio", money(ex))}
+            {stat("El cliente paga", money(pays))}
+            {stat("Recibes", money(pays - cardFee(pays, d.feeBps)), C.green)}
+          </View>
           <Button
             title="Cambiar porcentaje"
             secondary
@@ -210,69 +181,75 @@ export function renderParameters(ctx: OwnerPageContext): Body | null {
         />
         <Text style={s.section}>Datos y seguridad</Text>
         {menuRows(SETTINGS_MENU[3].items)}
-
-        <Card>
-          <View style={s.between}>
-            <View style={{ flex: 1 }}>
-              <Text style={[s.body, { fontWeight: "700" }]}>
-                Mostrar funciones avanzadas
-              </Text>
-              <Note>
-                Lotes, paquetes, cuentas, gastos, campañas, compañías y
-                ubicaciones. Tus datos se conservan aunque estén ocultas.
-              </Note>
-            </View>
-            <Switch
-              accessibilityLabel="Funciones avanzadas"
-              value={advancedOn}
-              onValueChange={(on) => (
-                b!.setSetting("advancedModules", on),
-                refresh()
-              )}
-            />
-          </View>
-        </Card>
-        {advancedOn && menuRows(ADVANCED_MENU)}
-
-        <Card>
-          <Text style={s.subtitle}>🔒 Acceso biométrico</Text>
-          <Note>
-            {lockApi.bioAvailable
-              ? lockApi.bioEnabled
-                ? "Activo: se pide la huella o el rostro al abrir la app. Usa Bloquear ahora para pedirla otra vez."
-                : "Desactivado en este teléfono."
-              : "Registra una huella o rostro en los ajustes del teléfono para activarlo."}
-          </Note>
-          {lockApi.bioAvailable && (
-            <View style={s.row}>
-              <View style={{ flex: 1 }}>
-                <Button
-                  title={
-                    lockApi.bioEnabled
-                      ? "Desactivar bloqueo"
-                      : "Activar bloqueo"
-                  }
-                  secondary
-                  small
-                  onPress={async () => {
-                    if (await lockApi.setBio(!lockApi.bioEnabled)) refresh();
-                  }}
+        <MenuList
+          items={[
+            {
+              key: "bio",
+              title: "Huella o rostro al abrir",
+              icon: "fingerprint",
+              tint: TILE.graphite,
+              value: !lockApi.bioAvailable
+                ? "No disponible"
+                : lockApi.bioEnabled
+                  ? "Activo"
+                  : "Apagado",
+            },
+            {
+              key: "adv",
+              title: "Funciones avanzadas",
+              desc: "Lotes, cuentas y gastos. Tus datos no se pierden.",
+              icon: "sliders-horizontal",
+              tint: TILE.graphite,
+              right: (
+                <Switch
+                  accessibilityLabel="Funciones avanzadas"
+                  value={advancedOn}
+                  trackColor={{ true: C.green, false: C.fill }}
+                  thumbColor="#fff"
+                  onValueChange={(on) => (
+                    b!.setSetting("advancedModules", on),
+                    refresh()
+                  )}
                 />
-              </View>
-              {lockApi.bioEnabled && (
-                <View style={{ flex: 1 }}>
-                  <Button
-                    title="Bloquear ahora"
-                    secondary
-                    small
-                    onPress={() => lockApi.lockNow()}
-                  />
-                </View>
-              )}
+              ),
+            },
+          ]}
+        />
+        {!lockApi.bioAvailable ? (
+          <Note>Registra una huella o rostro en los ajustes del teléfono para usar el bloqueo.</Note>
+        ) : (
+          <View style={[s.row, { marginTop: -4, marginBottom: 8 }]}>
+            <View style={{ flex: 1 }}>
+              <Button
+                title={lockApi.bioEnabled ? "Desactivar bloqueo" : "Activar bloqueo"}
+                secondary
+                small
+                onPress={async () => {
+                  if (await lockApi.setBio(!lockApi.bioEnabled)) refresh();
+                }}
+              />
             </View>
-          )}
-        </Card>
-        <Note>{`Nova Negocio ${VERSION}`}</Note>
+            {lockApi.bioEnabled && (
+              <View style={{ flex: 1 }}>
+                <Button title="Bloquear ahora" secondary small onPress={() => lockApi.lockNow()} />
+              </View>
+            )}
+          </View>
+        )}
+        {advancedOn && (
+          <>
+            <Text style={s.section}>Funciones avanzadas</Text>
+            {menuRows(ADVANCED_MENU)}
+          </>
+        )}
+        <Text
+          style={{
+            color: C.muted,
+            fontSize: 12.5,
+            textAlign: "center",
+            marginTop: 6,
+          }}
+        >{`Nova Negocio ${VERSION}`}</Text>
       </>
     ),
   };

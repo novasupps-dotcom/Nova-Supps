@@ -28,7 +28,7 @@ let ui;
 const issues = [];
 const pressables = (pred) => ui.root.findAll((n) => n.type === "Pressable" && typeof n.props.onPress === "function" && pred(n));
 async function tap(n) { await act(async () => n.props.onPress()); await act(async () => { await new Promise((r) => setTimeout(r, 5)); }); }
-async function tab(label) { const c = pressables((n) => text(n).trim().endsWith(" " + label) || text(n).trim() === label); assert(c.length, label); await tap(c[c.length - 1]); }
+async function tab(label) { let c = pressables((n) => text(n).trim().endsWith(" " + label) || text(n).trim() === label); if (!c.length) c = pressables((n) => n.props.accessibilityLabel === label); if (!c.length && label === "Ajustes") { const v = pressables((n) => n.props.accessibilityState && "selected" in n.props.accessibilityState && text(n).trim() === "Vender"); if (v.length) await act(async () => v[v.length - 1].props.onPress()); c = pressables((n) => n.props.accessibilityLabel === label); } assert(c.length, label); await tap(c[c.length - 1]); }
 const check = (where) => issues.push(...screenIssues(ui, where));
 const formOpen = () => ui.root.findAll((n) => n.type === "Modal").some((m) => m.props.visible);
 async function closeForm() { for (let i = 0; i < 3 && formOpen(); i++) { const c = pressables((n) => ["Cerrar", "Volver", "Cancelar"].includes(text(n).trim())); if (!c.length) break; await tap(c[0]); } }
@@ -40,7 +40,7 @@ async function closeForm() { for (let i = 0; i < 3 && formOpen(); i++) { const c
   b.saveCustomer({ name: "Cliente Seguimiento", phone: "5512345678", nextDate: require("../src/business.ts").today() });
   await act(async () => { ui = renderer.create(React.createElement(App)); });
   let pages = 0;
-  for (const t of ["Vender", "Ventas", "Clientes", "Stock", "Parámetros"]) {
+  for (const t of ["Vender", "Ventas", "Clientes", "Stock", "Ajustes"]) {
     await tab(t);
     check(t);
     pages++;
@@ -50,34 +50,35 @@ async function closeForm() { for (let i = 0; i < 3 && formOpen(); i++) { const c
   const saleCard = pressables((n) => /VNS\d+|V-/.test(text(n)) && text(n).includes("$"))[0];
   if (saleCard) { await tap(saleCard); check("Detalle venta"); pages++; }
   await tab("Stock");
-  const prodCard = pressables((n) => text(n).includes("disponibles") && text(n).includes("Editar"))[0];
+  const prodCard = pressables((n) => text(n).includes("disponibles") && text(n).includes("Cliente paga"))[0];
   if (prodCard) { await tap(prodCard); check("Detalle producto"); pages++; }
   // Parámetros (con las funciones avanzadas encendidas para recorrerlas todas)
-  await tab("Parámetros");
+  await tab("Ajustes");
   const sw = ui.root.findAll((n) => n.type === "Switch" && n.props.accessibilityLabel === "Funciones avanzadas")[0];
   assert(sw, "interruptor de funciones avanzadas");
   await act(async () => sw.props.onValueChange(true));
-  const rows = [...new Set(pressables((n) => text(n).trim().endsWith("›")).map((n) => text(n).split("›")[0].trim()))];
-  assert(rows.length >= 12, "Parámetros + avanzadas: " + rows.length);
+  // 2.3: cada fila de Ajustes es un botón con testID "menu:<título>".
+  const rows = [...new Set(pressables((n) => String(n.props.testID || "").startsWith("menu:")).map((n) => n.props.testID))];
+  assert(rows.length >= 12, "Ajustes + avanzadas: " + rows.length);
   for (const r of rows) {
-    await tab("Parámetros");
-    const row = pressables((n) => text(n).split("›")[0].trim() === r)[0];
+    await tab("Ajustes");
+    const row = pressables((n) => n.props.testID === r)[0];
     if (!row) continue;
     await tap(row);
-    check("Parámetros → " + r.split(" ").slice(1, 4).join(" "));
+    check("Ajustes → " + r.slice(5));
     pages++;
   }
-  for (const [t, label] of [["Ventas", "🧮 Corte de caja"], ["Ventas", "📊 Resumen"]]) {
+  for (const [t, label] of [["Ventas", "Corte de caja"], ["Ventas", "Resumen"]]) {
     await tab(t);
     await tap(pressables((n) => text(n).trim() === label)[0]);
     check(`${t} → ${label}`);
     pages++;
   }
   // Formularios principales
-  const forms = [["Vender", "＋ Producto nuevo"], ["Stock", "＋ Producto"], ["Clientes", "＋ Cliente"], ["Stock", "＋ Entrada"], ["Ventas", "＋ Gasto"], ["Ventas", "📥 Descargar Excel de ventas"]];
+  const forms = [["Vender", "＋ Producto nuevo"], ["Stock", "Nuevo producto"], ["Clientes", "Nuevo cliente"], ["Stock", "Nueva entrada"], ["Ventas", "Nuevo gasto"], ["Ventas", "Excel"]];
   for (const [t, label] of forms) {
     await tab(t);
-    const btn = pressables((n) => text(n).trim() === label)[0];
+    const btn = pressables((n) => text(n).trim() === label)[0] || pressables((n) => n.props.accessibilityLabel === label)[0];
     assert(btn, label);
     await tap(btn);
     check(`${t} → ${label}`);
@@ -86,7 +87,7 @@ async function closeForm() { for (let i = 0; i < 3 && formOpen(); i++) { const c
   }
   // Carrito (1.8): agregar desde Stock y abrir el carrito.
   await tab("Stock");
-  const add = pressables((n) => text(n).trim() === "🛒 Al carrito" && !n.props.disabled)[0];
+  const add = pressables((n) => text(n).trim() === "Al carrito" && !n.props.disabled)[0];
   if (add) {
     await tap(add);
     check("Stock con carrito");

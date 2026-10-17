@@ -1,4 +1,9 @@
 // Money is always integer MXN cents. SQLite transactions protect each operation.
+import {
+  findProductByCode,
+  normalizeProductCode,
+  sameProductCode,
+} from "./barcodes";
 export interface DB {
   execSync(sql: string): void;
   runSync(sql: string, ...args: any[]): any;
@@ -42,7 +47,10 @@ export function assert(ok: unknown, message: string): asserts ok {
 // Acepta "1250", "1,250.50", "$1 250.5" y "1250,5" (coma decimal solo si
 // hay una coma seguida de 1–2 dígitos y no hay punto).
 export function normalizeAmount(raw: string): string {
-  let t = String(raw ?? "").trim().replace(/^\$\s*/, "").replace(/\s+/g, "");
+  let t = String(raw ?? "")
+    .trim()
+    .replace(/^\$\s*/, "")
+    .replace(/\s+/g, "");
   if (/^\d+,\d{1,2}$/.test(t)) t = t.replace(",", ".");
   else if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(t)) t = t.replace(/,/g, "");
   return t;
@@ -81,9 +89,11 @@ export function localDay(iso?: string | null) {
 /** Comisión por defecto (Mercado Pago Point: 3.5% + IVA = 4.06%). Es un parámetro: Parámetros → Comisión. */
 export const CARD_FEE_BPS = 406;
 export const MAX_FEE_BPS = 2000;
-export const cardFee = (amount: number, bps = CARD_FEE_BPS) => Math.round((amount * bps) / 10000);
+export const cardFee = (amount: number, bps = CARD_FEE_BPS) =>
+  Math.round((amount * bps) / 10000);
 /** "4.06%" a partir de puntos base (406). */
-export const feeLabel = (bps = CARD_FEE_BPS) => `${(bps / 100).toFixed(2).replace(/\.?0+$/, "")}%`;
+export const feeLabel = (bps = CARD_FEE_BPS) =>
+  `${(bps / 100).toFixed(2).replace(/\.?0+$/, "")}%`;
 /**
  * 2.0 · El cliente absorbe la comisión (4.06%, configurable): paga el total tal
  * que, después de que Mercado Pago descuenta su comisión, te queda tu precio
@@ -112,19 +122,36 @@ export function spread(total: number, values: number[]): number[] {
     prev = 0;
   return values.map((v, i) => {
     run += v;
-    const cum = i === values.length - 1 ? total : sum ? Math.round((total * run) / sum) : 0;
+    const cum =
+      i === values.length - 1
+        ? total
+        : sum
+          ? Math.round((total * run) / sum)
+          : 0;
     const out = cum - prev;
     prev = cum;
     return out;
   });
 }
-export type Charge = { list: number; base: number; lines: number[]; subtotal: number; discount: number; total: number; commission: number };
+export type Charge = {
+  list: number;
+  base: number;
+  lines: number[];
+  subtotal: number;
+  discount: number;
+  total: number;
+  commission: number;
+};
 /**
  * Lo que se cobra por un carrito. `price` es tu precio (sin comisión) y `base`
  * el precio de venta si tiene descuento. El cliente ve cada producto ya con la
  * comisión (cantidad × precio al cliente), el subtotal, el descuento y el total.
  */
-export function chargeFor(items: { qty: number; price: number }[], bps = CARD_FEE_BPS, base?: number | null): Charge {
+export function chargeFor(
+  items: { qty: number; price: number }[],
+  bps = CARD_FEE_BPS,
+  base?: number | null,
+): Charge {
   const list = items.reduce((n, i) => n + i.qty * i.price, 0);
   const b = base === null || base === undefined ? list : base;
   const perLine = items.map((i) => i.qty * grossUp(i.price, bps));
@@ -137,8 +164,19 @@ export function chargeFor(items: { qty: number; price: number }[], bps = CARD_FE
     total = grossUp(b, bps);
     subtotal = b > list ? total : Math.max(sub0, total);
   }
-  const lines = subtotal === sub0 ? perLine : spread(subtotal, perLine.length ? perLine : []);
-  return { list, base: b, lines, subtotal, discount: subtotal - total, total, commission: total - b };
+  const lines =
+    subtotal === sub0
+      ? perLine
+      : spread(subtotal, perLine.length ? perLine : []);
+  return {
+    list,
+    base: b,
+    lines,
+    subtotal,
+    discount: subtotal - total,
+    total,
+    commission: total - b,
+  };
 }
 // ---------- 2.1 · Promociones por parámetro ----------
 export type Promo = {
@@ -158,10 +196,23 @@ export type Promo = {
   from?: string;
   to?: string;
 };
-export type PromoHit = { productId: string; amount: number; promoId: string; name: string };
-export const PROMO_KINDS: Record<Promo["kind"], string> = { nxm: "Lleva N, paga M (2x1, 3x2)", volume: "Por volumen", percent: "Descuento %" };
+export type PromoHit = {
+  productId: string;
+  amount: number;
+  promoId: string;
+  name: string;
+};
+export const PROMO_KINDS: Record<Promo["kind"], string> = {
+  nxm: "Lleva N, paga M (2x1, 3x2)",
+  volume: "Por volumen",
+  percent: "Descuento %",
+};
 /** Descuento (tu precio, en centavos) que da una promoción a un renglón. Mismo cálculo que public.promo_line_discount. */
-export function promoLineDiscount(p: Promo, line: { productId: string; segment: string; qty: number; price: number }, day: string): number {
+export function promoLineDiscount(
+  p: Promo,
+  line: { productId: string; segment: string; qty: number; price: number },
+  day: string,
+): number {
   if (!p.active) return 0;
   if (p.from && day < p.from) return 0;
   if (p.to && day > p.to) return 0;
@@ -169,7 +220,8 @@ export function promoLineDiscount(p: Promo, line: { productId: string; segment: 
   if (p.target === "segment" && p.ref !== line.segment) return 0;
   const value = line.qty * line.price;
   if (p.kind === "nxm") {
-    const n = Number(p.n), m = Number(p.m);
+    const n = Number(p.n),
+      m = Number(p.m);
     if (!(n >= 2 && m >= 1 && m < n)) return 0;
     return Math.floor(line.qty / n) * (n - m) * line.price;
   }
@@ -179,13 +231,18 @@ export function promoLineDiscount(p: Promo, line: { productId: string; segment: 
   return Math.min(value, Math.round((value * pct) / 100));
 }
 /** La mejor promoción para cada renglón (no se acumulan). */
-export function promoDiscounts(lines: { productId: string; segment: string; qty: number; price: number }[], promos: Promo[], day: string): { hits: PromoHit[]; total: number } {
+export function promoDiscounts(
+  lines: { productId: string; segment: string; qty: number; price: number }[],
+  promos: Promo[],
+  day: string,
+): { hits: PromoHit[]; total: number } {
   const hits: PromoHit[] = [];
   for (const l of lines) {
     let best: PromoHit | null = null;
     for (const p of promos) {
       const amount = promoLineDiscount(p, l, day);
-      if (amount > 0 && (!best || amount > best.amount)) best = { productId: l.productId, amount, promoId: p.id, name: p.name };
+      if (amount > 0 && (!best || amount > best.amount))
+        best = { productId: l.productId, amount, promoId: p.id, name: p.name };
     }
     if (best) hits.push(best);
   }
@@ -198,17 +255,28 @@ export function promoTag(p: Promo): string {
   return `−${p.percent}%`;
 }
 /** ¿Está vigente hoy? */
-export const promoLive = (p: Promo, day: string) => !!p.active && (!p.from || day >= p.from) && (!p.to || day <= p.to);
+export const promoLive = (p: Promo, day: string) =>
+  !!p.active && (!p.from || day >= p.from) && (!p.to || day <= p.to);
 /** Promociones aplicadas, agrupadas por nombre (para guardarlas en la venta y en reportes). */
-export function promoSummary(hits: PromoHit[]): { name: string; amount: number }[] {
+export function promoSummary(
+  hits: PromoHit[],
+): { name: string; amount: number }[] {
   const m = new Map<string, number>();
   for (const h of hits) m.set(h.name, (m.get(h.name) || 0) + h.amount);
   return [...m].map(([name, amount]) => ({ name, amount }));
 }
 /** Etiqueta de la promoción vigente que aplica a un producto (la de producto gana a la de categoría y a la general). */
-export function promoTagFor(promos: Promo[], productId: string, segment: string, day: string): string {
+export function promoTagFor(
+  promos: Promo[],
+  productId: string,
+  segment: string,
+  day: string,
+): string {
   const live = promos.filter((p) => promoLive(p, day));
-  const pick = live.find((p) => p.target === "product" && p.ref === productId) || live.find((p) => p.target === "segment" && p.ref === segment) || live.find((p) => p.target === "all");
+  const pick =
+    live.find((p) => p.target === "product" && p.ref === productId) ||
+    live.find((p) => p.target === "segment" && p.ref === segment) ||
+    live.find((p) => p.target === "all");
   return pick ? promoTag(pick) : "";
 }
 
@@ -216,26 +284,52 @@ export function promoTagFor(promos: Promo[], productId: string, segment: string,
  * Lo que ve el cliente de una venta guardada (comprobantes, vendedor): cada
  * producto ya con la comisión, subtotal, descuento y total. Nunca muestra la comisión.
  */
-export function customerView(v: Row): { lines: { qty: number; name: string; total: number | null }[]; subtotal: number; discount: number; total: number } {
+export function customerView(v: Row): {
+  lines: { qty: number; name: string; total: number | null }[];
+  subtotal: number;
+  discount: number;
+  total: number;
+} {
   const ls: Row[] = Array.isArray(v.lines) ? v.lines : [];
   const total = Number(v.total) || 0;
-  const commission = Number(v.commission) > 0 ? Number(v.commission) : Number(v.cardFeePassed) > 0 ? Number(v.cardFeePassed) : 0;
+  const commission =
+    Number(v.commission) > 0
+      ? Number(v.commission)
+      : Number(v.cardFeePassed) > 0
+        ? Number(v.cardFeePassed)
+        : 0;
   const out = (amounts: (number | null)[], subtotal: number) => ({
-    lines: ls.map((l, i) => ({ qty: Number(l.qty), name: String(l.name), total: amounts[i] ?? null })),
+    lines: ls.map((l, i) => ({
+      qty: Number(l.qty),
+      name: String(l.name),
+      total: amounts[i] ?? null,
+    })),
     subtotal,
     discount: Math.max(0, subtotal - total),
     total,
   });
-  if (!ls.length || !ls.every((l) => Number.isFinite(Number(l.unitPrice)))) return out(ls.map((l) => (commission ? null : (l.total ?? null))), total);
-  const items = ls.map((l) => ({ qty: Number(l.qty), price: Number(l.unitPrice) }));
+  if (!ls.length || !ls.every((l) => Number.isFinite(Number(l.unitPrice))))
+    return out(
+      ls.map((l) => (commission ? null : (l.total ?? null))),
+      total,
+    );
+  const items = ls.map((l) => ({
+    qty: Number(l.qty),
+    price: Number(l.unitPrice),
+  }));
   if (!commission) {
     const values = items.map((i) => i.qty * i.price);
     const list = values.reduce((n, x) => n + x, 0);
     const subtotal = Math.max(list, total);
     return out(subtotal === list ? values : spread(subtotal, values), subtotal);
   }
-  const bps = Number.isSafeInteger(Number(v.commissionBps)) && Number(v.commissionBps) > 0 ? Number(v.commissionBps) : CARD_FEE_BPS;
-  const base = Number.isSafeInteger(Number(v.basePrice)) ? Number(v.basePrice) : total - commission;
+  const bps =
+    Number.isSafeInteger(Number(v.commissionBps)) && Number(v.commissionBps) > 0
+      ? Number(v.commissionBps)
+      : CARD_FEE_BPS;
+  const base = Number.isSafeInteger(Number(v.basePrice))
+    ? Number(v.basePrice)
+    : total - commission;
   const c = chargeFor(items, bps, base);
   if (c.total === total) return out(c.lines, c.subtotal);
   // Cobrada con otra regla (1.9) o modificada: se respeta lo cobrado.
@@ -244,7 +338,8 @@ export function customerView(v: Row): { lines: { qty: number; name: string; tota
 }
 /** 1.7–1.8 subían una vez el catálogo 4.06% (la 1.9 lo revierte: ver restoreBasePrices). */
 export const CATALOG_UPLIFT_BPS = 406;
-export const upliftPrice = (price: number, bps = CATALOG_UPLIFT_BPS) => Math.round((price * (10000 + bps)) / 10000);
+export const upliftPrice = (price: number, bps = CATALOG_UPLIFT_BPS) =>
+  Math.round((price * (10000 + bps)) / 10000);
 /**
  * 1.7 · Segmento para vender por categoría (Creatinas, Proteínas, PWO, Snacks,
  * Vitaminas…). Agrupa las categorías del catálogo; lo que no reconoce conserva
@@ -260,8 +355,15 @@ export const SALE_SEGMENTS: { name: string; test: RegExp }[] = [
   { name: "Ganadores", test: /ganador|gainer|mass/ },
   { name: "Soporte hormonal", test: /hormonal|testo/ },
 ];
-const fold = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-export function saleSegment(p: { category?: string | null; name?: string | null }): string {
+const fold = (x: string) =>
+  x
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+export function saleSegment(p: {
+  category?: string | null;
+  name?: string | null;
+}): string {
   const cat = String(p.category || "").trim();
   const c = fold(cat);
   for (const g of SALE_SEGMENTS) if (c && g.test.test(c)) return g.name;
@@ -271,14 +373,25 @@ export function saleSegment(p: { category?: string | null; name?: string | null 
   return cat || "Otros";
 }
 /** Segmentos presentes en orden: primero los conocidos, luego el resto (A-Z). */
-export function segmentsOf(products: { category?: string | null; name?: string | null }[]): string[] {
+export function segmentsOf(
+  products: { category?: string | null; name?: string | null }[],
+): string[] {
   const set = new Set(products.map(saleSegment));
   const known = SALE_SEGMENTS.map((g) => g.name).filter((n) => set.has(n));
-  const rest = [...set].filter((n) => !known.includes(n) && n !== "Otros").sort((a, b) => a.localeCompare(b, "es"));
+  const rest = [...set]
+    .filter((n) => !known.includes(n) && n !== "Otros")
+    .sort((a, b) => a.localeCompare(b, "es"));
   return [...known, ...rest, ...(set.has("Otros") ? ["Otros"] : [])];
 }
 const FEE_NOTE = "Comisión tarjeta";
-export const STAGES = ["Prospecto", "Interesado", "Cliente", "Frecuente", "Seguimiento", "Inactivo"];
+export const STAGES = [
+  "Prospecto",
+  "Interesado",
+  "Cliente",
+  "Frecuente",
+  "Seguimiento",
+  "Inactivo",
+];
 export function today() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -296,17 +409,74 @@ function id() {
   return `${Date.now().toString(36)}-${(++counter).toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 }
 // Un solo formateador: crear Intl.NumberFormat en cada llamada es lento (se usa en cada renglón).
-const MXN = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
+const MXN = new Intl.NumberFormat("es-MX", {
+  style: "currency",
+  currency: "MXN",
+});
 export const money = (n: number) => MXN.format(n / 100);
 // mpConfig guarda la clave privada de Mercado Pago: nunca sale del teléfono.
 // cloudSession/cloudConfig: la conexión con la base en línea es de este teléfono.
 // El PIN, el teléfono y la sesión en línea son de ESTE teléfono: no viajan en el
 // respaldo y restaurar uno no los cambia.
-const BACKUP_EXCLUDED = ["uiSession", "beforeRelease08", "mpConfig", "mpPending", "cloudSession", "cloudConfig", "cloudPub", "cloudLastSync", "appRole", "sellerCache", "sellerQueue", "deviceId", "pin", "pinFails", "ownerRecoveryAt", "ownerVerified", "cloudBackupLast", "cloudBackupError", "pushToken", "pushOff", "pushAsked", "pushAttempt", "updateCheckedAt"];
+const BACKUP_EXCLUDED = [
+  "uiSession",
+  "beforeRelease08",
+  "mpConfig",
+  "mpPending",
+  "cloudSession",
+  "cloudConfig",
+  "cloudPub",
+  "cloudLastSync",
+  "appRole",
+  "sellerCache",
+  "sellerQueue",
+  "deviceId",
+  "pin",
+  "pinFails",
+  "ownerRecoveryAt",
+  "ownerVerified",
+  "cloudBackupLast",
+  "cloudBackupError",
+  "pushToken",
+  "pushOff",
+  "pushAsked",
+  "pushAttempt",
+  "pushLocalEnabled",
+  "pushLocalError",
+  "saleNoticeSeen223",
+  "updateCheckedAt",
+];
 /** 2.2: ajustes con credenciales; van al almacén seguro del teléfono cuando existe. */
 export const SECRET_KEYS = ["cloudSession", "mpConfig"];
-export type SecretStore = { get(key: string): string | null; set(key: string, value: string | null): void };
-const KEEP_ON_RESTORE = ["mpConfig", "mpPending", "cloudSession", "cloudConfig", "appRole", "sellerCache", "sellerQueue", "deviceId", "pin", "pinFails", "ownerRecoveryAt", "ownerVerified", "cloudBackupLast", "cloudBackupAuto", "cloudBackupError", "pushToken", "pushOff", "pushAsked", "pushAttempt", "updateCheckedAt"];
+export type SecretStore = {
+  get(key: string): string | null;
+  set(key: string, value: string | null): void;
+};
+const KEEP_ON_RESTORE = [
+  "mpConfig",
+  "mpPending",
+  "cloudSession",
+  "cloudConfig",
+  "appRole",
+  "sellerCache",
+  "sellerQueue",
+  "deviceId",
+  "pin",
+  "pinFails",
+  "ownerRecoveryAt",
+  "ownerVerified",
+  "cloudBackupLast",
+  "cloudBackupAuto",
+  "cloudBackupError",
+  "pushToken",
+  "pushOff",
+  "pushAsked",
+  "pushAttempt",
+  "pushLocalEnabled",
+  "pushLocalError",
+  "saleNoticeSeen223",
+  "updateCheckedAt",
+];
 export const TABLES = [
   "companies",
   "locations",
@@ -358,7 +528,8 @@ export class Business {
     if (r && secrets && r.value !== "null") {
       try {
         secrets.set(key, r.value);
-        if (secrets.get(key) === r.value) this.run("DELETE FROM settings WHERE key=?", key);
+        if (secrets.get(key) === r.value)
+          this.run("DELETE FROM settings WHERE key=?", key);
       } catch {}
     }
     return r ? JSON.parse(r.value) : fallback;
@@ -368,7 +539,10 @@ export class Business {
     if (secrets) {
       const raw = value == null ? null : JSON.stringify(value);
       secrets.set(key, raw);
-      assert(secrets.get(key) === raw, "No se pudo confirmar el guardado seguro. Intenta de nuevo.");
+      assert(
+        secrets.get(key) === raw,
+        "No se pudo confirmar el guardado seguro. Intenta de nuevo.",
+      );
       this.run("DELETE FROM settings WHERE key=?", key);
       return;
     }
@@ -396,15 +570,7 @@ export class Business {
       m.set(String(r.key).slice(prefix.length), JSON.parse(r.value));
     return m;
   }
-  relationsMap(type: string): Map<string, Row> {
-    const m = new Map<string, Row>();
-    for (const r of this.all(
-      "SELECT entityId,companyId,locationId FROM relations WHERE entityType=?",
-      type,
-    ))
-      m.set(r.entityId, { companyId: r.companyId, locationId: r.locationId });
-    return m;
-  }
+
   constructor(db: DB) {
     this.db = db;
     this.secrets = Business.secretStore;
@@ -472,14 +638,23 @@ export class Business {
   /** Comisión vigente para cobros con tarjeta, en puntos base (406 = 4.06%). */
   feeBps(): number {
     const v = Number(this.setting("cardFeeBps", CARD_FEE_BPS));
-    return Number.isSafeInteger(v) && v >= 0 && v <= MAX_FEE_BPS ? v : CARD_FEE_BPS;
+    return Number.isSafeInteger(v) && v >= 0 && v <= MAX_FEE_BPS
+      ? v
+      : CARD_FEE_BPS;
   }
   setFeeBps(bps: number) {
-    assert(Number.isSafeInteger(bps) && bps >= 0 && bps <= MAX_FEE_BPS, "La comisión debe estar entre 0% y 20%, con máximo dos decimales.");
+    assert(
+      Number.isSafeInteger(bps) && bps >= 0 && bps <= MAX_FEE_BPS,
+      "La comisión debe estar entre 0% y 20%, con máximo dos decimales.",
+    );
     this.transaction(() => {
       const before = this.feeBps();
       this.setSetting("cardFeeBps", bps);
-      this.audit("settings.cardFee", "cardFeeBps", `${feeLabel(before)} → ${feeLabel(bps)}`);
+      this.audit(
+        "settings.cardFee",
+        "cardFeeBps",
+        `${feeLabel(before)} → ${feeLabel(bps)}`,
+      );
     });
   }
   // ---------- 2.1 · Promociones ----------
@@ -491,23 +666,56 @@ export class Business {
     const name = String(input.name || "").trim();
     required(name);
     const kind = input.kind as Promo["kind"];
-    assert(["nxm", "volume", "percent"].includes(kind), "Elige el tipo de promoción.");
+    assert(
+      ["nxm", "volume", "percent"].includes(kind),
+      "Elige el tipo de promoción.",
+    );
     const target = (input.target || "all") as Promo["target"];
-    assert(["all", "segment", "product"].includes(target), "Elige a qué aplica.");
-    if (target !== "all") assert(String(input.ref || "").trim(), target === "product" ? "Elige el producto." : "Elige la categoría.");
-    if (target === "product") this.one("SELECT id FROM products WHERE id=?", input.ref);
-    const p: Promo = { id: input.id || id(), name: name.slice(0, 60), active: input.active !== false, kind, target, ...(target !== "all" ? { ref: String(input.ref).trim() } : {}) };
+    assert(
+      ["all", "segment", "product"].includes(target),
+      "Elige a qué aplica.",
+    );
+    if (target !== "all")
+      assert(
+        String(input.ref || "").trim(),
+        target === "product" ? "Elige el producto." : "Elige la categoría.",
+      );
+    if (target === "product")
+      this.one("SELECT id FROM products WHERE id=?", input.ref);
+    const p: Promo = {
+      id: input.id || id(),
+      name: name.slice(0, 60),
+      active: input.active !== false,
+      kind,
+      target,
+      ...(target !== "all" ? { ref: String(input.ref).trim() } : {}),
+    };
     if (kind === "nxm") {
-      const n = Number(input.n), m = Number(input.m);
-      assert(Number.isInteger(n) && Number.isInteger(m) && n >= 2 && n <= 20 && m >= 1 && m < n, "En N×M el cliente lleva N y paga M (M menor que N). Ejemplo: lleva 2, paga 1.");
+      const n = Number(input.n),
+        m = Number(input.m);
+      assert(
+        Number.isInteger(n) &&
+          Number.isInteger(m) &&
+          n >= 2 &&
+          n <= 20 &&
+          m >= 1 &&
+          m < n,
+        "En N×M el cliente lleva N y paga M (M menor que N). Ejemplo: lleva 2, paga 1.",
+      );
       Object.assign(p, { n, m });
     } else {
       const pct = Number(input.percent);
-      assert(Number.isInteger(pct) && pct >= 1 && pct <= 90, "El descuento debe ser un porcentaje entero entre 1 y 90.");
+      assert(
+        Number.isInteger(pct) && pct >= 1 && pct <= 90,
+        "El descuento debe ser un porcentaje entero entre 1 y 90.",
+      );
       p.percent = pct;
       if (kind === "volume") {
         const q = Number(input.minQty);
-        assert(Number.isInteger(q) && q >= 2 && q <= 999, "Por volumen: escribe desde cuántas piezas aplica (2 o más).");
+        assert(
+          Number.isInteger(q) && q >= 2 && q <= 999,
+          "Por volumen: escribe desde cuántas piezas aplica (2 o más).",
+        );
         p.minQty = q;
       }
     }
@@ -515,31 +723,57 @@ export class Business {
       const d = String(input[k] || "").trim();
       if (d) {
         const t = new Date(`${d}T12:00:00Z`);
-        assert(/^\d{4}-\d{2}-\d{2}$/.test(d) && Number.isFinite(t.getTime()) && t.toISOString().slice(0, 10) === d, "Fecha inválida.");
+        assert(
+          /^\d{4}-\d{2}-\d{2}$/.test(d) &&
+            Number.isFinite(t.getTime()) &&
+            t.toISOString().slice(0, 10) === d,
+          "Fecha inválida.",
+        );
         p[k] = d;
       }
     }
-    assert(!p.from || !p.to || p.from <= p.to, "La fecha final no puede ser antes de la inicial.");
+    assert(
+      !p.from || !p.to || p.from <= p.to,
+      "La fecha final no puede ser antes de la inicial.",
+    );
     this.transaction(() => {
       const list = this.promos().filter((x) => x.id !== p.id);
       this.setSetting("promotions", [...list, p]);
-      this.audit(input.id ? "promo.update" : "promo.create", p.id, `${p.name} · ${promoTag(p)}`);
+      this.audit(
+        input.id ? "promo.update" : "promo.create",
+        p.id,
+        `${p.name} · ${promoTag(p)}`,
+      );
     });
     return p.id;
   }
   deletePromo(promoId: string) {
     this.transaction(() => {
-      this.setSetting("promotions", this.promos().filter((x) => x.id !== promoId));
+      this.setSetting(
+        "promotions",
+        this.promos().filter((x) => x.id !== promoId),
+      );
       this.audit("promo.delete", promoId, "");
     });
   }
   /** Descuentos de promoción para un carrito (con tu precio de catálogo y la categoría de venta de cada producto). */
-  promoFor(items: { productId: string; qty: number }[], day = today()): { hits: PromoHit[]; total: number } {
+  promoFor(
+    items: { productId: string; qty: number }[],
+    day = today(),
+  ): { hits: PromoHit[]; total: number } {
     const promos = this.promos().filter((p) => promoLive(p, day));
     if (!promos.length || !items.length) return { hits: [], total: 0 };
     const lines = items.map((i) => {
-      const p = this.one("SELECT id,name,price,category FROM products WHERE id=?", i.productId);
-      return { productId: i.productId, qty: i.qty, price: p.price, segment: saleSegment(p) };
+      const p = this.one(
+        "SELECT id,name,price,category FROM products WHERE id=?",
+        i.productId,
+      );
+      return {
+        productId: i.productId,
+        qty: i.qty,
+        price: p.price,
+        segment: saleSegment(p),
+      };
     });
     return promoDiscounts(lines, promos, day);
   }
@@ -557,10 +791,22 @@ export class Business {
   setRealFee(ledgerId: string, fee: number) {
     integer(fee);
     this.transaction(() => {
-      const row = this.one("SELECT * FROM ledger WHERE id=? AND kind='expense' AND note LIKE 'Comisión tarjeta%'", ledgerId);
+      const row = this.one(
+        "SELECT * FROM ledger WHERE id=? AND kind='expense' AND note LIKE 'Comisión tarjeta%'",
+        ledgerId,
+      );
       if (-row.amount === fee && String(row.note).includes("real")) return;
-      this.run("UPDATE ledger SET amount=?,note=? WHERE id=?", -fee, `${FEE_NOTE} real Mercado Pago`, ledgerId);
-      this.audit("fee.reconcile", String(row.ref || ledgerId), `${-row.amount} → ${fee}`);
+      this.run(
+        "UPDATE ledger SET amount=?,note=? WHERE id=?",
+        -fee,
+        `${FEE_NOTE} real Mercado Pago`,
+        ledgerId,
+      );
+      this.audit(
+        "fee.reconcile",
+        String(row.ref || ledgerId),
+        `${-row.amount} → ${fee}`,
+      );
     });
   }
   // Eight columns in ledger; all calls use bound values.
@@ -681,23 +927,6 @@ export class Business {
     });
     return key;
   }
-  addCampaign(name: string, channel: string, code: string) {
-    required(name);
-    required(channel);
-    required(code);
-    const key = id();
-    this.transaction(() => {
-      this.run(
-        "INSERT INTO campaigns VALUES(?,?,?,?)",
-        key,
-        name,
-        channel,
-        code.trim().toUpperCase(),
-      );
-      this.audit("campaign.create", key);
-    });
-    return key;
-  }
   receive(
     productId: string,
     label: string,
@@ -787,34 +1016,6 @@ export class Business {
     });
     return key;
   }
-  addBundle(
-    name: string,
-    price: number,
-    items: { productId: string; qty: number }[],
-  ) {
-    required(name);
-    integer(price);
-    assert(items.length >= 2, "Agrega al menos dos productos distintos.");
-    assert(
-      new Set(items.map((x) => x.productId)).size === items.length,
-      "No repitas componentes.",
-    );
-    const key = id();
-    this.transaction(() => {
-      this.run("INSERT INTO bundles VALUES(?,?,?)", key, name, price);
-      items.forEach((i) => {
-        integer(i.qty, 1);
-        this.run(
-          "INSERT INTO bundle_items VALUES(?,?,?)",
-          key,
-          i.productId,
-          i.qty,
-        );
-      });
-      this.audit("bundle.create", key);
-    });
-    return key;
-  }
   sell(
     items: { productId: string; qty: number }[],
     total: number,
@@ -827,7 +1028,10 @@ export class Business {
     locationId: string | null = null,
     commission: { amount: number; bps: number } | null = null,
     // Por producto: precio con el que se vendió (ventas de vendedores) y descuento de promoción.
-    lineInfo: Record<string, { price?: number; discount?: number }> | null = null,
+    lineInfo: Record<
+      string,
+      { price?: number; discount?: number }
+    > | null = null,
   ) {
     integer(total);
     integer(paid);
@@ -837,7 +1041,10 @@ export class Business {
     if (comm) {
       integer(comm.amount);
       integer(comm.bps);
-      assert(comm.amount < total, "La comisión no puede ser mayor que la venta.");
+      assert(
+        comm.amount < total,
+        "La comisión no puede ser mayor que la venta.",
+      );
     }
     const goods = total - (comm?.amount ?? 0);
     assert(
@@ -875,35 +1082,31 @@ export class Business {
           today(),
         );
         for (const lot of lots) {
-          if (
-            locationId &&
-            !this.db.getFirstSync(
-              "SELECT lotId FROM lot_locations WHERE lotId=? AND locationId=?",
-              lot.id,
-              locationId,
-            )
-          )
-            continue;
           if (!remaining) break;
-          const take = Math.min(remaining, lot.qty-this.reservedForLot(lot.id));
-          if(take<=0) continue;
+          const take = Math.min(
+            remaining,
+            lot.qty - this.reservedForLot(lot.id),
+          );
+          if (take <= 0) continue;
           alloc.push({ lotId: lot.id, qty: take, cost: lot.cost });
           remaining -= take;
           cost += take * lot.cost;
         }
         assert(
           remaining === 0,
-          locationId
-            ? `En la ubicación elegida solo hay ${qty - remaining} de ${product.name} (pediste ${qty}). Quita la ubicación en "Más detalles" o asigna el lote a esa ubicación.`
-            : `Existencias vendibles insuficientes: ${product.name} (hay ${qty - remaining}, pediste ${qty}).`,
+          `Existencias vendibles insuficientes: ${product.name} (hay ${qty - remaining}, pediste ${qty}).`,
         );
         plan.push({ productId, qty, name: product.name, alloc });
       }
       integer(cost);
       // 2.1: una promoción que tú configuraste ya es tu autorización. Si la venta queda debajo
       // del costo SOLO por la promoción, se permite (y se anota); un precio especial no.
-      const promoOff = Object.values(lineInfo || {}).reduce((n, x) => n + Math.max(0, Math.round(Number(x?.discount) || 0)), 0);
-      const promoBelow = goods < cost && promoOff > 0 && goods + promoOff >= cost;
+      const promoOff = Object.values(lineInfo || {}).reduce(
+        (n, x) => n + Math.max(0, Math.round(Number(x?.discount) || 0)),
+        0,
+      );
+      const promoBelow =
+        goods < cost && promoOff > 0 && goods + promoOff >= cost;
       assert(
         goods >= cost || allowBelowCost || promoBelow,
         "La venta está debajo del costo. Activa la autorización explícita si corresponde.",
@@ -919,12 +1122,33 @@ export class Business {
         cost,
         "confirmed",
       );
-      const unitOf=(p:{productId:string})=>{const v=lineInfo?.[p.productId]?.price;return Number.isSafeInteger(v)&&(v as number)>=0?(v as number):this.one('SELECT price FROM products WHERE id=?',p.productId).price;};
-      const listValues=plan.map(p=>unitOf(p)*p.qty);
+      const unitOf = (p: { productId: string }) => {
+        const v = lineInfo?.[p.productId]?.price;
+        return Number.isSafeInteger(v) && (v as number) >= 0
+          ? (v as number)
+          : this.one("SELECT price FROM products WHERE id=?", p.productId)
+              .price;
+      };
+      const listValues = plan.map((p) => unitOf(p) * p.qty);
       // Promociones: cada renglón conserva su descuento; el resto (precio especial) se reparte proporcional.
-      const weights=plan.map((p,i)=>Math.max(0,listValues[i]-Math.min(listValues[i],Math.max(0,Math.round(Number(lineInfo?.[p.productId]?.discount)||0)))));
-      const lineTotals=spread(goods,weights.some(w=>w>0)?weights:listValues);
-      for (const [index,p] of plan.entries()) {
+      const weights = plan.map((p, i) =>
+        Math.max(
+          0,
+          listValues[i] -
+            Math.min(
+              listValues[i],
+              Math.max(
+                0,
+                Math.round(Number(lineInfo?.[p.productId]?.discount) || 0),
+              ),
+            ),
+        ),
+      );
+      const lineTotals = spread(
+        goods,
+        weights.some((w) => w > 0) ? weights : listValues,
+      );
+      for (const [index, p] of plan.entries()) {
         const line = id();
         this.run(
           "INSERT INTO sale_lines VALUES(?,?,?,?,?)",
@@ -934,8 +1158,12 @@ export class Business {
           p.qty,
           p.name,
         );
-        const lineTotal=lineTotals[index];
-        this.setSetting('line:'+line,{unitPrice:listValues[index]/p.qty,discount:listValues[index]-lineTotal,delivered:p.qty});
+        const lineTotal = lineTotals[index];
+        this.setSetting("line:" + line, {
+          unitPrice: listValues[index] / p.qty,
+          discount: listValues[index] - lineTotal,
+          delivered: p.qty,
+        });
         for (const a of p.alloc) {
           this.run(
             "INSERT INTO allocations VALUES(?,?,?,?,?)",
@@ -958,7 +1186,13 @@ export class Business {
           );
         }
       }
-      if (comm) this.setSetting("sale:" + key, { ...this.setting("sale:" + key, {}), basePrice: goods, commission: comm.amount, commissionBps: comm.bps });
+      if (comm)
+        this.setSetting("sale:" + key, {
+          ...this.setting("sale:" + key, {}),
+          basePrice: goods,
+          commission: comm.amount,
+          commissionBps: comm.bps,
+        });
       if (paid && accountId)
         this.ledger(accountId, paid, "sale", key, "Cobro de venta");
       if (customerId)
@@ -966,7 +1200,11 @@ export class Business {
       this.audit(
         "sale.confirm",
         key,
-        allowBelowCost ? "Autorización de precio bajo costo" : promoBelow ? "Debajo del costo por promoción" : "",
+        allowBelowCost
+          ? "Autorización de precio bajo costo"
+          : promoBelow
+            ? "Debajo del costo por promoción"
+            : "",
       );
     });
     return key;
@@ -1001,15 +1239,16 @@ export class Business {
       // desde su propio saldo aunque ya se haya retirado el dinero o descontado la comisión.
       for (const p of payments)
         assert(
-          this.one("SELECT kind FROM accounts WHERE id=?", p.accountId).kind === "Tarjeta" || this.balance(p.accountId) >= p.amount,
+          this.one("SELECT kind FROM accounts WHERE id=?", p.accountId).kind ===
+            "Tarjeta" || this.balance(p.accountId) >= p.amount,
           "No hay saldo suficiente en la cuenta original para devolver el cobro.",
         );
       for (const a of this.all(
         "SELECT a.* FROM allocations a JOIN sale_lines l ON l.id=a.lineId WHERE l.saleId=?",
         saleId,
       )) {
-        const delivered=a.qty-this.reservedForLotAllocation(a.id);
-        this.run('DELETE FROM settings WHERE key=?','reservation:'+a.id);
+        const delivered = a.qty - this.reservedForLotAllocation(a.id);
+        this.run("DELETE FROM settings WHERE key=?", "reservation:" + a.id);
         this.run("UPDATE lots SET qty=qty+? WHERE id=?", delivered, a.lotId);
         this.run(
           "INSERT INTO stock_moves VALUES(?,?,?,?,?,?,?)",
@@ -1065,7 +1304,10 @@ export class Business {
       );
       const before = lots.reduce((n, l) => n + l.qty, 0);
       const delta = counted - before;
-      assert(delta !== 0, "El conteo es igual a las existencias actuales; no hay nada que ajustar.");
+      assert(
+        delta !== 0,
+        "El conteo es igual a las existencias actuales; no hay nada que ajustar.",
+      );
       const key = id();
       const label = reason + (note.trim() ? `: ${note.trim()}` : "");
       const now = new Date().toISOString();
@@ -1077,23 +1319,62 @@ export class Business {
           const take = Math.min(remove, free);
           if (take <= 0) continue;
           this.run("UPDATE lots SET qty=qty-? WHERE id=?", take, lot.id);
-          this.run("INSERT INTO stock_moves VALUES(?,?,?,?,?,?,?)", id(), now, lot.id, -take, "adjust", key, label);
+          this.run(
+            "INSERT INTO stock_moves VALUES(?,?,?,?,?,?,?)",
+            id(),
+            now,
+            lot.id,
+            -take,
+            "adjust",
+            key,
+            label,
+          );
           result.value += take * lot.cost;
           remove -= take;
         }
-        assert(remove === 0, "No puedes dejar menos unidades que las apartadas para entregas pendientes.");
+        assert(
+          remove === 0,
+          "No puedes dejar menos unidades que las apartadas para entregas pendientes.",
+        );
       } else {
         const lastCost =
-          this.db.getFirstSync<Row>("SELECT cost FROM lots WHERE productId=? ORDER BY rowid DESC", productId)?.cost ??
+          this.db.getFirstSync<Row>(
+            "SELECT cost FROM lots WHERE productId=? ORDER BY rowid DESC",
+            productId,
+          )?.cost ??
           this.setting("product:" + productId, {}).referenceCost ??
           0;
         integer(lastCost);
-        this.run("INSERT INTO lots VALUES(?,?,?,?,?,?)", key, productId, "Ajuste · " + reason, "", lastCost, delta);
-        this.run("INSERT INTO stock_moves VALUES(?,?,?,?,?,?,?)", id(), now, key, delta, "adjust", key, label);
+        this.run(
+          "INSERT INTO lots VALUES(?,?,?,?,?,?)",
+          key,
+          productId,
+          "Ajuste · " + reason,
+          "",
+          lastCost,
+          delta,
+        );
+        this.run(
+          "INSERT INTO stock_moves VALUES(?,?,?,?,?,?,?)",
+          id(),
+          now,
+          key,
+          delta,
+          "adjust",
+          key,
+          label,
+        );
         result.value = delta * lastCost;
       }
-      this.setSetting("product:" + productId, { ...this.setting("product:" + productId, {}), inventoryKnown: true });
-      this.audit("stock.adjust", productId, `${before} → ${counted} · ${label}`);
+      this.setSetting("product:" + productId, {
+        ...this.setting("product:" + productId, {}),
+        inventoryKnown: true,
+      });
+      this.audit(
+        "stock.adjust",
+        productId,
+        `${before} → ${counted} · ${label}`,
+      );
       Object.assign(result, { before, delta });
     });
     return result;
@@ -1106,18 +1387,33 @@ export class Business {
   deleteCancelledSale(saleId: string) {
     this.transaction(() => {
       const sale = this.one("SELECT * FROM sales WHERE id=?", saleId);
-      assert(sale.status === "cancelled", "Solo se pueden eliminar ventas canceladas.");
       assert(
-        this.all("SELECT lotId FROM stock_moves WHERE ref=? GROUP BY lotId HAVING SUM(qty)!=0", saleId).length === 0,
+        sale.status === "cancelled",
+        "Solo se pueden eliminar ventas canceladas.",
+      );
+      assert(
+        this.all(
+          "SELECT lotId FROM stock_moves WHERE ref=? GROUP BY lotId HAVING SUM(qty)!=0",
+          saleId,
+        ).length === 0,
         "Esta venta tiene movimientos de inventario sin devolver; no se puede eliminar.",
       );
       assert(
-        this.one("SELECT COALESCE(SUM(amount),0) n FROM ledger WHERE ref=? AND kind IN ('sale','refund')", saleId).n === 0,
+        this.one(
+          "SELECT COALESCE(SUM(amount),0) n FROM ledger WHERE ref=? AND kind IN ('sale','refund')",
+          saleId,
+        ).n === 0,
         "Esta venta tiene cobros sin devolver; no se puede eliminar.",
       );
-      const lines = this.all("SELECT id FROM sale_lines WHERE saleId=?", saleId);
+      const lines = this.all(
+        "SELECT id FROM sale_lines WHERE saleId=?",
+        saleId,
+      );
       for (const l of lines) {
-        for (const a of this.all("SELECT id FROM allocations WHERE lineId=?", l.id))
+        for (const a of this.all(
+          "SELECT id FROM allocations WHERE lineId=?",
+          l.id,
+        ))
           this.run("DELETE FROM settings WHERE key=?", "reservation:" + a.id);
         this.run("DELETE FROM allocations WHERE lineId=?", l.id);
         this.run("DELETE FROM settings WHERE key=?", "line:" + l.id);
@@ -1125,14 +1421,21 @@ export class Business {
       this.run("DELETE FROM sale_lines WHERE saleId=?", saleId);
       this.run("DELETE FROM stock_moves WHERE ref=?", saleId);
       this.run("DELETE FROM ledger WHERE ref=?", saleId);
-      this.run("DELETE FROM relations WHERE entityType='sale' AND entityId=?", saleId);
+      this.run(
+        "DELETE FROM relations WHERE entityType='sale' AND entityId=?",
+        saleId,
+      );
       this.run("DELETE FROM settings WHERE key=?", "sale:" + saleId);
       this.run("DELETE FROM sales WHERE id=?", saleId);
-      this.audit("sale.delete", saleId, `Venta cancelada eliminada · total ${sale.total}`);
+      this.audit(
+        "sale.delete",
+        saleId,
+        `Venta cancelada eliminada · total ${sale.total}`,
+      );
     });
   }
   reservedForLotAllocation(allocationId: string): number {
-    return this.setting('reservation:'+allocationId,0);
+    return this.setting("reservation:" + allocationId, 0);
   }
   reservedForLot(lotId: string): number {
     return Number(
@@ -1142,22 +1445,23 @@ export class Business {
       ).n,
     );
   }
-  /**
-   * Unidades que una venta SÍ puede tomar (misma regla que `sell`): lotes vigentes,
-   * menos lo apartado en cada lote y, si se indica, solo lotes de esa ubicación.
-   */
-  sellableByProduct(locationId: string | null = null): Map<string, number> {
+  /** Unidades que una venta SÍ puede tomar (misma regla que `sell`): lotes vigentes menos lo apartado. */
+  sellableByProduct(): Map<string, number> {
     const m = new Map<string, number>();
     const rows = this.all(
       `SELECT l.id,l.productId,l.qty,COALESCE((SELECT SUM(CAST(s.value AS INTEGER)) FROM allocations a JOIN settings s ON s.key='reservation:'||a.id WHERE a.lotId=l.id),0) r
-       FROM lots l WHERE l.qty>0 AND (l.expires='' OR l.expires>=?)${locationId ? " AND EXISTS (SELECT 1 FROM lot_locations x WHERE x.lotId=l.id AND x.locationId=?)" : ""}`,
-      ...(locationId ? [today(), locationId] : [today()]),
+       FROM lots l WHERE l.qty>0 AND (l.expires='' OR l.expires>=?)`,
+      today(),
     );
-    for (const l of rows) m.set(l.productId, (m.get(l.productId) ?? 0) + Math.max(0, l.qty - Number(l.r || 0)));
+    for (const l of rows)
+      m.set(
+        l.productId,
+        (m.get(l.productId) ?? 0) + Math.max(0, l.qty - Number(l.r || 0)),
+      );
     return m;
   }
-  sellable(productId: string, locationId: string | null = null): number {
-    return this.sellableByProduct(locationId).get(productId) ?? 0;
+  sellable(productId: string): number {
+    return this.sellableByProduct().get(productId) ?? 0;
   }
   stock() {
     const meta = this.settingsMap("product:");
@@ -1193,7 +1497,10 @@ export class Business {
         ...this.setting("customer:" + customerId, {}),
         archived,
       });
-      this.audit(archived ? "customer.archive" : "customer.restore", customerId);
+      this.audit(
+        archived ? "customer.archive" : "customer.restore",
+        customerId,
+      );
     });
   }
   accounts() {
@@ -1203,19 +1510,19 @@ export class Business {
   }
   sales() {
     const meta = this.settingsMap("sale:");
-    const relations = this.relationsMap("sale");
     return this.all(
       "SELECT s.*,c.name customer,COALESCE(p.paid,0) paid FROM sales s LEFT JOIN customers c ON c.id=s.customerId LEFT JOIN (SELECT ref,SUM(amount) paid FROM ledger WHERE kind='sale' GROUP BY ref) p ON p.ref=s.id ORDER BY s.created DESC",
     ).map((s) => ({
       ...s,
       ...(meta.get(s.id) ?? {}),
-      ...(relations.get(s.id) ?? { companyId: null, locationId: null }),
     }));
   }
   /** Cobrado neto de cada venta por cuenta (cobro, abonos y devoluciones). */
   salePaymentsByAccount(): Map<string, Record<string, number>> {
     const m = new Map<string, Record<string, number>>();
-    for (const r of this.all("SELECT ref,accountId,SUM(amount) n FROM ledger WHERE kind IN ('sale','refund') AND ref IS NOT NULL GROUP BY ref,accountId")) {
+    for (const r of this.all(
+      "SELECT ref,accountId,SUM(amount) n FROM ledger WHERE kind IN ('sale','refund') AND ref IS NOT NULL GROUP BY ref,accountId",
+    )) {
       if (!r.n) continue;
       const x = m.get(r.ref) ?? {};
       x[r.accountId] = r.n;
@@ -1230,13 +1537,18 @@ export class Business {
       saleId,
     );
     return s
-      ? { ...s, ...this.setting("sale:" + s.id, {}), ...this.relation("sale", s.id) }
+      ? {
+          ...s,
+          ...this.setting("sale:" + s.id, {}),
+        }
       : null;
   }
   /** Renglones de todas las ventas agrupados por venta (una consulta). */
   saleLinesBySale(): Map<string, Row[]> {
     const m = new Map<string, Row[]>();
-    for (const l of this.all("SELECT saleId,name,qty FROM sale_lines ORDER BY id")) {
+    for (const l of this.all(
+      "SELECT saleId,name,qty FROM sale_lines ORDER BY id",
+    )) {
       const list = m.get(l.saleId) ?? [];
       list.push(l);
       m.set(l.saleId, list);
@@ -1259,22 +1571,33 @@ export class Business {
     );
     // Ventas segmentadas por forma de pago. La comisión (4.06%) solo existe en
     // cobros con tarjeta; efectivo y transferencia pasan íntegros.
-    const label: Record<string, string> = { Banco: "Transferencia", Efectivo: "Efectivo", Tarjeta: "Tarjeta", Billetera: "Billetera" };
+    const label: Record<string, string> = {
+      Banco: "Transferencia",
+      Efectivo: "Efectivo",
+      Tarjeta: "Tarjeta",
+      Billetera: "Billetera",
+    };
     const order = ["Transferencia", "Tarjeta", "Efectivo", "Billetera"];
     const byMethod = this.all(
       "SELECT a.kind,COALESCE(SUM(CASE WHEN l.kind IN ('sale','refund') THEN l.amount ELSE 0 END),0) gross,COALESCE(SUM(CASE WHEN l.kind='expense' AND l.note LIKE 'Comisión tarjeta%' THEN -l.amount ELSE 0 END),0) fee FROM ledger l JOIN accounts a ON a.id=l.accountId WHERE l.created>=? AND l.created<? GROUP BY a.kind",
       since,
       until,
     )
-      .map((r) => ({ method: label[r.kind] ?? r.kind, gross: r.gross, fee: r.fee, net: r.gross - r.fee }))
+      .map((r) => ({
+        method: label[r.kind] ?? r.kind,
+        gross: r.gross,
+        fee: r.fee,
+        net: r.gross - r.fee,
+      }))
       .filter((r) => r.gross || r.fee)
       .sort((x, y) => order.indexOf(x.method) - order.indexOf(y.method));
     // 1.9: comisión que pagaron los clientes (ya va dentro de las ventas).
     const saleMeta = this.settingsMap("sale:");
-    const commissions = this.all("SELECT id FROM sales WHERE status='confirmed' AND created>=? AND created<?", since, until).reduce(
-      (n, r) => n + (Number(saleMeta.get(r.id)?.commission) || 0),
-      0,
-    );
+    const commissions = this.all(
+      "SELECT id FROM sales WHERE status='confirmed' AND created>=? AND created<?",
+      since,
+      until,
+    ).reduce((n, r) => n + (Number(saleMeta.get(r.id)?.commission) || 0), 0);
     const netSales = s.revenue - e.fees;
     // Mermas: costo de las unidades dadas de baja en ajustes (las altas lo compensan).
     const shrinkage = this.one(
@@ -1321,33 +1644,69 @@ export class Business {
       // VNS0009 was imported from the corrected Excel before line-level metadata
       // existed in the previous pilot; retain its exact historical prices here.
       if (!meta && sale.folio === "VNS0009") {
-        meta = line.productId === "NS-VIT-001" ? { unitPrice: 36900, discount: 0 } :
-          line.productId === "NS-CAF-001" ? { unitPrice: 66900, discount: 0 } : null;
+        meta =
+          line.productId === "NS-VIT-001"
+            ? { unitPrice: 36900, discount: 0 }
+            : line.productId === "NS-CAF-001"
+              ? { unitPrice: 66900, discount: 0 }
+              : null;
       }
-      const cost = this.one("SELECT COALESCE(SUM(qty*cost),0) cost FROM allocations WHERE lineId=?", line.id).cost;
-      return { ...line, ...(meta || {}), total: meta ? (meta.unitPrice * line.qty - (meta.discount || 0)) : null, cost };
+      const cost = this.one(
+        "SELECT COALESCE(SUM(qty*cost),0) cost FROM allocations WHERE lineId=?",
+        line.id,
+      ).cost;
+      return {
+        ...line,
+        ...(meta || {}),
+        total: meta ? meta.unitPrice * line.qty - (meta.discount || 0) : null,
+        cost,
+      };
     });
-    const movements = this.all("SELECT l.*,a.name account FROM ledger l JOIN accounts a ON a.id=l.accountId WHERE l.ref=? ORDER BY l.created,l.id", saleId);
-    const fees = Math.max(0,-movements.filter((x) => x.kind === "expense" && String(x.note || "").startsWith("Comisión tarjeta")).reduce((n, x) => n + x.amount, 0));
-    const refunded = -movements.filter((x) => x.kind === "refund").reduce((n, x) => n + x.amount, 0);
-    const paid = movements.filter((x) => x.kind === "sale").reduce((n, x) => n + x.amount, 0);
+    const movements = this.all(
+      "SELECT l.*,a.name account FROM ledger l JOIN accounts a ON a.id=l.accountId WHERE l.ref=? ORDER BY l.created,l.id",
+      saleId,
+    );
+    const fees = Math.max(
+      0,
+      -movements
+        .filter(
+          (x) =>
+            x.kind === "expense" &&
+            String(x.note || "").startsWith("Comisión tarjeta"),
+        )
+        .reduce((n, x) => n + x.amount, 0),
+    );
+    const refunded = -movements
+      .filter((x) => x.kind === "refund")
+      .reduce((n, x) => n + x.amount, 0);
+    const paid = movements
+      .filter((x) => x.kind === "sale")
+      .reduce((n, x) => n + x.amount, 0);
     const cost = lines.reduce((n, x) => n + x.cost, 0);
-    for(const line of lines) Object.assign(line,this.setting('line:'+line.id,{}));
-    const gross=sale.status==='cancelled'?0:sale.total-cost;
-    return { ...sale, lines, movements, fees, refunded, paid, cost, gross, marginPercent:sale.total?gross/sale.total*100:0, netSales:(sale.status==='cancelled'?0:sale.total)-fees, netCollected: paid - refunded - fees, profit: gross - fees };
+    for (const line of lines)
+      Object.assign(line, this.setting("line:" + line.id, {}));
+    const gross = sale.status === "cancelled" ? 0 : sale.total - cost;
+    return {
+      ...sale,
+      lines,
+      movements,
+      fees,
+      refunded,
+      paid,
+      cost,
+      gross,
+      marginPercent: sale.total ? (gross / sale.total) * 100 : 0,
+      netSales: (sale.status === "cancelled" ? 0 : sale.total) - fees,
+      netCollected: paid - refunded - fees,
+      profit: gross - fees,
+    };
   }
   operatingControl(): Row[] {
-    return this.all("SELECT l.*,a.name account FROM ledger l JOIN accounts a ON a.id=l.accountId WHERE l.kind='expense' ORDER BY l.created DESC").map(l=>({...l,isFee:String(l.note).startsWith('Comisión tarjeta')}));
-  }
-  campaigns() {
-    const meta = this.settingsMap("campaign:");
-    const relations = this.relationsMap("campaign");
     return this.all(
-      "SELECT c.*,COALESCE(s.revenue,0) revenue,COALESCE(s.gross,0) gross,COALESCE(l.spend,0) spend FROM campaigns c LEFT JOIN (SELECT campaignId,SUM(total) revenue,SUM(total-cost) gross FROM sales WHERE status='confirmed' AND campaignId IS NOT NULL GROUP BY campaignId) s ON s.campaignId=c.id LEFT JOIN (SELECT campaignId,-SUM(amount) spend FROM ledger WHERE kind='expense' AND campaignId IS NOT NULL GROUP BY campaignId) l ON l.campaignId=c.id ORDER BY name",
-    ).map((c) => ({
-      ...c,
-      ...(meta.get(c.id) ?? {}),
-      ...(relations.get(c.id) ?? { companyId: null, locationId: null }),
+      "SELECT l.*,a.name account FROM ledger l JOIN accounts a ON a.id=l.accountId WHERE l.kind='expense' ORDER BY l.created DESC",
+    ).map((l) => ({
+      ...l,
+      isFee: String(l.note).startsWith("Comisión tarjeta"),
     }));
   }
   metrics(): Row {
@@ -1357,131 +1716,26 @@ export class Business {
     const l = this.one(
       "SELECT COALESCE(SUM(amount),0) cash,COALESCE(SUM(CASE WHEN kind IN ('sale','refund') THEN amount ELSE 0 END),0) collected,COALESCE(SUM(CASE WHEN kind='expense' THEN -amount ELSE 0 END),0) expenses,COALESCE(SUM(CASE WHEN kind='income' THEN amount ELSE 0 END),0) other FROM ledger",
     );
-    const fees=this.one("SELECT COALESCE(-SUM(amount),0) fees FROM ledger WHERE kind='expense' AND note LIKE 'Comisión tarjeta%'").fees as number;
-    const shrinkage=this.one("SELECT COALESCE(-SUM(m.qty*l.cost),0) n FROM stock_moves m JOIN lots l ON l.id=m.lotId WHERE m.kind='adjust'").n as number;
+    const fees = this.one(
+      "SELECT COALESCE(-SUM(amount),0) fees FROM ledger WHERE kind='expense' AND note LIKE 'Comisión tarjeta%'",
+    ).fees as number;
+    const shrinkage = this.one(
+      "SELECT COALESCE(-SUM(m.qty*l.cost),0) n FROM stock_moves m JOIN lots l ON l.id=m.lotId WHERE m.kind='adjust'",
+    ).n as number;
     return {
       shrinkage,
       ...s,
       ...l,
       fees,
-      grossRevenue:s.revenue,
-      netSales:s.revenue-fees,
-      netCollected:l.collected-fees,
-      operatingOutflows:l.expenses-fees,
-      marginPercent:s.revenue?(s.revenue-s.cost)/s.revenue*100:0,
+      grossRevenue: s.revenue,
+      netSales: s.revenue - fees,
+      netCollected: l.collected - fees,
+      operatingOutflows: l.expenses - fees,
+      marginPercent: s.revenue ? ((s.revenue - s.cost) / s.revenue) * 100 : 0,
       receivable: this.receivable("", "9999"),
       gross: s.revenue - s.cost,
       result: s.revenue - s.cost - l.expenses + l.other - shrinkage,
     };
-  }
-  companies(includeArchived = false) {
-    return this.all(
-      `SELECT * FROM companies ${includeArchived ? "" : "WHERE active=1"} ORDER BY name`,
-    );
-  }
-  locations(includeArchived = false) {
-    return this.all(
-      `SELECT l.*,c.name company FROM locations l LEFT JOIN companies c ON c.id=l.companyId ${includeArchived ? "" : "WHERE l.active=1"} ORDER BY l.name`,
-    );
-  }
-  relation(type: string, key: string) {
-    return (
-      this.db.getFirstSync<Row>(
-        "SELECT companyId,locationId FROM relations WHERE entityType=? AND entityId=?",
-        type,
-        key,
-      ) || { companyId: null, locationId: null }
-    );
-  }
-  link(
-    type: string,
-    key: string,
-    companyId: string | null,
-    locationId: string | null,
-  ) {
-    assert(
-      ["product", "customer", "campaign", "sale"].includes(type),
-      "Relación inválida.",
-    );
-    const table = {
-      product: "products",
-      customer: "customers",
-      campaign: "campaigns",
-      sale: "sales",
-    }[type]!;
-    this.one(`SELECT id FROM ${table} WHERE id=?`, key);
-    if (companyId)
-      this.one("SELECT id FROM companies WHERE id=? AND active=1", companyId);
-    if (locationId) {
-      const l = this.one(
-        "SELECT * FROM locations WHERE id=? AND active=1",
-        locationId,
-      );
-      assert(
-        !companyId || !l.companyId || l.companyId === companyId,
-        "La ubicación pertenece a otra compañía.",
-      );
-    }
-    this.run(
-      "INSERT OR REPLACE INTO relations VALUES(?,?,?,?)",
-      type,
-      key,
-      companyId,
-      locationId,
-    );
-  }
-  saveCompany(input: Row) {
-    required(input.name);
-    const key = input.id || id();
-    assert(
-      ["Mi negocio", "Proveedor", "Cliente empresa", "Socio", "Otro"].includes(
-        input.kind,
-      ),
-      "Tipo de compañía inválido.",
-    );
-    this.transaction(() => {
-      if (input.id) this.one("SELECT id FROM companies WHERE id=?", key);
-      this.run(
-        "INSERT INTO companies VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,kind=excluded.kind,phone=excluded.phone,email=excluded.email,notes=excluded.notes,active=excluded.active",
-        key,
-        input.name.trim(),
-        input.kind,
-        input.phone || "",
-        input.email || "",
-        input.notes || "",
-        input.active === false ? 0 : 1,
-      );
-      this.audit("company.save", key);
-    });
-    return key;
-  }
-  saveLocation(input: Row) {
-    required(input.name);
-    const key = input.id || id();
-    assert(
-      ["Tienda", "Almacén", "Entrega", "Otra"].includes(input.kind),
-      "Tipo de ubicación inválido.",
-    );
-    this.transaction(() => {
-      if (input.id) this.one("SELECT id FROM locations WHERE id=?", key);
-      if (input.companyId)
-        this.one(
-          "SELECT id FROM companies WHERE id=? AND active=1",
-          input.companyId,
-        );
-      this.run(
-        "INSERT INTO locations VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,companyId=excluded.companyId,kind=excluded.kind,address=excluded.address,notes=excluded.notes,active=excluded.active",
-        key,
-        input.name.trim(),
-        input.companyId || null,
-        input.kind,
-        input.address || "",
-        input.notes || "",
-        input.active === false ? 0 : 1,
-      );
-      this.audit("location.save", key);
-    });
-    return key;
   }
   saveCustomer(input: Row) {
     let key = "";
@@ -1494,76 +1748,15 @@ export class Business {
         input.nextDate || "",
         input.id,
       );
-      this.link(
-        "customer",
-        key,
-        input.companyId || null,
-        input.locationId || null,
-      );
     });
     return key;
   }
   customers() {
-    const relations = this.relationsMap("customer");
     const meta = this.settingsMap("customer:");
     return this.all("SELECT * FROM customers ORDER BY name").map((c): Row => ({
       ...c,
-      ...(relations.get(c.id) ?? { companyId: null, locationId: null }),
       archived: meta.get(c.id)?.archived === true,
     }));
-  }
-  saveCampaign(input: Row) {
-    required(input.name);
-    required(input.channel);
-    date(input.start || "");
-    date(input.end || "");
-    assert(
-      !input.start || !input.end || input.start <= input.end,
-      "La fecha final precede al inicio.",
-    );
-    integer(input.budget || 0);
-    assert(
-      ["Borrador", "Activa", "Pausada", "Finalizada"].includes(
-        input.status || "Borrador",
-      ),
-      "Estado inválido.",
-    );
-    const key = input.id || id();
-    const code = (input.code || "CAM-" + key.slice(-6)).trim().toUpperCase();
-    this.transaction(() => {
-      if (input.id) {
-        this.one("SELECT id FROM campaigns WHERE id=?", key);
-        this.run(
-          "UPDATE campaigns SET name=?,channel=?,code=? WHERE id=?",
-          input.name.trim(),
-          input.channel,
-          code,
-          key,
-        );
-      } else
-        this.run(
-          "INSERT INTO campaigns VALUES(?,?,?,?)",
-          key,
-          input.name.trim(),
-          input.channel,
-          code,
-        );
-      this.setSetting("campaign:" + key, {
-        status: input.status || "Borrador",
-        budget: input.budget || 0,
-        start: input.start || "",
-        end: input.end || "",
-        notes: input.notes || "",
-      });
-      this.link(
-        "campaign",
-        key,
-        input.companyId || null,
-        input.locationId || null,
-      );
-      this.audit("campaign.save", key);
-    });
-    return key;
   }
   quickProduct(input: Row) {
     required(input.name);
@@ -1579,9 +1772,19 @@ export class Business {
       "NS-AUTO-" + key.slice(-8).toUpperCase();
     let productId = key;
     // Código de barras (lector USB/Bluetooth o cámara): único por producto.
-    const barcode = input.barcode !== undefined ? String(input.barcode || "").trim().toUpperCase().slice(0, 40) : undefined;
+    const barcode =
+      input.barcode !== undefined
+        ? normalizeProductCode(input.barcode)
+        : undefined;
+    assert(
+      !barcode || barcode.length <= 40,
+      "El código de barras admite hasta 40 caracteres.",
+    );
+    const others = this.stock().filter((p) => p.id !== input.id);
+    const skuOwner = findProductByCode(others, sku);
+    assert(!skuOwner, `Ese SKU ya identifica a ${skuOwner?.name}.`);
     if (barcode) {
-      const other = this.stock().find((p) => p.id !== input.id && String(p.barcode || "").toUpperCase() === barcode);
+      const other = findProductByCode(others, barcode);
       assert(!other, `Ese código de barras ya es de ${other?.name}.`);
     }
     this.transaction(() => {
@@ -1615,54 +1818,119 @@ export class Business {
         notes: input.notes ?? previous.notes ?? "",
         inventoryKnown: input.qty ? true : (previous.inventoryKnown ?? false),
         barcode: barcode ?? previous.barcode ?? "",
+        lookupSource: input.lookupSource ?? previous.lookupSource ?? "",
+        lookupSourceUrl:
+          input.lookupSourceUrl ?? previous.lookupSourceUrl ?? "",
       });
-      this.link("product", productId, input.companyId || null, null);
-      if (!input.id && input.qty) {
-        const lot = this.receive(
-          productId,
-          "Alta inicial",
-          input.expires || "",
-          input.qty,
-          input.cost,
-          null,
-        );
-        if (input.locationId) this.assignLot(lot, input.locationId);
-      }
+      if (!input.id && input.qty)
+        this.receive(productId, "Alta inicial", input.expires || "", input.qty, input.cost, null);
     });
     return productId;
   }
-  assignLot(lotId: string, locationId: string) {
+  setProductBarcode(productId: string, raw: string) {
+    const barcode = normalizeProductCode(raw);
+    required(barcode);
+    assert(
+      barcode.length <= 40,
+      "El código de barras admite hasta 40 caracteres.",
+    );
     this.transaction(() => {
-      this.one("SELECT id FROM lots WHERE id=?", lotId);
-      this.one("SELECT id FROM locations WHERE id=? AND active=1", locationId);
-      this.run(
-        "INSERT OR REPLACE INTO lot_locations VALUES(?,?)",
-        lotId,
-        locationId,
+      this.one("SELECT id FROM products WHERE id=?", productId);
+      const other = findProductByCode(
+        this.stock().filter((product) => product.id !== productId),
+        barcode,
       );
-      this.audit("stock.location", lotId, locationId);
+      assert(!other, `Ese código de barras ya es de ${other?.name}.`);
+      this.setSetting("product:" + productId, {
+        ...this.setting("product:" + productId, {}),
+        barcode,
+      });
+      this.audit("product.barcode", productId, barcode);
+    });
+  }
+  /** Una ficha admite códigos adicionales sin cambiar su SKU ni quitar el código principal. */
+  linkProductCode(productId: string, raw: string, source = "") {
+    const code = normalizeProductCode(raw);
+    required(code);
+    assert(code.length <= 40, "El código admite hasta 40 caracteres.");
+    this.transaction(() => {
+      const product = this.one(
+        "SELECT id,sku FROM products WHERE id=?",
+        productId,
+      );
+      const current = this.setting("product:" + productId, {});
+      const other = findProductByCode(
+        this.stock().filter((p) => p.id !== productId),
+        code,
+      );
+      assert(!other, `Ese código ya identifica a ${other?.name}.`);
+      if (findProductByCode([{ ...current, sku: product.sku }], code)) return;
+      const aliases = Array.isArray(current.barcodeAliases)
+        ? current.barcodeAliases
+        : [];
+      this.setSetting("product:" + productId, {
+        ...current,
+        barcode: current.barcode || code,
+        barcodeAliases: current.barcode
+          ? [
+              ...aliases.filter(
+                (alias: unknown) => !sameProductCode(alias, code),
+              ),
+              code,
+            ]
+          : aliases,
+      });
+      this.audit(
+        "product.code.link",
+        productId,
+        code + (source ? " · " + source : ""),
+      );
+    });
+  }
+  saveProductLookupPhoto(productId: string, online: Row) {
+    if (!/^https:\/\//i.test(String(online.imageUri || ""))) return;
+    this.transaction(() => {
+      this.one("SELECT id FROM products WHERE id=?", productId);
+      const current = this.setting("product:" + productId, {});
+      this.setSetting("product:" + productId, {
+        ...current,
+        cleanImageUri: online.imageUri,
+        imageUris: Array.isArray(online.imageUris)
+          ? online.imageUris
+              .filter(
+                (url: unknown) =>
+                  typeof url === "string" && /^https:\/\//i.test(url),
+              )
+              .slice(0, 5)
+          : [],
+        lookupCode: online.actualCode || online.code || "",
+        lookupSource: online.source || "",
+        lookupSourceUrl: online.sourceUrl || "",
+        lookupPresentation: online.presentation || "",
+        lookupFlavor: online.flavor || "",
+      });
+    });
+  }
+  unlinkAdditionalProductCode(productId: string, raw: string) {
+    this.transaction(() => {
+      this.one("SELECT id FROM products WHERE id=?", productId);
+      const current = this.setting("product:" + productId, {});
+      const aliases = Array.isArray(current.barcodeAliases)
+        ? current.barcodeAliases
+        : [];
+      this.setSetting("product:" + productId, {
+        ...current,
+        barcodeAliases: aliases.filter(
+          (code: unknown) => !sameProductCode(code, raw),
+        ),
+      });
+      this.audit("product.code.unlink", productId, normalizeProductCode(raw));
     });
   }
   lots() {
     return this.all(
-      "SELECT l.*,p.name product,p.sku,lc.locationId,lo.name location FROM lots l JOIN products p ON p.id=l.productId LEFT JOIN lot_locations lc ON lc.lotId=l.id LEFT JOIN locations lo ON lo.id=lc.locationId ORDER BY p.name,l.expires",
+      "SELECT l.*,p.name product,p.sku FROM lots l JOIN products p ON p.id=l.productId ORDER BY p.name,l.expires",
     );
-  }
-  receiveAt(
-    productId: string,
-    label: string,
-    expires: string,
-    qty: number,
-    cost: number,
-    accountId: string | null,
-    locationId: string | null,
-  ) {
-    let key = "";
-    this.transaction(() => {
-      key = this.receive(productId, label, expires, qty, cost, accountId);
-      if (locationId) this.assignLot(key, locationId);
-    });
-    return key;
   }
   updateSaleDetails(saleId: string, input: Row) {
     this.transaction(() => {
@@ -1674,17 +1942,10 @@ export class Business {
       );
       required(input.channel);
       this.run(
-        "UPDATE sales SET customerId=?,campaignId=?,channel=? WHERE id=?",
+        "UPDATE sales SET customerId=?,channel=? WHERE id=?",
         input.customerId || null,
-        input.campaignId || null,
         input.channel,
         saleId,
-      );
-      this.link(
-        "sale",
-        saleId,
-        input.companyId || null,
-        input.locationId || null,
       );
       const before = this.setting("sale:" + saleId, {});
       this.setSetting("sale:" + saleId, {
@@ -1708,7 +1969,9 @@ export class Business {
       from,
       to,
     );
-    const by: Record<string, number> = Object.fromEntries(rows.map((r) => [r.k, r.amount]));
+    const by: Record<string, number> = Object.fromEntries(
+      rows.map((r) => [r.k, r.amount]),
+    );
     const sales = (by.sale || 0) + (by.refund || 0);
     const expenses = -(by.expense || 0) - (by.fee || 0);
     const purchases = -(by.purchase || 0);
@@ -1724,7 +1987,10 @@ export class Business {
       .map(([kind, label]) => ({ kind, label, amount: by[kind] || 0 }))
       .filter((x) => x.amount);
     const balanceAt = (iso: string) =>
-      this.one("SELECT COALESCE(SUM(l.amount),0) n FROM ledger l JOIN accounts a ON a.id=l.accountId WHERE a.kind='Efectivo' AND l.created<?", iso).n as number;
+      this.one(
+        "SELECT COALESCE(SUM(l.amount),0) n FROM ledger l JOIN accounts a ON a.id=l.accountId WHERE a.kind='Efectivo' AND l.created<?",
+        iso,
+      ).n as number;
     return {
       sales,
       expenses,
@@ -1737,15 +2003,7 @@ export class Business {
     };
   }
   /** Paquetes con sus componentes (dos consultas en total). */
-  bundles(): Row[] {
-    const items = new Map<string, Row[]>();
-    for (const i of this.all("SELECT i.*,p.name FROM bundle_items i JOIN products p ON p.id=i.productId ORDER BY p.name")) {
-      const list = items.get(i.bundleId) ?? [];
-      list.push(i);
-      items.set(i.bundleId, list);
-    }
-    return this.all("SELECT * FROM bundles ORDER BY name").map((b) => ({ ...b, items: items.get(b.id) ?? [] }));
-  }
+
   /**
    * 1.9 · La comisión ya no va dentro del precio: se suma al cobrar. Regresa una
    * sola vez el catálogo (productos y paquetes) al precio original, el de antes
@@ -1764,18 +2022,25 @@ export class Business {
     this.transaction(() => {
       if (cu) {
         const history: Row[] = Array.isArray(cu.history) ? cu.history : [];
-        const firstBps = Number(history[0]?.from ?? cu.bps) || CATALOG_UPLIFT_BPS;
+        const firstBps =
+          Number(history[0]?.from ?? cu.bps) || CATALOG_UPLIFT_BPS;
         const nowBps = Number(cu.bps) || CATALOG_UPLIFT_BPS;
         const base = (price: number, orig: unknown) => {
           if (Number.isSafeInteger(orig)) {
             let expected = upliftPrice(orig as number, firstBps);
-            for (const h of history) expected = Math.round((expected * (10000 + Number(h.to))) / (10000 + Number(h.from)));
+            for (const h of history)
+              expected = Math.round(
+                (expected * (10000 + Number(h.to))) / (10000 + Number(h.from)),
+              );
             if (price === expected) return orig as number;
           }
           if (price % 100 === 0) return price;
           return Math.round((price * 10000) / (10000 + nowBps));
         };
-        for (const [table, key] of [["products", "products"], ["bundles", "bundles"]] as const)
+        for (const [table, key] of [
+          ["products", "products"],
+          ["bundles", "bundles"],
+        ] as const)
           for (const r of this.all(`SELECT id,price FROM ${table}`)) {
             const to = base(r.price, cu[key]?.[r.id]);
             if (to === r.price) continue;
@@ -1784,28 +2049,51 @@ export class Business {
             n++;
           }
       }
-      this.setSetting("pricing", { mode: "precio+comisión", at: new Date().toISOString(), changed });
-      if (n) this.audit("catalog.restore", "catalog", `Precios sin comisión: ${Object.keys(changed.products).length} productos, ${Object.keys(changed.bundles).length} paquetes. La comisión se suma al cobrar.`);
+      this.setSetting("pricing", {
+        mode: "precio+comisión",
+        at: new Date().toISOString(),
+        changed,
+      });
+      if (n)
+        this.audit(
+          "catalog.restore",
+          "catalog",
+          `Precios sin comisión: ${Object.keys(changed.products).length} productos, ${Object.keys(changed.bundles).length} paquetes. La comisión se suma al cobrar.`,
+        );
     });
     return n;
   }
   /** Borra la copia interna completa que la 0.8 guardaba dentro de la base. */
   cleanupLegacy(): boolean {
-    if (!this.db.getFirstSync("SELECT key FROM settings WHERE key='beforeRelease08'")) return false;
+    if (
+      !this.db.getFirstSync(
+        "SELECT key FROM settings WHERE key='beforeRelease08'",
+      )
+    )
+      return false;
     this.transaction(() => {
       this.run("DELETE FROM settings WHERE key='beforeRelease08'");
-      this.audit("maintenance", "beforeRelease08", "Copia interna previa a 0.8 eliminada (los respaldos externos no cambian).");
+      this.audit(
+        "maintenance",
+        "beforeRelease08",
+        "Copia interna previa a 0.8 eliminada (los respaldos externos no cambian).",
+      );
     });
     return true;
   }
   /** Fotos propias de productos guardadas en sus metadatos. */
   productPhotos(): { id: string; imageUri: string }[] {
     const out: { id: string; imageUri: string }[] = [];
-    for (const [id, m] of this.settingsMap("product:")) if (m && typeof m.imageUri === "string" && m.imageUri) out.push({ id, imageUri: m.imageUri });
+    for (const [id, m] of this.settingsMap("product:"))
+      if (m && typeof m.imageUri === "string" && m.imageUri)
+        out.push({ id, imageUri: m.imageUri });
     return out;
   }
   setProductPhoto(productId: string, imageUri: string | null) {
-    this.setSetting("product:" + productId, { ...this.setting("product:" + productId, {}), imageUri });
+    this.setSetting("product:" + productId, {
+      ...this.setting("product:" + productId, {}),
+      imageUri,
+    });
   }
   /**
    * Modifica una venta activa: cambia cantidades, quita o agrega productos y
@@ -1817,19 +2105,38 @@ export class Business {
     saleId: string,
     items: { productId: string; qty: number }[],
     total: number,
-    opts: { refundAccountId?: string | null; refund?: number | null; allowBelowCost?: boolean; note?: string; base?: number | null } = {},
+    opts: {
+      refundAccountId?: string | null;
+      refund?: number | null;
+      allowBelowCost?: boolean;
+      note?: string;
+      base?: number | null;
+    } = {},
   ) {
     integer(total);
-    assert(items.length > 0, "Deja al menos un producto. Para devolver todo usa Cancelar venta.");
+    assert(
+      items.length > 0,
+      "Deja al menos un producto. Para devolver todo usa Cancelar venta.",
+    );
     const wanted = new Map<string, number>();
     for (const i of items) {
       integer(i.qty, 1);
       wanted.set(i.productId, (wanted.get(i.productId) ?? 0) + i.qty);
     }
-    const result = { before: 0, after: total, refund: 0, returned: 0, added: 0, balance: 0 };
+    const result = {
+      before: 0,
+      after: total,
+      refund: 0,
+      returned: 0,
+      added: 0,
+      balance: 0,
+    };
     this.transaction(() => {
       const sale = this.one("SELECT * FROM sales WHERE id=?", saleId);
-      assert(sale.status === "confirmed", "Solo se pueden modificar ventas activas.");
+      assert(
+        sale.status === "confirmed",
+        "Solo se pueden modificar ventas activas.",
+      );
       result.before = sale.total;
       const now = new Date().toISOString();
       const allocations = this.all(
@@ -1840,10 +2147,14 @@ export class Business {
         allocations.every((a) => !this.reservedForLotAllocation(a.id)),
         "Esta venta tiene entregas pendientes de la carga inicial; no se puede modificar desde aquí.",
       );
-      const lines = () => this.all("SELECT * FROM sale_lines WHERE saleId=? ORDER BY rowid", saleId);
+      const lines = () =>
+        this.all(
+          "SELECT * FROM sale_lines WHERE saleId=? ORDER BY rowid",
+          saleId,
+        );
       const oldQty = new Map<string, number>();
-      for (const l of lines()) oldQty.set(l.productId, (oldQty.get(l.productId) ?? 0) + l.qty);
-      const locationId = this.relation("sale", saleId).locationId as string | null;
+      for (const l of lines())
+        oldQty.set(l.productId, (oldQty.get(l.productId) ?? 0) + l.qty);
       for (const productId of new Set([...oldQty.keys(), ...wanted.keys()])) {
         const before = oldQty.get(productId) ?? 0;
         const after = wanted.get(productId) ?? 0;
@@ -1851,31 +2162,75 @@ export class Business {
           // Devolución: regresa al lote de donde salió (la asignación más reciente primero).
           let remove = before - after;
           result.returned += remove;
-          for (const a of allocations.filter((x) => x.productId === productId).reverse()) {
+          for (const a of allocations
+            .filter((x) => x.productId === productId)
+            .reverse()) {
             if (!remove) break;
             const take = Math.min(remove, a.qty);
             this.run("UPDATE lots SET qty=qty+? WHERE id=?", take, a.lotId);
-            this.run("INSERT INTO stock_moves VALUES(?,?,?,?,?,?,?)", id(), now, a.lotId, take, "return", saleId, "Devolución parcial");
-            if (take === a.qty) this.run("DELETE FROM allocations WHERE id=?", a.id);
-            else this.run("UPDATE allocations SET qty=qty-? WHERE id=?", take, a.id);
-            const line = this.one("SELECT * FROM sale_lines WHERE id=?", a.lineId);
+            this.run(
+              "INSERT INTO stock_moves VALUES(?,?,?,?,?,?,?)",
+              id(),
+              now,
+              a.lotId,
+              take,
+              "return",
+              saleId,
+              "Devolución parcial",
+            );
+            if (take === a.qty)
+              this.run("DELETE FROM allocations WHERE id=?", a.id);
+            else
+              this.run(
+                "UPDATE allocations SET qty=qty-? WHERE id=?",
+                take,
+                a.id,
+              );
+            const line = this.one(
+              "SELECT * FROM sale_lines WHERE id=?",
+              a.lineId,
+            );
             if (line.qty === take) {
               this.run("DELETE FROM settings WHERE key=?", "line:" + line.id);
               this.run("DELETE FROM sale_lines WHERE id=?", line.id);
-            } else this.run("UPDATE sale_lines SET qty=qty-? WHERE id=?", take, line.id);
+            } else
+              this.run(
+                "UPDATE sale_lines SET qty=qty-? WHERE id=?",
+                take,
+                line.id,
+              );
             remove -= take;
           }
           assert(remove === 0, "No se pudo devolver el producto a su lote.");
         } else if (after > before) {
           let add = after - before;
           result.added += add;
-          const product = this.one("SELECT * FROM products WHERE id=?", productId);
-          let line = this.db.getFirstSync<Row>("SELECT * FROM sale_lines WHERE saleId=? AND productId=? ORDER BY rowid", saleId, productId);
+          const product = this.one(
+            "SELECT * FROM products WHERE id=?",
+            productId,
+          );
+          let line = this.db.getFirstSync<Row>(
+            "SELECT * FROM sale_lines WHERE saleId=? AND productId=? ORDER BY rowid",
+            saleId,
+            productId,
+          );
           if (!line) {
             const key = id();
-            this.run("INSERT INTO sale_lines VALUES(?,?,?,?,?)", key, saleId, productId, add, product.name);
+            this.run(
+              "INSERT INTO sale_lines VALUES(?,?,?,?,?)",
+              key,
+              saleId,
+              productId,
+              add,
+              product.name,
+            );
             line = { id: key };
-          } else this.run("UPDATE sale_lines SET qty=qty+? WHERE id=?", add, line.id);
+          } else
+            this.run(
+              "UPDATE sale_lines SET qty=qty+? WHERE id=?",
+              add,
+              line.id,
+            );
           const lots = this.all(
             "SELECT * FROM lots WHERE productId=? AND qty>0 AND (expires='' OR expires>=?) ORDER BY CASE WHEN expires='' THEN 1 ELSE 0 END,expires,id",
             productId,
@@ -1883,35 +2238,74 @@ export class Business {
           );
           for (const lot of lots) {
             if (!add) break;
-            if (locationId && !this.db.getFirstSync("SELECT lotId FROM lot_locations WHERE lotId=? AND locationId=?", lot.id, locationId)) continue;
             const take = Math.min(add, lot.qty - this.reservedForLot(lot.id));
             if (take <= 0) continue;
-            this.run("INSERT INTO allocations VALUES(?,?,?,?,?)", id(), line.id, lot.id, take, lot.cost);
+            this.run(
+              "INSERT INTO allocations VALUES(?,?,?,?,?)",
+              id(),
+              line.id,
+              lot.id,
+              take,
+              lot.cost,
+            );
             this.run("UPDATE lots SET qty=qty-? WHERE id=?", take, lot.id);
-            this.run("INSERT INTO stock_moves VALUES(?,?,?,?,?,?,?)", id(), now, lot.id, -take, "sale", saleId, product.name);
+            this.run(
+              "INSERT INTO stock_moves VALUES(?,?,?,?,?,?,?)",
+              id(),
+              now,
+              lot.id,
+              -take,
+              "sale",
+              saleId,
+              product.name,
+            );
             add -= take;
           }
-          assert(add === 0, `Existencias vendibles insuficientes: ${product.name}.`);
+          assert(
+            add === 0,
+            `Existencias vendibles insuficientes: ${product.name}.`,
+          );
         }
       }
       const cost = this.one(
         "SELECT COALESCE(SUM(a.qty*a.cost),0) n FROM allocations a JOIN sale_lines l ON l.id=a.lineId WHERE l.saleId=?",
         saleId,
       ).n as number;
-      assert(total >= cost || opts.allowBelowCost, "El nuevo total queda debajo del costo. Activa la autorización si corresponde.");
-      this.run("UPDATE sales SET total=?,cost=? WHERE id=?", total, cost, saleId);
+      assert(
+        total >= cost || opts.allowBelowCost,
+        "El nuevo total queda debajo del costo. Activa la autorización si corresponde.",
+      );
+      this.run(
+        "UPDATE sales SET total=?,cost=? WHERE id=?",
+        total,
+        cost,
+        saleId,
+      );
       // Si la venta lleva comisión al cliente, el nuevo total también la incluye.
       const saleMeta = this.setting("sale:" + saleId, {});
       const commBps = Number(saleMeta.commissionBps);
       const withFee = saleMeta.commission > 0 && Number.isSafeInteger(commBps);
-      const splitBase = withFee ? (Number.isSafeInteger(opts.base) && (opts.base as number) <= total ? (opts.base as number) : baseOf(total, commBps)) : total;
+      const splitBase = withFee
+        ? Number.isSafeInteger(opts.base) && (opts.base as number) <= total
+          ? (opts.base as number)
+          : baseOf(total, commBps)
+        : total;
       const split = { base: splitBase, commission: total - splitBase };
-      if (withFee) this.setSetting("sale:" + saleId, { ...saleMeta, basePrice: split.base, commission: split.commission });
+      if (withFee)
+        this.setSetting("sale:" + saleId, {
+          ...saleMeta,
+          basePrice: split.base,
+          commission: split.commission,
+        });
       // Reparte el nuevo total (sin comisión) entre los renglones según su precio de lista.
       const current = lines();
       const listValues = current.map((l) => {
         const meta = this.setting("line:" + l.id, null);
-        const unit = meta && Number.isSafeInteger(meta.unitPrice) ? meta.unitPrice : this.one("SELECT price FROM products WHERE id=?", l.productId).price;
+        const unit =
+          meta && Number.isSafeInteger(meta.unitPrice)
+            ? meta.unitPrice
+            : this.one("SELECT price FROM products WHERE id=?", l.productId)
+                .price;
         return { line: l, unit, value: unit * l.qty, meta: meta || {} };
       });
       const listTotal = listValues.reduce((n, x) => n + x.value, 0);
@@ -1919,42 +2313,81 @@ export class Business {
         assigned = 0;
       listValues.forEach((x, index) => {
         running += x.value;
-        const cumulative = index === listValues.length - 1 ? split.base : listTotal ? Math.round((split.base * running) / listTotal) : 0;
+        const cumulative =
+          index === listValues.length - 1
+            ? split.base
+            : listTotal
+              ? Math.round((split.base * running) / listTotal)
+              : 0;
         const lineTotal = cumulative - assigned;
         assigned = cumulative;
-        this.setSetting("line:" + x.line.id, { ...x.meta, unitPrice: x.unit, discount: x.value - lineTotal, delivered: x.line.qty });
+        this.setSetting("line:" + x.line.id, {
+          ...x.meta,
+          unitPrice: x.unit,
+          discount: x.value - lineTotal,
+          delivered: x.line.qty,
+        });
       });
       // Dinero: devolución de lo cobrado de más.
-      const paid = this.one("SELECT COALESCE(SUM(amount),0) n FROM ledger WHERE ref=? AND kind='sale'", saleId).n as number;
+      const paid = this.one(
+        "SELECT COALESCE(SUM(amount),0) n FROM ledger WHERE ref=? AND kind='sale'",
+        saleId,
+      ).n as number;
       const refund = opts.refund ?? Math.max(0, paid - total);
       integer(refund);
       assert(refund <= paid, "No puedes devolver más de lo que se cobró.");
-      assert(paid - refund <= total, `Lo cobrado supera el nuevo total: devuelve al menos ${money(paid - total)}.`);
+      assert(
+        paid - refund <= total,
+        `Lo cobrado supera el nuevo total: devuelve al menos ${money(paid - total)}.`,
+      );
       if (refund) {
         const accountId = opts.refundAccountId;
         assert(accountId, "Elige la cuenta de donde sale la devolución.");
-        assert(this.balance(accountId) >= refund, "Saldo insuficiente en esa cuenta para devolver.");
+        assert(
+          this.balance(accountId) >= refund,
+          "Saldo insuficiente en esa cuenta para devolver.",
+        );
         this.ledger(accountId, -refund, "sale", saleId, "Devolución parcial");
       }
       result.refund = refund;
       result.balance = total - (paid - refund);
-      assert(result.balance === 0 || sale.customerId, "La venta quedaría con saldo pendiente: asígnale un cliente primero (Editar seguimiento).");
+      assert(
+        result.balance === 0 || sale.customerId,
+        "La venta quedaría con saldo pendiente: asígnale un cliente primero (Editar seguimiento).",
+      );
       const meta = this.setting("sale:" + saleId, {});
       this.setSetting("sale:" + saleId, {
         ...meta,
         revisions: (meta.revisions || 0) + 1,
-        ...(opts.note?.trim() ? { notes: [meta.notes, opts.note.trim()].filter(Boolean).join("\n") } : {}),
+        ...(opts.note?.trim()
+          ? { notes: [meta.notes, opts.note.trim()].filter(Boolean).join("\n") }
+          : {}),
       });
-      this.audit("sale.revise", saleId, `${money(sale.total)} → ${money(total)} · devueltas ${result.returned} · agregadas ${result.added} · devolución ${money(refund)}`);
+      this.audit(
+        "sale.revise",
+        saleId,
+        `${money(sale.total)} → ${money(total)} · devueltas ${result.returned} · agregadas ${result.added} · devolución ${money(refund)}`,
+      );
     });
     return result;
   }
   /** Alta de un cliente creado por un vendedor (mismo id que en la base en línea). */
   importCustomer(id: string, name: string, phone: string): boolean {
     required(id);
-    if (this.db.getFirstSync("SELECT id FROM customers WHERE id=?", id)) return false;
+    if (this.db.getFirstSync("SELECT id FROM customers WHERE id=?", id))
+      return false;
     this.transaction(() => {
-      this.run("INSERT INTO customers VALUES(?,?,?,?,?,?)", id, String(name || "Cliente").trim().slice(0, 120) || "Cliente", String(phone || "").slice(0, 30), "", "Cliente", "");
+      this.run(
+        "INSERT INTO customers VALUES(?,?,?,?,?,?)",
+        id,
+        String(name || "Cliente")
+          .trim()
+          .slice(0, 120) || "Cliente",
+        String(phone || "").slice(0, 30),
+        "",
+        "Cliente",
+        "",
+      );
       this.audit("customer.import", id, "Alta hecha por un vendedor");
     });
     return true;
@@ -1975,12 +2408,18 @@ export class Business {
   applyRemoteSale(row: Row, accountId: string): string {
     const already = this.setting("remote:" + row.id, null);
     if (already) return already;
-    const items = (Array.isArray(row.items) ? row.items : []).map((i: Row) => ({ productId: String(i.productId), qty: Number(i.qty) }));
+    const items = (Array.isArray(row.items) ? row.items : []).map((i: Row) => ({
+      productId: String(i.productId),
+      qty: Number(i.qty),
+    }));
     assert(items.length, "La venta no trae productos.");
     // Un cobro con tarjeta solo puede pagar UNA venta (también contra las tuyas).
     const orderId = row.mp?.orderId ? String(row.mp.orderId) : "";
     if (orderId) {
-      assert(/^[A-Za-z0-9_-]{1,80}$/.test(orderId), "Cobro con tarjeta inválido.");
+      assert(
+        /^[A-Za-z0-9_-]{1,80}$/.test(orderId),
+        "Cobro con tarjeta inválido.",
+      );
       const used = this.db.getFirstSync<Row>(
         "SELECT key FROM settings WHERE key LIKE 'sale:%' AND (value LIKE ? OR value LIKE ?) LIMIT 1",
         `%"mpOrderId":"${orderId}"%`,
@@ -1989,28 +2428,82 @@ export class Business {
       assert(!used, "Ese cobro con tarjeta ya está registrado en otra venta.");
       // 2.0.3: cobro hecho directo en la terminal (PAY-…): el pago no puede estar ya en otra venta.
       const ref = String(row.mp?.referenceId || "");
-      assert(!ref || !this.paymentLinked(ref), "Ese pago de Mercado Pago ya está registrado en otra venta.");
+      assert(
+        !ref || !this.paymentLinked(ref),
+        "Ese pago de Mercado Pago ya está registrado en otra venta.",
+      );
     }
     integer(Number(row.total));
     let saleId = "";
     this.transaction(() => {
       let customerId: string | null = row.customer_id || null;
-      if (customerId) this.importCustomer(customerId, row.customer_name || "Cliente", row.customer_phone || "");
+      if (customerId)
+        this.importCustomer(
+          customerId,
+          row.customer_name || "Cliente",
+          row.customer_phone || "",
+        );
       // El servidor cobra tu precio de lista (− promociones) + la comisión que absorbe el cliente;
       // se separa igual que en las ventas del dueño. Se registra lo que el vendedor realmente cobró.
       const rows: Row[] = Array.isArray(row.items) ? row.items : [];
-      const charged = Number.isSafeInteger(Number(row.client_total)) && Number(row.client_total) > 0 && !row.mp?.orderId ? Number(row.client_total) : Number(row.total);
+      const charged =
+        Number.isSafeInteger(Number(row.client_total)) &&
+        Number(row.client_total) > 0 &&
+        !row.mp?.orderId
+          ? Number(row.client_total)
+          : Number(row.total);
       integer(charged);
-      const list = rows.reduce((n: number, i: Row) => n + (Number(i.price) || 0) * (Number(i.qty) || 0), 0);
-      const sub = Number.isSafeInteger(Number(row.subtotal)) && Number(row.subtotal) > 0 ? Number(row.subtotal) : list;
-      const promo = Number.isSafeInteger(Number(row.promo)) && Number(row.promo) > 0 ? Number(row.promo) : 0;
+      const list = rows.reduce(
+        (n: number, i: Row) =>
+          n + (Number(i.price) || 0) * (Number(i.qty) || 0),
+        0,
+      );
+      const sub =
+        Number.isSafeInteger(Number(row.subtotal)) && Number(row.subtotal) > 0
+          ? Number(row.subtotal)
+          : list;
+      const promo =
+        Number.isSafeInteger(Number(row.promo)) && Number(row.promo) > 0
+          ? Number(row.promo)
+          : 0;
       const base = Math.max(0, sub - promo);
       const commission = base > 0 && charged > base ? charged - base : 0;
-      const bps = Number.isSafeInteger(Number(row.fee_bps)) && Number(row.fee_bps) > 0 ? Number(row.fee_bps) : this.feeBps();
-      const lineInfo: Record<string, { price?: number; discount?: number }> = {};
-      for (const i of rows) if (i.productId) lineInfo[String(i.productId)] = { price: Number.isSafeInteger(Number(i.price)) ? Number(i.price) : undefined, discount: Number(i.discount) || 0 };
-      saleId = this.sell(items, charged, charged, accountId, customerId, null, "Vendedor", true, null, commission > 0 && commission < charged ? { amount: commission, bps } : null, rows.length ? lineInfo : null);
-      const promoNames = [...new Set(rows.filter((i) => Number(i.discount) > 0 && i.promo).map((i) => String(i.promo)))];
+      const bps =
+        Number.isSafeInteger(Number(row.fee_bps)) && Number(row.fee_bps) > 0
+          ? Number(row.fee_bps)
+          : this.feeBps();
+      const lineInfo: Record<string, { price?: number; discount?: number }> =
+        {};
+      for (const i of rows)
+        if (i.productId)
+          lineInfo[String(i.productId)] = {
+            price: Number.isSafeInteger(Number(i.price))
+              ? Number(i.price)
+              : undefined,
+            discount: Number(i.discount) || 0,
+          };
+      saleId = this.sell(
+        items,
+        charged,
+        charged,
+        accountId,
+        customerId,
+        null,
+        "Vendedor",
+        true,
+        null,
+        commission > 0 && commission < charged
+          ? { amount: commission, bps }
+          : null,
+        rows.length ? lineInfo : null,
+      );
+      const promoNames = [
+        ...new Set(
+          rows
+            .filter((i) => Number(i.discount) > 0 && i.promo)
+            .map((i) => String(i.promo)),
+        ),
+      ];
       const when = new Date(row.created_at);
       if (!isNaN(when.getTime()) && when.getTime() <= Date.now() + 5 * 60000) {
         const iso = when.toISOString();
@@ -2021,29 +2514,70 @@ export class Business {
       const mp = row.mp || null;
       this.setSetting("sale:" + saleId, {
         ...this.setting("sale:" + saleId, {}),
-        folio: row.folio || "V-" + String(row.id).replace(/[^A-Za-z0-9]/g, "").slice(-6).toUpperCase(),
+        folio:
+          row.folio ||
+          "V-" +
+            String(row.id)
+              .replace(/[^A-Za-z0-9]/g, "")
+              .slice(-6)
+              .toUpperCase(),
         seller: row.seller_name || "Vendedor",
         sellerId: row.seller_id || "",
         remoteId: row.id,
         notes: row.note || "",
-        ...(promoNames.length ? { promos: promoNames.map((name) => ({ name, amount: rows.filter((i) => i.promo === name).reduce((n, i) => n + (Number(i.discount) || 0), 0) })) } : {}),
-        ...(row.transfer_id ? { transferId: row.transfer_id, transferLabel: ((this.setting("transferAccounts", []) as Row[]).find((t) => t.id === row.transfer_id)?.label as string) || row.transfer_id } : {}),
+        ...(promoNames.length
+          ? {
+              promos: promoNames.map((name) => ({
+                name,
+                amount: rows
+                  .filter((i) => i.promo === name)
+                  .reduce((n, i) => n + (Number(i.discount) || 0), 0),
+              })),
+            }
+          : {}),
+        ...(row.transfer_id
+          ? {
+              transferId: row.transfer_id,
+              transferLabel:
+                ((this.setting("transferAccounts", []) as Row[]).find(
+                  (t) => t.id === row.transfer_id,
+                )?.label as string) || row.transfer_id,
+            }
+          : {}),
         ...(mp?.orderId
           ? {
               mpOrderId: mp.orderId,
               mpPaymentId: mp.paymentId || "",
-              mpPayments: [{ orderId: mp.orderId, kind: "venta", amount: charged, paymentId: mp.paymentId || "", referenceId: mp.referenceId || "", feeId: this.lastFeeEntry(saleId)?.id || "", at: row.created_at, card: mp.card || {} }],
+              mpPayments: [
+                {
+                  orderId: mp.orderId,
+                  kind: "venta",
+                  amount: charged,
+                  paymentId: mp.paymentId || "",
+                  referenceId: mp.referenceId || "",
+                  feeId: this.lastFeeEntry(saleId)?.id || "",
+                  at: row.created_at,
+                  card: mp.card || {},
+                },
+              ],
             }
           : {}),
       });
       this.setSetting("remote:" + row.id, saleId);
-      this.audit("sale.remote", saleId, `Venta de ${row.seller_name || "vendedor"} (${row.method})`);
+      this.audit(
+        "sale.remote",
+        saleId,
+        `Venta de ${row.seller_name || "vendedor"} (${row.method})`,
+      );
     });
     return saleId;
   }
   /** Ejecuta `task` y deshace todo: sirve para validar antes de cobrar o devolver en Mercado Pago. */
   dryRun(task: () => void) {
-    assert(this.depth === 0, "Validación no disponible dentro de otra operación.");
+    assert(
+      this.depth === 0,
+      "Validación no disponible dentro de otra operación.",
+    );
     const ROLLBACK = new Error("__dry_run__");
     try {
       this.transaction(() => {
@@ -2060,7 +2594,9 @@ export class Business {
       for (const t of TABLES) data[t] = this.all(`SELECT * FROM ${t}`);
       // La sesión de pantalla y la copia interna previa a 0.8 no se exportan:
       // duplicaban el tamaño de cada respaldo.
-      data.settings = data.settings.filter((r) => !BACKUP_EXCLUDED.includes(r.key));
+      data.settings = data.settings.filter(
+        (r) => !BACKUP_EXCLUDED.includes(r.key),
+      );
     });
     return JSON.stringify(
       {
@@ -2086,7 +2622,10 @@ export class Business {
         d[t] = [];
     assert(d && typeof d === "object", "Respaldo inválido.");
     this.transaction(() => {
-      const kept = this.all(`SELECT key,value FROM settings WHERE key IN (${KEEP_ON_RESTORE.map(() => "?").join(",")})`, ...KEEP_ON_RESTORE);
+      const kept = this.all(
+        `SELECT key,value FROM settings WHERE key IN (${KEEP_ON_RESTORE.map(() => "?").join(",")})`,
+        ...KEEP_ON_RESTORE,
+      );
       for (const t of [...TABLES].reverse()) this.run(`DELETE FROM ${t}`);
       for (const t of TABLES) {
         assert(
@@ -2119,8 +2658,12 @@ export class Business {
         }
       }
       // Lo que es de este teléfono (PIN, sesión, rol…) nunca lo decide el archivo.
-      this.run(`DELETE FROM settings WHERE key IN (${BACKUP_EXCLUDED.map(() => "?").join(",")})`, ...BACKUP_EXCLUDED);
-      for (const k of kept) this.run("INSERT OR REPLACE INTO settings VALUES(?,?)", k.key, k.value);
+      this.run(
+        `DELETE FROM settings WHERE key IN (${BACKUP_EXCLUDED.map(() => "?").join(",")})`,
+        ...BACKUP_EXCLUDED,
+      );
+      for (const k of kept)
+        this.run("INSERT OR REPLACE INTO settings VALUES(?,?)", k.key, k.value);
       assert(
         this.all("PRAGMA foreign_key_check").length === 0,
         "Referencias inválidas.",

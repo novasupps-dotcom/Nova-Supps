@@ -2,7 +2,8 @@ import * as LocalAuthentication from "expo-local-authentication";
 import React from "react";
 import { money, localDay } from "../business";
 import { fmtDay } from "../ui";
-import { Alert, Switch, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, Switch, View } from "react-native";
+import { Text, TextInput } from "../text";
 import { MercadoPago, type MpConfig } from "../mercadopago";
 import {
   TRANSFER_TEMPLATES,
@@ -10,7 +11,9 @@ import {
   validateTransfer,
   type TransferAccount,
 } from "../transfer";
-import { Button, C, Card, Chips, Note, Pill, followUpsDue, s } from "../ui";
+import { Button, C, Card, Chips, Icon, IconButton, Note, Pill, s } from "../ui";
+import { TILE } from "../theme";
+import type { Row } from "../business";
 import type { Body, OwnerPageContext } from "./ownerContext";
 
 export function renderPaymentSettings(ctx: OwnerPageContext): Body | null {
@@ -44,25 +47,18 @@ export function renderPaymentSettings(ctx: OwnerPageContext): Body | null {
     mpPdvSet,
     setMpPdvSet,
     startCharge,
+    teamData,
+    teamAction,
+    teamMsg,
+    getCloud,
   } = ctx;
   const d = data!;
   const {
-    products,
-    customers,
-    campaigns,
-    companies,
-    locations,
     accounts,
-    sales,
-    lots,
-    m,
   } = d;
-  const low = products.filter(
-    (p) => !p.archived && p.inventoryKnown && p.available <= p.minimum,
-  );
-  const soon = followUpsDue(customers);
   if (page === "Transferencias") {
     const list: TransferAccount[] = b!.setting("transferAccounts", []);
+    const sellers: Row[] = (teamData?.members || []).filter((m) => m.role === "seller");
     const save = (next: TransferAccount[]) => {
       b!.setSetting("transferAccounts", next);
       refresh();
@@ -87,68 +83,116 @@ export function renderPaymentSettings(ctx: OwnerPageContext): Body | null {
         />
       </View>
     );
+    const UseChip = ({ label, on, onPress, a11y }: { label: string; on: boolean; onPress: () => void; a11y?: string }) => (
+      <Pressable
+        accessibilityRole="switch"
+        accessibilityState={{ checked: on }}
+        accessibilityLabel={`${a11y || label}: ${on ? "sí" : "no"}`}
+        onPress={onPress}
+        style={({ pressed }) => [
+          s.chip,
+          { flexDirection: "row", alignItems: "center", gap: 6 },
+          on && { backgroundColor: C.ink },
+          pressed && { opacity: 0.7 },
+        ]}
+      >
+        {on && <Icon name="check" size={14} color="#fff" />}
+        <Text style={[s.chipText, on && s.chipTextOn]}>{label}</Text>
+      </Pressable>
+    );
     const missing = TRANSFER_TEMPLATES.filter(
       (t) => !list.some((a) => a.id === t.id),
     );
     return {
       scroll: (
         <>
-          <Note>
-            Captura aquí tus datos para que te paguen por transferencia.
-            Aparecen SOLO cuando eliges transferencia al vender (en tu teléfono
-            y en el de los vendedores a los que se los asignes en Equipo), con
-            un botón para mandárselos al cliente.
-          </Note>
-          {list.map((a) => (
-            <Card key={a.id}>
-              <View style={s.between}>
-                <Text style={[s.subtitle, { flex: 1 }]}>{`🏦 ${a.label}`}</Text>
-              </View>
-              <Note>{`Titular: ${a.holder}`}</Note>
-              {!!a.clabe && <Text style={s.body}>{`CLABE ${a.clabe}`}</Text>}
-              {!!a.account && (
-                <Text style={s.body}>{`Cuenta ${a.account}`}</Text>
-              )}
-              {!!a.card && <Text style={s.body}>{`Tarjeta ${a.card}`}</Text>}
-              {!!a.note && <Note>{a.note}</Note>}
-              <Note>{`Cuenta en la app: ${accounts.find((x) => x.id === a.accountId)?.name || "sin asignar"}`}</Note>
-              <View style={s.wrap}>
-                <Button
-                  title="Editar"
-                  secondary
-                  small
-                  onPress={() => (setTrErr(""), setTrEdit({ ...a }))}
-                />
-                <Button
-                  title="Eliminar"
-                  danger
-                  small
-                  onPress={() =>
-                    Alert.alert(
-                      "Eliminar datos",
-                      `¿Quitar los datos de ${a.label}? Tus vendedores dejarán de verlos.`,
-                      [
-                        { text: "Volver", style: "cancel" },
-                        {
-                          text: "Eliminar",
-                          style: "destructive",
-                          onPress: () =>
-                            save(list.filter((x) => x.id !== a.id)),
-                        },
-                      ],
-                    )
-                  }
-                />
-              </View>
-            </Card>
-          ))}
+          <Note>Cómo te pagan tus clientes. Edita o elimina cada cuenta y elige quién la usa: tú y cada vendedor.</Note>
+          {!!teamMsg && <Note color={teamMsg.tone === "bad" ? C.red : C.green}>{teamMsg.text}</Note>}
+          <Text style={s.section}>Cuentas para transferencia</Text>
+          {list.map((a) => {
+            const usedBy = (m: Row) =>
+              Array.isArray(m.transfer_ids) ? m.transfer_ids.includes(a.id) : true;
+            return (
+              <Card key={a.id}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                  <View style={[s.menuTile, { backgroundColor: a.id === "mercadopago" ? TILE.blue : TILE.green }]}>
+                    <Icon name="landmark" size={18} color="#fff" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.body, { fontWeight: "600", fontSize: 17 }]}>{a.label}</Text>
+                    <Text style={[s.muted, { fontSize: 13 }]}>{`Titular: ${a.holder}`}</Text>
+                  </View>
+                  <IconButton
+                    icon="pencil"
+                    label={`Editar ${a.label}`}
+                    bg={C.soft}
+                    onPress={() => (setTrErr(""), setTrEdit({ ...a }))}
+                  />
+                  <IconButton
+                    icon="trash-2"
+                    label={`Eliminar ${a.label}`}
+                    color={C.red}
+                    bg={C.redSoft}
+                    onPress={() =>
+                      Alert.alert(
+                        "Eliminar datos",
+                        `¿Quitar los datos de ${a.label}? Tus vendedores dejarán de verlos.`,
+                        [
+                          { text: "Volver", style: "cancel" },
+                          {
+                            text: "Eliminar",
+                            style: "destructive",
+                            onPress: () => save(list.filter((x) => x.id !== a.id)),
+                          },
+                        ],
+                      )
+                    }
+                  />
+                </View>
+                <View style={{ marginTop: 10, gap: 2 }}>
+                  {!!a.clabe && <Text style={s.body}>{`CLABE ${a.clabe.replace(/(\d{4})(?=\d)/g, "$1 ")}`}</Text>}
+                  {!!a.account && <Text style={s.body}>{`Cuenta ${a.account}`}</Text>}
+                  {!!a.card && <Text style={s.body}>{`Tarjeta ${a.card.replace(/(\d{4})(?=\d)/g, "$1 ")}`}</Text>}
+                  {!!a.note && <Note>{a.note}</Note>}
+                  <Text style={[s.muted, { fontSize: 13 }]}>
+                    {`Se registra en: ${accounts.find((x) => x.id === a.accountId)?.name || "sin asignar"}`}
+                  </Text>
+                </View>
+                <Text style={[s.label, { marginLeft: 0, marginTop: 12 }]}>Quién la usa</Text>
+                <View style={s.wrap}>
+                  <UseChip
+                    label="Tú"
+                    on={!a.ownerHidden}
+                    onPress={() =>
+                      save(list.map((x) => (x.id === a.id ? { ...x, ownerHidden: !x.ownerHidden } : x)))
+                    }
+                  />
+                  {sellers.map((m) => (
+                    <UseChip
+                      key={m.user_id}
+                      label={String(m.name)}
+                      on={usedBy(m)}
+                      onPress={() => {
+                        const ids: string[] = Array.isArray(m.transfer_ids) ? m.transfer_ids : list.map((x) => x.id);
+                        const next = usedBy(m) ? ids.filter((x) => x !== a.id) : [...ids, a.id];
+                        void teamAction(
+                          () => getCloud()!.update("members", `user_id=eq.${m.user_id}`, { transfer_ids: next }),
+                          `${m.name} ${usedBy(m) ? "ya no ve" : "ahora ve"} ${a.label}`,
+                        );
+                      }}
+                    />
+                  ))}
+                </View>
+              </Card>
+            );
+          })}
           {!list.length && !trEdit && (
             <Note color={C.amber}>
               Aún no capturas datos para transferencia.
             </Note>
           )}
           {trEdit ? (
-            <Card tone="ok">
+            <Card>
               <Text style={s.subtitle}>
                 {list.some((a) => a.id === trEdit.id)
                   ? `Editar ${trEdit.label || "cuenta"}`
@@ -264,9 +308,68 @@ export function renderPaymentSettings(ctx: OwnerPageContext): Body | null {
               />
             </View>
           )}
+          <Text style={s.section}>Formas de cobro al vender</Text>
+          <View style={[s.list, { paddingHorizontal: 16 }]}>
+            <View style={[s.cartRow, { flexWrap: "wrap" }, !sellers.length && { borderBottomWidth: 0 }]}>
+              <Text style={[s.body, { width: "100%", fontWeight: "500" }]}>Tú (dueño) · en tu carrito</Text>
+              {accounts.map((acc) => {
+                const hidden: string[] = b!.setting("hiddenPayAccounts", []) || [];
+                const on = !hidden.includes(acc.id);
+                const short = String(acc.name).split(" · ")[0];
+                const label = accounts.filter((x) => String(x.name).split(" · ")[0] === short).length > 1 ? String(acc.name) : short;
+                return (
+                  <UseChip
+                    key={acc.id}
+                    label={label}
+                    a11y={`Tu carrito · ${label}`}
+                    on={on}
+                    onPress={() => {
+                      const next = on ? [...hidden, acc.id] : hidden.filter((x) => x !== acc.id);
+                      if (accounts.every((x) => next.includes(x.id))) return notify("Deja al menos una forma de cobro en tu carrito.");
+                      b!.setSetting("hiddenPayAccounts", next);
+                      refresh();
+                      notify(on ? `${label} ya no aparece en tu carrito` : `${label} vuelve a tu carrito`);
+                    }}
+                  />
+                );
+              })}
+            </View>
+            {sellers.map((m, i) => {
+              const methods: string[] = Array.isArray(m.methods) ? m.methods : ["Tarjeta", "Efectivo", "Transferencia"];
+              return (
+                <View key={m.user_id} style={[s.cartRow, { flexWrap: "wrap" }, i === sellers.length - 1 && { borderBottomWidth: 0 }]}>
+                  <Text style={[s.body, { width: "100%", fontWeight: "500" }]}>{m.name}</Text>
+                  {(["Efectivo", "Tarjeta", "Transferencia"] as const).map((meth) => {
+                    const on = methods.includes(meth);
+                    return (
+                      <UseChip
+                        key={meth}
+                        label={meth === "Tarjeta" ? "Tarjeta (terminal)" : meth}
+                        on={on}
+                        onPress={() => {
+                          const next = on
+                            ? methods.filter((x) => x !== meth)
+                            : ["Tarjeta", "Efectivo", "Transferencia"].filter((x) => x === meth || methods.includes(x));
+                          if (!next.length) return notify("Deja al menos una forma de pago.");
+                          void teamAction(
+                            () => getCloud()!.update("members", `user_id=eq.${m.user_id}`, { methods: next }),
+                            `${m.name}: ${next.join(", ")}`,
+                          );
+                        }}
+                      />
+                    );
+                  })}
+                </View>
+              );
+            })}
+          </View>
           <Note>
-            Se publican a tu base en línea al guardar. Asigna a cada vendedor
-            cuáles ve en Parámetros → Vendedores.
+            {`Toca una forma para quitarla o ponerla al cobrar. Tus ventas y saldos anteriores no cambian. `}
+            {teamData
+              ? sellers.length
+                ? "Los cambios llegan a tus vendedores en cuanto se conectan."
+                : "Cuando tengas vendedores, aquí eliges con qué puede cobrar cada uno."
+              : "Conecta la base en línea (Ajustes → Vendedores) para elegir con qué cobra cada vendedor."}
           </Note>
         </>
       ),
@@ -326,13 +429,7 @@ export function renderPaymentSettings(ctx: OwnerPageContext): Body | null {
                 />
               </View>
             )}
-            <Note>
-              Con la terminal activa, al vender con una cuenta de tipo Tarjeta
-              la app manda el monto a tu Point Smart (modo Punto de Venta) y
-              registra la venta solo si Mercado Pago aprueba el pago. Si la
-              terminal está en modo normal, se cobra directo en ella y la app
-              busca el pago para ligarlo a la venta.
-            </Note>
+            <Note>Al cobrar con tarjeta, la app manda el monto a tu Point (modo Punto de Venta) y registra la venta cuando Mercado Pago lo aprueba. En modo normal, cobras en la terminal y la app liga el pago.</Note>
           </Card>
           {!!mpMsg && (
             <Card tone={mpMsg.tone}>
@@ -341,12 +438,7 @@ export function renderPaymentSettings(ctx: OwnerPageContext): Body | null {
           )}
           <Text style={s.section}>1 · Clave de acceso</Text>
           <Card>
-            <Note>
-              En Mercado Pago Developers abre tu aplicación → Credenciales de
-              producción → copia el Access Token (empieza con APP_USR). Se
-              guarda solo en este teléfono, no se incluye en los respaldos y
-              para cambiarla se pide tu huella.
-            </Note>
+            <Note>Mercado Pago Developers → tu aplicación → Credenciales de producción → Access Token (APP_USR…). Se guarda solo en este teléfono y no viaja en los respaldos.</Note>
             <View style={{ height: 8 }} />
             <TextInput
               accessibilityLabel="Access Token de Mercado Pago"
@@ -433,11 +525,7 @@ export function renderPaymentSettings(ctx: OwnerPageContext): Body | null {
           </Card>
           <Text style={s.section}>2 · Terminal</Text>
           <Card>
-            <Note>
-              Antes, vincula tu Point Smart a una sucursal y caja desde la app
-              de Mercado Pago (en la terminal: “Soy responsable del negocio” y
-              escanea el QR).
-            </Note>
+            <Note>Antes, vincula tu Point a una sucursal y caja desde la app de Mercado Pago.</Note>
             <Button
               title={mpBusy ? "Buscando…" : "Buscar mis terminales"}
               secondary
@@ -598,7 +686,7 @@ export function renderPaymentSettings(ctx: OwnerPageContext): Body | null {
                 style={[
                   s.cartRow,
                   {
-                    backgroundColor: "#fff",
+                    backgroundColor: C.paper,
                     paddingHorizontal: 12,
                     borderRadius: 10,
                     marginBottom: 6,

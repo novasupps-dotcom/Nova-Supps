@@ -36,11 +36,21 @@ Fecha: 12 de octubre de 2026. Versión de fuente: 2.2.0; Android versionCode 38.
 
 La exportación integrada de Hermes encontró una restricción de escritura en la carpeta temporal de Windows. Se comprobó la misma salida exportando el JavaScript y compilándolo con el ejecutable Hermes del SDK en el espacio de trabajo autorizado. Se generó un bundle de prueba; esto no constituye un APK instalable.
 
-## Pendiente para entregar el APK
+## APK 2.2 generado y firmado
 
-El usuario confirmó que aún no creó Expo ni Firebase. Falta `google-services.json`, el identificador de EAS y la URL real de actualizaciones. La comprobación `npm run android:config` señala esos tres requisitos. La clave FCM V1 debe configurarla el usuario con `eas credentials`.
+Expo y Firebase están configurados. El proyecto EAS es `832d4228-542d-4cee-a11a-cb304c1fda71`, cuenta `emmgamart`, paquete `com.novasupps.negocio`. La captura del usuario confirma la clave FCM V1 cargada y asignada al paquete. La comprobación local de configuración es correcta.
 
-Después: el usuario da Run al SQL en Supabase, compila en EAS, se refirma localmente el APK y se comprueban los avisos, cámara y cobro con la terminal en teléfonos reales. No se ejecutó SQL en producción ni se publicó una función. La función `cobro-terminal` conservó su código.
+El usuario confirmó que ejecutó el SQL 2.2 en Supabase. La compilación EAS `911f218c-e48e-4a62-8eff-782e47c468c2` terminó correctamente y generó Android 2.2.0 / 38. El APK se descargó y se firmó localmente con la llave original de Nova.
+
+- Archivo final: `Nova_Negocio_2.2_Android.apk`, 113839789 bytes.
+- SHA-256 del APK: `4bd644e5912880e3e0494fdce482a33d33c7a7411b7e3a1b8133660d52e2b9af`.
+- Certificado original confirmado y firmas v1, v2 y v3 verificadas.
+- Paquete, versión y código verificados directamente en el manifiesto.
+- Alineación de bibliotecas a 16 KB verificada después de firmar.
+
+En Windows, zipalign 36 falló al reescribir el APK. Como el archivo de EAS ya pasaba la comprobación de alineación, se conservó esa estructura y se verificó de nuevo al terminar. El script ahora comprueba la alineación antes de reescribir. La comprobación de firmas incluye el rango 23+ para verificar v1; el mínimo real de la app sigue siendo Android API 24.
+
+Pendiente en teléfonos: instalar encima de 2.1 y comprobar los avisos reales, cámara, fotografías y cobro con terminal. El agente no ejecutó SQL en producción ni publicó una función; `cobro-terminal` conservó su código.
 
 El APK 2.1 se conserva. Su SHA-256 corresponde al indicado en el documento original: `a5e944b96d42259a8f88809d19364b67c83ba81adc21454768820191a73d8189`. La huella del certificado extraído de ese APK es `3b71f02d1463b877e7f20dd3141e150e10e5c60e40c2198ba98dadd10207ae94`.
 

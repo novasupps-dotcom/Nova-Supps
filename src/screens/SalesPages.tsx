@@ -1,5 +1,7 @@
 import React from "react";
-import { Alert, Share, Text, View } from "react-native";
+import { STORE_NAME, TILE } from "../theme";
+import { Alert, Share, View } from "react-native";
+import { Text } from "../text";
 import { localDay, money, today, type Row } from "../business";
 import { cardLabel, terminalPayments } from "../receipt";
 import {
@@ -11,8 +13,9 @@ import {
   Note,
   Pill,
   fmtDay,
-  followUpsDue,
   s,
+  QuickActions,
+  MenuList,
 } from "../ui";
 import type { Body, OwnerPageContext } from "./ownerContext";
 import {
@@ -46,6 +49,8 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
     currentPeriod,
     setPeriod,
     excelCard,
+    excelOpen,
+    openExcel,
     byMethodCard,
     resultCard,
     line,
@@ -77,20 +82,10 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
   } = ctx;
   const d = data!;
   const {
-    products,
-    customers,
-    campaigns,
-    companies,
-    locations,
     accounts,
     sales,
-    lots,
     m,
   } = d;
-  const low = products.filter(
-    (p) => !p.archived && p.inventoryKnown && p.available <= p.minimum,
-  );
-  const soon = followUpsDue(customers);
   if (page === "Resumen de ventas") {
     const ps = b!.periodSummary(periodFrom(currentPeriod));
     const top = b!.all(
@@ -101,12 +96,13 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
         <>
           <View style={{ marginBottom: 10 }}>
             <Chips
+              row
               options={options(PERIODS)}
               value={currentPeriod}
               onChange={setPeriod}
             />
           </View>
-          {excelCard()}
+          {excelCard("Descargar Excel de ventas")}
           <Card>
             <Text style={s.subtitle}>Ventas totales</Text>
             <Text style={s.price}>{money(ps.revenue)}</Text>
@@ -142,11 +138,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
               bold: true,
               color: ps.profit >= 0 ? C.green : C.red,
             })}
-            <Note>
-              Las mermas (caducados, dañados, regalos o faltantes del conteo) se
-              valúan a su costo de compra. No mueven dinero, por eso no cambian
-              el Disponible, pero sí tu utilidad.
-            </Note>
+            <Note>Las mermas se valúan a su costo: no mueven dinero, pero sí bajan tu utilidad.</Note>
           </Card>
           {!!top.length && (
             <Card>
@@ -244,23 +236,25 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                 }
               />
             </View>
-            <Note>
-              {v.customer || "Público general"} · {fmtDay(saleDay(v))} ·{" "}
-              {v.channel}
-            </Note>
-            <Text style={s.price}>{money(v.total)}</Text>
-            <Text style={s.body}>
+            <Text style={[s.muted, { fontSize: 13 }]}>
+              {v.customer || "Público general"} · {fmtDay(saleDay(v))}
+              {v.channel && !/^sin canal/i.test(String(v.channel)) ? ` · ${v.channel}` : ""}
+            </Text>
+            <Text style={{ fontSize: 34, fontWeight: "700", color: C.ink, marginTop: 10, fontVariant: ["tabular-nums"] }}>
+              {money(v.total)}
+            </Text>
+            <Text style={s.muted}>
               Cobrado {money(v.paid)} · Saldo {money(balance)}
             </Text>
             {!!v.mpOrderId && (
-              <Note>🏧 Cobrado en terminal Mercado Pago · {v.mpOrderId}</Note>
+              <Note>Cobrado en terminal Mercado Pago · {v.mpOrderId}</Note>
             )}
             {!!v.seller && (
-              <Note>{`👤 Vendida por ${v.seller} desde su teléfono`}</Note>
+              <Note>{`Vendida por ${v.seller} desde su teléfono`}</Note>
             )}
             {!!v.revisions && (
               <Note>
-                ✏️ Modificada{" "}
+                Modificada{" "}
                 {v.revisions === 1 ? "1 vez" : `${v.revisions} veces`}{" "}
                 (devoluciones o cambios de productos).
               </Note>
@@ -272,49 +266,50 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
               </Note>
             )}
             {!!v.notes && <Note>{v.notes}</Note>}
-            {v.status === "confirmed" && (
+            {v.status === "confirmed" && balance > 0 && (
               <Button
-                title="📲 Enviar comprobante"
-                secondary
-                small
-                onPress={() => void sendReceipt(v)}
+                title="Abonar"
+                onPress={() =>
+                  open("Abono", {
+                    saleId: v.id,
+                    amount: amount(balance),
+                    accountId: cashAccount(),
+                  })
+                }
               />
             )}
-            {v.status === "confirmed" && (
-              <>
-                {balance > 0 && (
-                  <Button
-                    title="Abonar"
-                    onPress={() =>
-                      open("Abono", {
-                        saleId: v.id,
-                        amount: amount(balance),
-                        accountId: cashAccount(),
-                      })
-                    }
-                  />
-                )}
-                <Button
-                  title="↩️ Devolver productos / modificar venta"
-                  secondary
-                  small
-                  onPress={() => openRevise(v)}
-                />
-                <View style={s.row}>
-                  <View style={{ flex: 1 }}>
-                    <Button
-                      title="Editar seguimiento"
-                      secondary
-                      small
-                      onPress={() => open("Editar venta", strings(v))}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Button
-                      title="Cancelar venta"
-                      danger
-                      small
-                      onPress={() =>
+          </Card>
+          {v.status === "confirmed" && (
+            <MenuList
+              items={[
+                {
+                  key: "receipt",
+                  title: "Enviar comprobante",
+                  icon: "send",
+                  tint: TILE.blue,
+                  onPress: () => void sendReceipt(v),
+                },
+                {
+                  key: "revise",
+                  title: "Devolver productos / modificar venta",
+                  icon: "undo-2",
+                  tint: TILE.gold,
+                  onPress: () => openRevise(v),
+                },
+                {
+                  key: "follow",
+                  title: "Editar seguimiento",
+                  icon: "pencil",
+                  tint: TILE.graphite,
+                  onPress: () => open("Editar venta", strings(v)),
+                },
+                {
+                  key: "cancel",
+                  title: "Cancelar venta",
+                  icon: "x",
+                  tint: TILE.red,
+                  danger: true,
+                  onPress: () =>
                         v.mpOrderId && mpCfg
                           ? Alert.alert(
                               "Cancelar y devolver",
@@ -396,37 +391,34 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                                     ),
                                 },
                               ],
-                            )
-                      }
-                    />
-                  </View>
-                </View>
-              </>
-            )}
-            {v.status === "cancelled" && (
-              <>
-                <Button
-                  title="🗑 Eliminar venta cancelada"
-                  danger
-                  small
-                  onPress={() => confirmDeleteSale(v, back)}
-                />
-                <Note>
-                  Si fue una venta de prueba o un error, elimínala para que no
-                  aparezca en ningún reporte.
-                </Note>
-              </>
-            )}
-          </Card>
+                            ),
+                },
+              ]}
+            />
+          )}
+          {v.status === "cancelled" && (
+            <Card>
+              <Button
+                icon="trash-2" title="Eliminar venta cancelada"
+                danger
+                small
+                onPress={() => confirmDeleteSale(v, back)}
+              />
+              <Note>
+                Si fue una venta de prueba o un error, elimínala para que no
+                aparezca en ningún reporte.
+              </Note>
+            </Card>
+          )}
           <Card>
             <Text style={s.subtitle}>Desglose de productos</Text>
             {v.lines.map((l: Row) => (
               <View
                 key={l.id}
                 style={{
-                  paddingVertical: 8,
-                  borderBottomWidth: 1,
-                  borderBottomColor: C.line,
+                  paddingVertical: 10,
+                  borderBottomWidth: 0.5,
+                  borderBottomColor: C.inputLine,
                 }}
               >
                 <Text style={s.body}>
@@ -485,7 +477,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                 }}
               >
                 <Text style={[s.body, { fontWeight: "700" }]}>
-                  🏧 {x.kind === "abono" ? "Abono" : "Cobro"} en terminal
+                  {x.kind === "abono" ? "Abono" : "Cobro"} en terminal
                   {x.amount || x.card?.amount
                     ? ` · ${money(x.card?.amount || x.amount)}`
                     : ""}
@@ -506,7 +498,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                 )}
                 <View style={s.wrap}>
                   <Button
-                    title="📲 Comprobante de tarjeta"
+                    icon="send" title="Comprobante de tarjeta"
                     small
                     onPress={() => void sendCardReceipt(v!, x)}
                   />
@@ -559,16 +551,16 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
     const payOptions = [
       { id: "Todos", name: "Todos los cobros" },
       ...(accounts.some((a) => a.kind === "Efectivo" && used.has(a.id))
-        ? [{ id: "Efectivo", name: "💵 Efectivo" }]
+        ? [{ id: "Efectivo", name: "Efectivo" }]
         : []),
       ...accounts
         .filter(
           (a) =>
             (a.kind === "Banco" || a.kind === "Billetera") && used.has(a.id),
         )
-        .map((a) => ({ id: "acct:" + a.id, name: `🏦 ${a.name}` })),
+        .map((a) => ({ id: "acct:" + a.id, name: `${a.name}` })),
       ...(accounts.some((a) => a.kind === "Tarjeta" && used.has(a.id))
-        ? [{ id: "Tarjeta", name: "🏧 Terminal (tarjeta)" }]
+        ? [{ id: "Tarjeta", name: "Terminal (tarjeta)" }]
         : []),
     ];
     const payFilter = payOptions.some((o) => o.id === filters.VentasPago)
@@ -609,42 +601,41 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
             {(() => {
               const ps = d.todaySales;
               return (
-                <Card>
-                  <Text style={s.label}>Vendido hoy</Text>
-                  <Text style={s.price}>{money(ps.revenue)}</Text>
-                  <Note>{`${ps.orders} ${ps.orders === 1 ? "venta" : "ventas"}${m.receivable > 0 ? ` · por cobrar ${money(m.receivable)}` : ""}`}</Note>
-                  <View style={s.wrap}>
-                    <Button
-                      title="🧮 Corte de caja"
-                      secondary
-                      small
-                      onPress={() => go("Corte de caja")}
-                    />
-                    <Button
-                      title="📊 Resumen"
-                      secondary
-                      small
-                      onPress={() => go("Resumen de ventas")}
-                    />
-                    <Button
-                      title="＋ Gasto"
-                      secondary
-                      small
-                      onPress={() =>
-                        open("Movimiento", {
-                          kind: "expense",
-                          accountId: cashAccount(),
-                        })
-                      }
-                    />
-                  </View>
-                  {excelCard()}
-                </Card>
+                <>
+                  <Card>
+                    <Text style={[s.label, { marginLeft: 0, marginTop: 0 }]}>Vendido hoy</Text>
+                    <Text style={{ fontSize: 36, fontWeight: "700", color: C.ink, fontVariant: ["tabular-nums"] }}>
+                      {money(ps.revenue)}
+                    </Text>
+                    <Text style={s.muted}>
+                      {`${ps.orders} ${ps.orders === 1 ? "venta" : "ventas"}`}
+                      {m.receivable > 0 ? ` · Por cobrar ${money(m.receivable)}` : ""}
+                    </Text>
+                  </Card>
+                  <QuickActions
+                    items={[
+                      { label: "Corte de caja", icon: "calculator", onPress: () => go("Corte de caja") },
+                      { label: "Resumen", icon: "chart-column", onPress: () => go("Resumen de ventas") },
+                      {
+                        label: "Nuevo gasto",
+                        icon: "receipt-text",
+                        onPress: () =>
+                          open("Movimiento", {
+                            kind: "expense",
+                            accountId: cashAccount(),
+                          }),
+                      },
+                      { label: "Excel", icon: "download", onPress: openExcel },
+                    ]}
+                  />
+                  {excelOpen && excelCard()}
+                </>
               );
             })()}
             {searchBox("Buscar cliente o folio")}
-            <View style={{ marginBottom: 10 }}>
+            <View style={{ marginBottom: 6 }}>
               <Chips
+                row
                 options={[
                   { id: "Activas", name: "Activas" },
                   { id: "Hoy", name: "Hoy" },
@@ -660,8 +651,8 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
             </View>
             {payOptions.length > 2 && (
               <View style={{ marginBottom: 10 }}>
-                <Text style={s.label}>Forma de cobro</Text>
                 <Chips
+                  row
                   options={payOptions}
                   value={payFilter}
                   onChange={(v) =>
@@ -678,7 +669,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                 </Note>
                 {list.length > 0 && (
                   <Button
-                    title={`🗑 Eliminar ${list.length === 1 ? "la venta cancelada" : `las ${list.length} ventas canceladas`}`}
+                    icon="trash-2" title={`Eliminar ${list.length === 1 ? "la venta cancelada" : `las ${list.length} ventas canceladas`}`}
                     danger
                     small
                     onPress={() => confirmDeleteAllCancelled(list)}
@@ -690,7 +681,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                 {list.length} {list.length === 1 ? "venta" : "ventas"} ·{" "}
                 {money(totalShown)}
                 {payFilter !== "Todos"
-                  ? ` · cobrado por ${payOptions.find((o) => o.id === payFilter)?.name.replace(/^\S+\s/, "") || ""}: ${money(collectedShown)}`
+                  ? ` · cobrado por ${payOptions.find((o) => o.id === payFilter)?.name || ""}: ${money(collectedShown)}`
                   : ""}
                 {cancelled.length
                   ? ` · ${cancelled.length} ${cancelled.length === 1 ? "cancelada oculta" : "canceladas ocultas"}`
@@ -711,18 +702,19 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
               }}
             >
               <View style={s.between}>
-                <Text style={[s.subtitle, { flex: 1 }]} numberOfLines={1}>
+                <Text style={[s.body, { flex: 1, fontWeight: "600", fontSize: 17 }]} numberOfLines={1}>
                   {v.customer || "Público general"}
                 </Text>
-                <Text style={s.price}>{money(v.total)}</Text>
+                <Text style={[s.price, { fontSize: 18, marginVertical: 0 }]}>{money(v.total)}</Text>
               </View>
-              <View style={[s.between, { gap: 8 }]}>
+              <View style={[s.between, { gap: 8, marginTop: 4 }]}>
                 <View style={{ flex: 1 }}>
-                  <Note>
+                  <Text style={[s.muted, { fontSize: 13 }]} numberOfLines={1}>
                     {v.folio || v.id.slice(-8).toUpperCase()} ·{" "}
-                    {fmtDay(saleDay(v))} · {v.channel}
+                    {fmtDay(saleDay(v))}
+                    {v.channel && !/^sin canal/i.test(String(v.channel)) ? ` · ${v.channel}` : ""}
                     {v.seller ? ` · ${v.seller}` : ""}
-                  </Note>
+                  </Text>
                 </View>
                 <Pill
                   text={
@@ -741,13 +733,10 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                   }
                 />
               </View>
-              {lines.slice(0, 3).map((l, i) => (
-                <Text key={i} style={s.body} numberOfLines={1}>
-                  {l.qty} × {l.name}
+              {lines.length > 0 && (
+                <Text style={[s.muted, { marginTop: 6 }]} numberOfLines={2}>
+                  {lines.map((l) => `${l.qty} × ${l.name}`).join(" · ")}
                 </Text>
-              ))}
-              {lines.length > 3 && (
-                <Note>y {lines.length - 3} productos más</Note>
               )}
               {v.status === "confirmed" && balance > 0 && (
                 <Button
@@ -764,7 +753,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
               )}
               {v.status === "cancelled" && (
                 <Button
-                  title="🗑 Eliminar"
+                  icon="trash-2" title="Eliminar"
                   danger
                   small
                   onPress={() => confirmDeleteSale(v)}
@@ -810,7 +799,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
     );
     const result = ps.netSales - ps.expenses;
     const shareText = [
-      `*Corte de caja · GNS Nova Negocio*`,
+      `*Corte de caja · ${STORE_NAME}*`,
       fmtDay(day),
       "",
       `Ventas: ${ps.orders} · ${money(ps.revenue)}`,
@@ -893,7 +882,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
             })}
           </Card>
           <Card tone="warn">
-            <Text style={s.subtitle}>💵 Efectivo</Text>
+            <Text style={s.subtitle}>Efectivo</Text>
             {line("Caja al abrir el día", money(cash.opening))}
             {line("＋ Ventas cobradas en efectivo", money(cash.sales))}
             {!!cash.expenses &&
@@ -915,11 +904,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
             {line("Caja esperada al cierre", money(cash.closing), {
               bold: true,
             })}
-            <Note>
-              Las aportaciones, retiros y traspasos se muestran aparte: no son
-              ventas. Cuenta el dinero y compáralo con la caja esperada; si no
-              cuadra, registra la diferencia en Cuentas.
-            </Note>
+            <Note>Aportaciones, retiros y traspasos van aparte: no son ventas. Si el efectivo no cuadra, registra la diferencia en Cuentas.</Note>
           </Card>
           {!!items.length && (
             <Card>
@@ -928,13 +913,13 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
             </Card>
           )}
           <Button
-            title="📤 Compartir corte"
+            icon="share-2" title="Compartir corte"
             onPress={() =>
               void Share.share({ message: shareText }).catch(() => {})
             }
           />
           <Button
-            title="💾 Guardar respaldo del día"
+            icon="hard-drive" title="Guardar respaldo del día"
             secondary
             onPress={exportBackup}
           />

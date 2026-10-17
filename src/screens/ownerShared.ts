@@ -1,7 +1,9 @@
 import { localDay, money, type Row } from "../business";
 import { type Outcome, type TerminalPayment } from "../mercadopago";
+import type { IconName } from "../icons";
+import { TILE } from "../theme";
 
-export const VERSION = "2.2.0";
+export const VERSION = "2.5.2";
 export const HOME = "Vender";
 
 export const PAGES = [
@@ -14,13 +16,8 @@ export const PAGES = [
   "Transferencias",
   "Equipo",
   "Catálogo",
-  "Campañas",
-  "Compañías",
-  "Ubicaciones",
   "Lotes",
   "Cuentas",
-  "Paquetes",
-  "Oportunidades",
   "Datos importados",
   "Respaldo",
   "Detalle producto",
@@ -34,17 +31,31 @@ export const PAGES = [
   "Catálogo para clientes",
 ];
 
-export const TABS = [
-  { name: "Vender", icon: "🛒" },
-  { name: "Ventas", icon: "🧾" },
-  { name: "Clientes", icon: "👥" },
-  { name: "Stock", icon: "📦" },
-  { name: "Parámetros", icon: "⚙️" },
+/** 2.3: cuatro pestañas; Ajustes (página "Parámetros") se abre con el engrane de arriba. */
+export const TABS: { name: string; icon: IconName }[] = [
+  { name: "Vender", icon: "shopping-bag" },
+  { name: "Ventas", icon: "receipt" },
+  { name: "Clientes", icon: "users" },
+  { name: "Stock", icon: "package" },
 ];
+/** Nombre visible de cada página (la clave interna no cambia para no perder sesiones guardadas). */
+export const pageTitle = (page: string) =>
+  page === "Parámetros"
+    ? "Ajustes"
+    : page === "Control Operativo"
+      ? "Gastos operativos"
+      : page === "Catálogo"
+        ? "Stock"
+        : page === "Equipo"
+          ? "Vendedores"
+          : page === "Transferencias"
+            ? "Formas de pago"
+            : page;
 
 export type MenuItem = {
   page: string;
-  icon: string;
+  icon: IconName;
+  tint: string;
   title: string;
   desc: string;
 };
@@ -55,21 +66,24 @@ export const SETTINGS_MENU: { section: string; items: MenuItem[] }[] = [
     items: [
       {
         page: "Terminal Mercado Pago",
-        icon: "🏧",
+        icon: "credit-card",
+        tint: TILE.red,
         title: "Terminal Mercado Pago",
         desc: "Cobra con tu Point desde la app",
       },
       {
         page: "Cobros",
-        icon: "💰",
+        icon: "banknote",
+        tint: TILE.green,
         title: "Tabla de cobros",
-        desc: "Pagos, abonos y devoluciones por fecha",
+        desc: "Pagos, abonos y devoluciones",
       },
       {
         page: "Transferencias",
-        icon: "🏦",
-        title: "Datos para transferencia",
-        desc: "Para mandarlos al cliente y a tus vendedores",
+        icon: "landmark",
+        tint: TILE.blue,
+        title: "Formas de pago",
+        desc: "Cuentas, efectivo y tarjeta; quién usa cada una",
       },
     ],
   },
@@ -78,21 +92,24 @@ export const SETTINGS_MENU: { section: string; items: MenuItem[] }[] = [
     items: [
       {
         page: "Promociones",
-        icon: "🏷️",
+        icon: "tag",
+        tint: TILE.red,
         title: "Promociones",
         desc: "2x1, por volumen o % de descuento",
       },
       {
         page: "Reportes",
-        icon: "📊",
+        icon: "chart-column",
+        tint: TILE.gold,
         title: "Reportes",
         desc: "Por producto y por vendedor",
       },
       {
         page: "Catálogo para clientes",
-        icon: "📒",
+        icon: "book-open",
+        tint: TILE.blue,
         title: "Catálogo para clientes",
-        desc: "PDF o mensaje de WhatsApp con tus precios",
+        desc: "PDF o WhatsApp con tus precios",
       },
     ],
   },
@@ -101,7 +118,8 @@ export const SETTINGS_MENU: { section: string; items: MenuItem[] }[] = [
     items: [
       {
         page: "Equipo",
-        icon: "👥",
+        icon: "users",
+        tint: TILE.graphite,
         title: "Vendedores",
         desc: "Invitar, formas de pago y sincronizar",
       },
@@ -112,7 +130,8 @@ export const SETTINGS_MENU: { section: string; items: MenuItem[] }[] = [
     items: [
       {
         page: "Respaldo",
-        icon: "💾",
+        icon: "hard-drive",
+        tint: TILE.graphite,
         title: "Respaldo y Excel",
         desc: "Copia de tus datos y Excel de ventas",
       },
@@ -123,55 +142,29 @@ export const SETTINGS_MENU: { section: string; items: MenuItem[] }[] = [
 export const ADVANCED_MENU: MenuItem[] = [
   {
     page: "Lotes",
-    icon: "🏷️",
+    icon: "layers",
+    tint: TILE.gold,
     title: "Lotes y caducidades",
-    desc: "Costos, caducidad y ubicación de cada lote",
-  },
-  {
-    page: "Paquetes",
-    icon: "🎁",
-    title: "Paquetes",
-    desc: "Combos que descuentan cada producto",
+    desc: "Costos y caducidad de cada lote",
   },
   {
     page: "Cuentas",
-    icon: "💳",
+    icon: "wallet",
+    tint: TILE.green,
     title: "Cuentas y movimientos",
     desc: "Saldos, aportaciones y traspasos",
   },
   {
     page: "Control Operativo",
-    icon: "📉",
+    icon: "receipt-text",
+    tint: TILE.red,
     title: "Gastos operativos",
     desc: "Terminal, publicidad y demás gastos",
   },
   {
-    page: "Campañas",
-    icon: "📣",
-    title: "Campañas",
-    desc: "Venta atribuida, gasto y ROAS",
-  },
-  {
-    page: "Oportunidades",
-    icon: "💡",
-    title: "Oportunidades",
-    desc: "Reposición y seguimientos",
-  },
-  {
-    page: "Compañías",
-    icon: "🏢",
-    title: "Compañías",
-    desc: "Proveedores, socios y empresas",
-  },
-  {
-    page: "Ubicaciones",
-    icon: "📍",
-    title: "Ubicaciones",
-    desc: "Tiendas, almacenes y puntos de entrega",
-  },
-  {
     page: "Datos importados",
-    icon: "📥",
+    icon: "file-spreadsheet",
+    tint: TILE.graphite,
     title: "Datos importados",
     desc: "Carga inicial desde Excel",
   },

@@ -3,12 +3,13 @@
 // ahora". Sin PIN propio: la seguridad de las cuentas la dan los códigos que
 // genera el dueño y la cuenta ligada a cada teléfono.
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
-import { Image, ScrollView, Text, View } from "react-native";
+import { Image, ScrollView, View } from "react-native";
+import { Text } from "./text";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as LocalAuthentication from "expo-local-authentication";
 import type { Business } from "./business";
-import { LOGO_HEADER, LOGO_HEADER_RATIO } from "./brand";
-import { s, Button, Note } from "./ui";
+import { LOGO_FULL, LOGO_FULL_RATIO } from "./brand";
+import { s, Button, Icon, C } from "./ui";
 
 type LockApi = { lockNow: () => void; bioAvailable: boolean; bioEnabled: boolean; setBio: (on: boolean) => Promise<boolean> };
 const LockCtx = createContext<LockApi>({ lockNow() {}, bioAvailable: false, bioEnabled: false, setBio: async () => false });
@@ -80,10 +81,10 @@ export function LockGate({ b, children }: { b: Business; role?: "owner" | "selle
   return (
     <SafeAreaView style={s.safe}>
       <ScrollView automaticallyAdjustKeyboardInsets contentContainerStyle={[s.content, { flexGrow: 1, justifyContent: "center" }]}>
-        <Image source={LOGO_HEADER} accessibilityLabel="GNS · Nova Negocio" resizeMode="contain" style={{ width: 280, height: 280 / LOGO_HEADER_RATIO, marginBottom: 28 }} />
-        <Text style={{ fontSize: 30, marginBottom: 8 }}>🔒</Text>
-        <Text style={s.title}>Nova Negocio está protegido</Text>
-        {!!msg && <Note>{msg}</Note>}
+        <Image source={LOGO_FULL} accessibilityLabel="GGG · Nova Supps" resizeMode="contain" style={{ width: 220, height: 220 / LOGO_FULL_RATIO, marginBottom: 30, alignSelf: "center" }} />
+        <Icon name="lock" size={28} color={C.muted} style={{ marginBottom: 10, alignSelf: "center" }} />
+        <Text style={[s.title, { textAlign: "center" }]}>Nova Negocio está protegido</Text>
+        {!!msg && <Text style={[s.muted, { textAlign: "center" }]}>{msg}</Text>}
         <View style={{ height: 16 }} />
         {state === "locked" && <Button title="Desbloquear con huella o rostro" onPress={() => void unlock()} />}
       </ScrollView>

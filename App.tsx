@@ -1,26 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  AppState,
-  BackHandler,
-  FlatList,
-  Image,
-  KeyboardAvoidingView,
-  Linking,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  Switch,
-  Share,
-  Text,
-  TextInput,
-  Vibration,
-  View,
-  useWindowDimensions,
-} from "react-native";
+import { STORE_NAME } from "./src/theme";
+import { canLoadFonts, fontsReady, loadFonts } from "./src/fonts";
+import { ActivityIndicator, Alert, AppState, BackHandler, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StatusBar, Switch, Share, Vibration, View, useWindowDimensions } from "react-native";
+import { Text, TextInput } from "./src/text";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import * as SQLite from "expo-sqlite";
 import * as FS from "expo-file-system/legacy";
@@ -56,13 +38,15 @@ import { pickPhotoAndroid } from "./src/androidPhoto";
 import { secureStore } from "./src/secure";
 import { canScan } from "./src/native";
 import { CameraScanner } from "./src/scanner";
+import { findProductByCode, normalizeProductCode } from "./src/barcodes";
+import { InventoryCodeForm } from "./src/screens/InventoryCodeForm";
 import {
   autoRegisterPush,
   setupNotifications,
   scheduleFollowUps,
+  notifyOwnerSale,
   detachPush,
 } from "./src/push";
-import { PushCard } from "./src/screens/PushCard";
 import { UpdateNotice } from "./src/screens/UpdateNotice";
 import {
   Cloud,
@@ -75,8 +59,6 @@ import { storeCloud } from "./src/storeConfig";
 import { deviceId } from "./src/device";
 import {
   syncOwner,
-  NEEDS_SCHEMA_21,
-  SCHEMA_21_NOTE,
   type RemoteSale,
   type SyncResult,
 } from "./src/sync";
@@ -84,9 +66,6 @@ import { SellerApp } from "./src/seller";
 import { LoginScreen, loginHere, type LoginResult } from "./src/login";
 import {
   TransferInfo,
-  TRANSFER_TEMPLATES,
-  cleanTransfer,
-  validateTransfer,
   type TransferAccount,
 } from "./src/transfer";
 import {
@@ -95,16 +74,12 @@ import {
   cardFromOrder,
   cardFromPayment,
   mergeCard,
-  cardLabel,
   terminalPayments,
   whatsappNumber,
   validWhatsapp,
 } from "./src/receipt";
 import { LockGate, useLock } from "./src/lock";
-import { PromotionsPage } from "./src/screens/Promotions";
-import { ReportsPage } from "./src/screens/Reports";
-import { CustomerCatalogPage } from "./src/screens/CustomerCatalog";
-import { CloudBackupCard, when } from "./src/screens/CloudBackup";
+import { when } from "./src/screens/CloudBackup";
 import {
   backupDue,
   downloadBackup,
@@ -113,7 +88,7 @@ import {
   type CloudBackup,
 } from "./src/cloudBackup";
 import { catalogueImages } from "./src/catalogueImages";
-import { LOGO_HEADER, LOGO_HEADER_RATIO } from "./src/brand";
+import { LOGO_FULL, LOGO_FULL_RATIO, LOGO_HEADER, LOGO_HEADER_RATIO } from "./src/brand";
 import {
   salesWorkbook,
   EXPORT_PERIODS,
@@ -131,7 +106,6 @@ import {
   manualOrder,
   terminalPaymentLabel,
   type MpConfig,
-  type Outcome,
   type TerminalPayment,
 } from "./src/mercadopago";
 import {
@@ -150,13 +124,19 @@ import {
   DateField,
   QUICK_FOLLOWUP,
   QUICK_EXPIRY,
-  QUICK_CAMPAIGN,
   fmtDay,
-  daysBetween,
   tryCents,
   followUpsDue,
   followUpLabel,
   FOLLOW_UP_DAYS,
+  AppHeader,
+  TabBar,
+  Icon,
+  IconButton,
+  TextButton,
+  BottomDock,
+  PayOptions,
+  Stepper,
 } from "./src/ui";
 
 import { VERSION } from "./src/screens/ownerShared";
@@ -164,11 +144,8 @@ import {
   HOME,
   PAGES,
   TABS,
-  type MenuItem,
-  SETTINGS_MENU,
-  ADVANCED_MENU,
+  pageTitle,
   channels,
-  PERIODS,
   normalize,
   amount,
   strings,
@@ -176,7 +153,6 @@ import {
   minus,
   units,
   periodFrom,
-  saleDay,
   type Cart,
   type Draft,
   type SaleDraft,
@@ -203,9 +179,6 @@ function load(b: Business) {
   return {
     products,
     customers: b.customers(),
-    campaigns: b.campaigns(),
-    companies: b.companies(),
-    locations: b.locations(),
     accounts: b.accounts(),
     sales,
     lots: b.lots(),
@@ -548,14 +521,12 @@ function AppContent({ business }: { business?: Business }) {
     if (!b) return;
     const schedule = () =>
       void scheduleFollowUps(
-        b
-          .customers()
-          .map((c) => ({
-            id: String(c.id),
-            name: String(c.name),
-            nextDate: c.nextDate,
-            archived: c.archived,
-          })),
+        b.customers().map((c) => ({
+          id: String(c.id),
+          name: String(c.name),
+          nextDate: c.nextDate,
+          archived: c.archived,
+        })),
         new Date(),
         !b.setting("pushOff", false),
       );
@@ -575,6 +546,7 @@ function AppContent({ business }: { business?: Business }) {
       },
       () => void syncRef.current(),
       () => !b.setting("pushOff", false),
+      b,
     );
   }, [b]);
   useEffect(() => {
@@ -601,7 +573,7 @@ function AppContent({ business }: { business?: Business }) {
           .map((c) => `• ${c.name}: ${followUpLabel(c.daysLeft, c.nextDate)}`);
         if (list.length > 8) lines.push(`…y ${list.length - 8} más`);
         Alert.alert(
-          `🔔 ${list.length === 1 ? "Seguimiento próximo" : `${list.length} seguimientos próximos`}`,
+          `${list.length === 1 ? "Seguimiento próximo" : `${list.length} seguimientos próximos`}`,
           `En los próximos ${FOLLOW_UP_DAYS} días (o vencidos):\n\n${lines.join("\n")}`,
           [
             { text: "Después", style: "cancel" },
@@ -652,7 +624,8 @@ function AppContent({ business }: { business?: Business }) {
     setNewInvite(null);
     setSellerCuts(null);
     setExcel(null);
-    if (page === "Equipo" && b && !locked) void loadTeam();
+    if ((page === "Equipo" || page === "Transferencias") && b && !locked)
+      void loadTeam();
   }, [page, locked]);
   // Después de un cambio (venta, entrada, precio) se publican las existencias.
   useEffect(() => {
@@ -800,10 +773,10 @@ function AppContent({ business }: { business?: Business }) {
       paid,
       d.f.accountId || null,
       d.f.customerId || null,
-      d.f.campaignId || null,
+      null,
       d.f.channel,
       d.allow,
-      d.f.locationId || null,
+      null,
       commission ? { amount: commission, bps } : null,
       lineInfo,
     ];
@@ -815,8 +788,10 @@ function AppContent({ business }: { business?: Business }) {
   ) {
     let msg = "";
     let saleId = "";
+    let noticeTotal = 0;
     b!.transaction(() => {
       const x = saleArgs(d);
+      noticeTotal = x.price;
       const id = b!.sell(...x.args);
       saleId = id;
       b!.updateSaleDetails(id, { ...d.f, channel: d.f.channel });
@@ -846,6 +821,12 @@ function AppContent({ business }: { business?: Business }) {
         setTimeout(() => (setBasket([]), setBasketF({})), 0);
       }
     });
+    const account = data?.accounts.find((a) => a.id === d.f.accountId);
+    void notifyOwnerSale(b!, {
+      id: saleId,
+      total: noticeTotal,
+      method: account?.kind || d.f.channel,
+    }).catch(() => {});
     return { msg, saleId };
   }
   /** Guarda en la venta el cobro hecho en la terminal y concilia su comisión real. */
@@ -965,9 +946,15 @@ function AppContent({ business }: { business?: Business }) {
     try {
       await ensureOwnerBound(cloud);
       const previousPush = JSON.stringify(b.setting("pushToken", null));
-      void autoRegisterPush(b, cloud).then(state => {
-        if (state === "ok" && previousPush !== JSON.stringify(b.setting("pushToken", null))) refresh();
-      }).catch(() => {});
+      void autoRegisterPush(b, cloud)
+        .then((state) => {
+          if (
+            state === "ok" &&
+            previousPush !== JSON.stringify(b.setting("pushToken", null))
+          )
+            refresh();
+        })
+        .catch(() => {});
       const sellerTerminal = !!(
         b.setting("sellerTerminal", false) && mpCfg?.terminalId
       );
@@ -995,6 +982,13 @@ function AppContent({ business }: { business?: Business }) {
             }
           : undefined,
         onApplied: (saleId: string, row: RemoteSale) => {
+          void notifyOwnerSale(b, {
+            id: row.id,
+            total: Number((row as Row).client_total ?? row.total),
+            seller: row.seller_name,
+            method: row.method,
+            remote: true,
+          }).catch(() => {});
           if (row.mp?.orderId && mpCfg)
             try {
               const e = terminalPayments(b.saleDetail(saleId))[0];
@@ -1201,7 +1195,7 @@ function AppContent({ business }: { business?: Business }) {
     }, `Código creado para ${name}.`);
   }
   const inviteMessage = (code: string, name: string, expires: string) =>
-    `Hola ${name}, para vender con GNS Nova Negocio:\n1. Instala la app (te paso el archivo APK).\n2. Ábrela y elige «Soy vendedor».\n3. Escribe tu código de invitación: *${formatShortCode(code)}*\n4. Pon tu nombre, tu correo y una contraseña, y toca «Crear mi cuenta».\nEl código es solo para ti, sirve una vez y vence el ${fmtDay(localDay(expires))}.`;
+    `Hola ${name}, para vender con ${STORE_NAME}:\n1. Instala la app (te paso el archivo APK).\n2. Ábrela y elige «Soy vendedor».\n3. Escribe tu código de invitación: *${formatShortCode(code)}*\n4. Pon tu nombre, tu correo y una contraseña, y toca «Crear mi cuenta».\nEl código es solo para ti, sirve una vez y vence el ${fmtDay(localDay(expires))}.`;
   const shareInvite = (code: string, name: string, expires: string) =>
     void Share.share({ message: inviteMessage(code, name, expires) }).catch(
       () => {},
@@ -1327,7 +1321,7 @@ function AppContent({ business }: { business?: Business }) {
           abono,
           outcome: "notpdv",
           since: new Date().toISOString(),
-          text: `La terminal elegida ya no aparece en tu cuenta de Mercado Pago. Revisa Parámetros → Terminal Mercado Pago, o ${what} sin terminal.`,
+          text: `La terminal elegida ya no aparece en tu cuenta de Mercado Pago. Revisa Ajustes → Terminal Mercado Pago, o ${what} sin terminal.`,
         });
       if (t.operating_mode !== "PDV")
         return setPay({
@@ -1580,23 +1574,28 @@ function AppContent({ business }: { business?: Business }) {
   const defaults: Record<string, Record<string, string>> = {
     Producto: { minimum: "1" },
     Cliente: { stage: "Prospecto" },
-    Campaña: { channel: "Instagram", status: "Borrador" },
-    Compañía: { kind: "Mi negocio" },
-    Ubicación: { kind: "Tienda" },
     Venta: { channel: "Mostrador", qty: "1" },
     Entrada: { mode: "Inventario inicial", label: "Entrada", qty: "1" },
     Cuenta: { kind: "Efectivo" },
     Movimiento: { kind: "expense" },
-    Paquete: { qty: "1" },
     "Ajuste de inventario": { reason: "Conteo físico" },
   };
   const cashAccount = () =>
     data?.accounts.find((a) => a.kind === "Efectivo")?.id || "";
+  /** 2.5.1 · Formas de cobro que el dueño quitó de su carrito (Ajustes → Formas de pago). */
+  const hiddenPay = (): string[] =>
+    (b?.setting("hiddenPayAccounts", []) as string[]) || [];
+  /** Cuenta que se elige sola al cobrar: efectivo si está a la vista; si no, la primera visible. */
+  const saleDefaultAccount = () => {
+    const shown = (data?.accounts || []).filter((a) => !hiddenPay().includes(a.id));
+    return (shown.find((a) => a.kind === "Efectivo") || shown[0])?.id || cashAccount();
+  };
   function open(
     name: string,
     values: Record<string, string> = {},
     nestedField?: string,
   ) {
+    setBarcodeScanner(false);
     if (nestedField)
       setStack((prev) => [
         ...prev,
@@ -1606,7 +1605,7 @@ function AppContent({ business }: { business?: Business }) {
     setF({
       ...defaults[name],
       ...(name === "Venta" && !values.accountId
-        ? { accountId: cashAccount() }
+        ? { accountId: saleDefaultAccount() }
         : {}),
       ...values,
     });
@@ -1618,12 +1617,12 @@ function AppContent({ business }: { business?: Business }) {
     setForm(name);
     setSelector(null);
   }
-  /** Ajusta las piezas a lo disponible (paquetes, carrito guardado de otro día). */
-  function fitItems(items: Cart, locationId: string | null) {
+  /** Ajusta las piezas a lo disponible (carrito guardado de otro día). */
+  function fitItems(items: Cart) {
     const short: string[] = [];
     const fitted = items
       .map((i) => {
-        const limit = cartLimit(i.productId, "Venta", locationId);
+        const limit = cartLimit(i.productId, "Venta");
         if (i.qty > limit)
           short.push(
             `${productName(i.productId)}: ${limit ? `solo ${units(limit)}` : "sin existencias"}`,
@@ -1650,7 +1649,7 @@ function AppContent({ business }: { business?: Business }) {
       return false;
     }
     setBasket((old) => addTo(old, productId, qty));
-    if (!quiet) notify(`🛒 ${productName(productId)} en el carrito`);
+    if (!quiet) notify(`${productName(productId)} en el carrito`);
     return true;
   }
   function removeFromBasket(productId: string) {
@@ -1668,10 +1667,7 @@ function AppContent({ business }: { business?: Business }) {
   function openCheckout() {
     checkoutFromBasket.current = true;
     open("Venta", basketF);
-    const { fitted, short } = fitItems(
-      basketRef.current,
-      basketF.locationId || null,
-    );
+    const { fitted, short } = fitItems(basketRef.current);
     setCart(fitted);
     if (short.length)
       setFormError(
@@ -1701,11 +1697,11 @@ function AppContent({ business }: { business?: Business }) {
     go("Vender");
   }
   const openSale = (values: Record<string, string> = {}, items: Cart = []) => {
-    // Paquete: se cobra directo a su precio (no pasa por el carrito).
+    // Con total fijo: se cobra directo a ese precio (no pasa por el carrito).
     if (items.length && values.total) {
       checkoutFromBasket.current = false;
       open("Venta", values);
-      const { fitted, short } = fitItems(items, values.locationId || null);
+      const { fitted, short } = fitItems(items);
       setCart(fitted);
       if (short.length)
         setFormError(
@@ -1723,6 +1719,7 @@ function AppContent({ business }: { business?: Business }) {
     else go("Vender");
   };
   function close(id?: string) {
+    setBarcodeScanner(false);
     setSelector(null);
     setFormError("");
     if (stack.length) {
@@ -1737,7 +1734,7 @@ function AppContent({ business }: { business?: Business }) {
         !!id &&
         last.field === "cartAdd" &&
         (!["Venta", "Modificar venta"].includes(last.form) ||
-          (b?.sellable(id, last.f.locationId || null) ?? 0) >= 1);
+          (b?.sellable(id) ?? 0) >= 1);
       const restoredCart = canAdd ? addTo(last.cart, id!, 1) : last.cart;
       if (id && last.field === "cartAdd" && !canAdd)
         setTimeout(
@@ -1845,32 +1842,19 @@ function AppContent({ business }: { business?: Business }) {
   /**
    * Máximo de unidades que se pueden poner en el carrito: lo disponible en
    * inventario. Al modificar una venta se suman las unidades que ya tiene esa
-   * venta (regresarían al inventario). Los paquetes no tienen límite.
+   * venta (regresarían al inventario).
    */
-  // Cálculos de existencias por pantalla: una consulta por ubicación/venta, no una por producto.
+  // Cálculos de existencias por pantalla: una consulta por venta, no una por producto.
   const limitCache = new Map<string, Map<string, number>>();
   const cached = (key: string, make: () => Map<string, number>) => {
     let m = limitCache.get(key);
     if (!m) limitCache.set(key, (m = make()));
     return m;
   };
-  function cartLimit(
-    productId: string,
-    mode = form,
-    location?: string | null,
-  ): number {
+  function cartLimit(productId: string, mode = form): number {
     if (mode !== "Venta" && mode !== "Modificar venta")
       return Number.POSITIVE_INFINITY;
-    const loc = location !== undefined ? location : f.locationId || null;
-    // Con ubicación elegida, solo cuenta lo que hay en esa ubicación (igual que al cobrar).
-    let limit = Math.max(
-      0,
-      loc && b
-        ? (cached("loc:" + loc, () => b.sellableByProduct(loc)).get(
-            productId,
-          ) ?? 0)
-        : (productById.get(productId)?.available ?? 0),
-    );
+    let limit = Math.max(0, productById.get(productId)?.available ?? 0);
     if (mode === "Modificar venta" && f.saleId && b)
       limit +=
         cached(
@@ -2101,7 +2085,6 @@ function AppContent({ business }: { business?: Business }) {
     // La foto guardada no se copia al borrador: así el borrador no pesa ~1 MB por tecla.
     open("Producto", {
       ...strings(rest),
-      ...strings(b!.relation("product", p.id)),
       price: amount(p.price),
       ...(imageUri ? { hasPhoto: "1" } : {}),
     });
@@ -2126,14 +2109,13 @@ function AppContent({ business }: { business?: Business }) {
       (v.lines as Row[]).map((l) => ({ productId: l.productId, qty: l.qty })),
     );
   };
-  const editCampaign = (c: Row) =>
-    open("Campaña", { ...strings(c), budget: amount(c.budget || 0) });
   const searchBox = (placeholder: string) => (
     <SearchBox value={query} onChange={setQuery} placeholder={placeholder} />
   );
   const filterChips = (key: string, list: string[]) => (
     <View style={{ marginBottom: 10 }}>
       <Chips
+        row
         options={options(list)}
         value={filters[key] || list[0]}
         onChange={(v) => setFilters((old) => ({ ...old, [key]: v }))}
@@ -2144,7 +2126,7 @@ function AppContent({ business }: { business?: Business }) {
     const n = basket.find((i) => i.productId === p.id)?.qty ?? 0;
     return (
       <Button
-        title={n ? `🛒 En el carrito: ${n} · ＋1` : "🛒 Al carrito"}
+        icon="shopping-cart" title={n ? `En el carrito: ${n} · ＋1` : "Al carrito"}
         small
         disabled={p.available < 1 || n >= p.available}
         onPress={() => addToBasket(p.id)}
@@ -2169,7 +2151,7 @@ function AppContent({ business }: { business?: Business }) {
             s.body,
             { flex: 1 },
             opts.indent && { paddingLeft: 14, color: C.muted },
-            opts.bold && { fontWeight: "800" },
+            opts.bold && { fontWeight: "600" },
           ]}
         >
           {label}
@@ -2177,13 +2159,13 @@ function AppContent({ business }: { business?: Business }) {
         <Text
           style={[
             s.body,
-            { fontWeight: opts.bold ? "800" : "600" },
+            { fontWeight: opts.bold ? "700" : "500" },
             opts.color ? { color: opts.color } : null,
           ]}
         >
           {value}
-          {opts.onPress ? "  ›" : ""}
         </Text>
+        {!!opts.onPress && <Icon name="chevron-right" size={16} color={C.faint} />}
       </>
     );
     return opts.onPress ? (
@@ -2206,17 +2188,14 @@ function AppContent({ business }: { business?: Business }) {
   );
   const feePct = feeLabel(data?.feeBps);
   /** Ventas netas = suma de las formas de pago; solo tarjeta descuenta su comisión. */
-  const excelCard = () =>
+  const excelCard = (label = "Excel") =>
     excel ? (
-      <Card tone="ok">
-        <Text style={s.subtitle}>📥 Excel de ventas</Text>
-        <Note>
-          Cada venta con sus productos, cómo se cobró, montos, si generó
-          comisión de tarjeta (y cuánto), neto, costo y utilidad; más hojas de
-          productos vendidos, cobros y un resumen.
-        </Note>
+      <Card>
+        <Text style={s.subtitle}>Excel de ventas</Text>
+        <Note>Ventas, productos, cobros, comisiones y utilidad del periodo.</Note>
         <View style={{ height: 6 }} />
         <Chips
+          row
           options={options([...EXPORT_PERIODS])}
           value={excel.period}
           onChange={(v) => setExcel({ period: v as ExportPeriod, busy: false })}
@@ -2233,7 +2212,8 @@ function AppContent({ business }: { business?: Business }) {
       </Card>
     ) : (
       <Button
-        title="📥 Descargar Excel de ventas"
+        icon="download"
+        title={label}
         secondary
         small
         onPress={() => setExcel({ period: "Este mes", busy: false })}
@@ -2272,10 +2252,7 @@ function AppContent({ business }: { business?: Business }) {
           money(ps.commissions),
           { indent: true },
         )}
-      <Note>
-        Tus clientes absorben la comisión con cualquier forma de pago. Mercado
-        Pago descuenta la suya solo en cobros con tarjeta.
-      </Note>
+      <Note>El cliente absorbe la comisión con cualquier forma de pago; Mercado Pago solo cobra la suya con tarjeta.</Note>
     </Card>
   );
   /** Disponible = ventas netas (la comisión ya se descontó solo de tarjeta) − gastos operativos. */
@@ -2379,6 +2356,8 @@ function AppContent({ business }: { business?: Business }) {
       currentPeriod,
       setPeriod,
       excelCard,
+      excelOpen: !!excel,
+    openExcel: () => setExcel({ period: "Este mes", busy: false }),
       byMethodCard,
       resultCard,
       line,
@@ -2421,7 +2400,6 @@ function AppContent({ business }: { business?: Business }) {
       confirmDeleteAllCancelled,
       setSaleDetailId,
       openSale,
-      editCampaign,
       corteDay,
       setCorteDay,
       revision,
@@ -2533,12 +2511,12 @@ function AppContent({ business }: { business?: Business }) {
           ]}
         >
           <Image
-            source={LOGO_HEADER}
-            accessibilityLabel="GNS · Nova Negocio"
+            source={LOGO_FULL}
+            accessibilityLabel="GGG · Nova Supps"
             resizeMode="contain"
             style={{
-              width: 280,
-              height: 280 / LOGO_HEADER_RATIO,
+              width: 240,
+              height: 240 / LOGO_FULL_RATIO,
               marginBottom: 18,
             }}
           />
@@ -2549,8 +2527,7 @@ function AppContent({ business }: { business?: Business }) {
   if (!data) return <SafeAreaView style={s.safe} />;
 
   // ---------- Formularios ----------
-  const { products, customers, campaigns, companies, locations, accounts } =
-    data;
+  const { products, customers, accounts } = data;
   const val = (k: string) => f[k] ?? "";
   const set = (k: string, v: string) => setF((prev) => ({ ...prev, [k]: v }));
   const field = (
@@ -2570,6 +2547,16 @@ function AppContent({ business }: { business?: Business }) {
         ]}
         value={val(key)}
         onChangeText={(v) => set(key, v)}
+        onSubmitEditing={
+          ["barcode", "sku"].includes(key) && form === "Producto"
+            ? () => {
+                if (val(key).trim())
+                  open("Inventario por código", { barcode: val(key) });
+              }
+            : undefined
+        }
+        submitBehavior={["barcode", "sku"].includes(key) ? "submit" : undefined}
+        autoCorrect={!["barcode", "sku"].includes(key)}
         keyboardType={
           numeric
             ? "decimal-pad"
@@ -2580,7 +2567,7 @@ function AppContent({ business }: { business?: Business }) {
                 : "default"
         }
         placeholder={placeholder}
-        placeholderTextColor="#879188"
+        placeholderTextColor={C.muted}
         multiline={multiline}
         autoCapitalize={
           ["email", "sku", "code", "barcode"].includes(key)
@@ -2603,7 +2590,7 @@ function AppContent({ business }: { business?: Business }) {
           onChangeText={(v) => set(key, v)}
           keyboardType="decimal-pad"
           placeholder={placeholder}
-          placeholderTextColor="#879188"
+          placeholderTextColor={C.muted}
         />
         {!!raw && (
           <Note color={parsed === null ? C.red : C.muted}>
@@ -2623,24 +2610,35 @@ function AppContent({ business }: { business?: Business }) {
     create?: string,
   ) => (
     <View key={key} style={s.field}>
-      <Text style={s.label}>{label}</Text>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={label}
-        style={[s.input, s.between]}
+        style={({ pressed }) => [
+          s.input,
+          s.between,
+          { borderColor: C.paper },
+          pressed && { backgroundColor: C.soft },
+        ]}
         onPress={() => {
           setSearch("");
           setSelector({ key, label, rows, optional, create });
         }}
       >
+        <Text style={{ color: C.ink, fontSize: 16 }}>{label.replace(/ \*$/, "")}</Text>
         <Text
-          style={{ color: val(key) ? C.ink : C.muted, fontSize: 16, flex: 1 }}
+          style={{
+            color: val(key) ? C.ink : C.muted,
+            fontSize: 16,
+            flex: 1,
+            textAlign: "right",
+            fontWeight: val(key) ? "500" : "400",
+          }}
           numberOfLines={1}
         >
           {rows.find((r) => r.id === val(key))?.name ||
-            (optional ? "Sin asignar" : "Seleccionar…")}
+            (optional ? "Sin asignar" : "Seleccionar")}
         </Text>
-        <Text style={{ color: C.muted }}>▾</Text>
+        <Icon name="chevron-right" size={18} color={C.faint} />
       </Pressable>
     </View>
   );
@@ -2660,14 +2658,25 @@ function AppContent({ business }: { business?: Business }) {
       />
     </View>
   );
-  const accountField = (key: string, label: string) =>
-    accounts.length <= 6
-      ? chips(
-          key,
-          label,
-          accounts.map((a) => ({ id: a.id, name: a.name })),
-        )
-      : choose(key, label, accounts, false, "Cuenta");
+  const accountField = (key: string, label: string, list: Row[] = accounts) =>
+    list.length <= 6 ? (
+      <View key={key} style={s.field}>
+        <Text style={s.label}>{label}</Text>
+        <PayOptions
+          options={list.map((a) => ({ id: a.id, name: a.name, kind: a.kind }))}
+          value={val(key)}
+          onChange={(v) => set(key, v)}
+        />
+      </View>
+    ) : (
+      choose(key, label, list, false, "Cuenta")
+    );
+  // 2.5.1: en el cobro solo las formas que el dueño dejó en su carrito (y la ya elegida, si la hay).
+  const saleAccounts = (() => {
+    const hidden = hiddenPay();
+    const shown = accounts.filter((a) => !hidden.includes(a.id) || a.id === val("accountId"));
+    return shown.length ? shown : accounts;
+  })();
   const dateField = (
     key: string,
     label: string,
@@ -2681,38 +2690,19 @@ function AppContent({ business }: { business?: Business }) {
       quick={quick}
     />
   );
-  const relation = () => (
-    <>
-      {choose("companyId", "Compañía", companies, true, "Compañía")}
-      {choose(
-        "locationId",
-        "Ubicación",
-        locations.filter(
-          (l) =>
-            !val("companyId") ||
-            !l.companyId ||
-            l.companyId === val("companyId"),
-        ),
-        true,
-        "Ubicación",
-      )}
-      {(form === "Venta" || form === "Modificar venta") &&
-        !!val("locationId") && (
-          <Note color={C.amber}>
-            Con ubicación elegida solo se venden piezas de lotes asignados a esa
-            ubicación; las “disponibles” de arriba ya cuentan solo esas. Déjala
-            vacía para vender de todo tu inventario.
-          </Note>
-        )}
-    </>
-  );
   const more = () => (
-    <Button
-      title={advanced ? "− Menos detalles" : "＋ Más detalles (opcional)"}
-      secondary
-      small
+    <Pressable
+      accessibilityRole="button"
       onPress={() => setAdvanced(!advanced)}
-    />
+      style={({ pressed }) => [
+        { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 12 },
+        pressed && { opacity: 0.6 },
+      ]}
+    >
+      <Text style={{ color: C.brand, fontSize: 15, fontWeight: "500" }}>
+        {advanced ? "− Menos detalles" : "＋ Más detalles (opcional)"}
+      </Text>
+    </Pressable>
   );
   const listTotal = cart.reduce(
     (n, i) =>
@@ -2760,7 +2750,6 @@ function AppContent({ business }: { business?: Business }) {
             ...strings(c),
             id: c.id,
             phone: val("phone").trim(),
-            ...strings(b!.relation("customer", c.id)),
           });
       }
       await Linking.openURL(
@@ -2927,6 +2916,22 @@ function AppContent({ business }: { business?: Business }) {
     try {
       switch (form) {
         case "Producto": {
+          // Si otra operación vinculó el código mientras se preparaba el alta, se reutiliza la ficha.
+          const existing = !val("id")
+            ? findProductByCode(b.stock(), val("barcode")) ||
+              findProductByCode(b.stock(), val("sku"))
+            : null;
+          if (existing && val("scanOrigin") === "1") {
+            setBusy(false);
+            saveBusy.current = false;
+            open("Inventario por código", {
+              barcode: val("barcode") || val("sku"),
+            });
+            notify(
+              "Este producto ya existe. Se cargó su ficha con el precio registrado.",
+            );
+            return;
+          }
           assert(val("name").trim(), "Escribe el nombre del producto.");
           assert(val("price").trim(), "Escribe el precio de venta.");
           assert(
@@ -2960,16 +2965,6 @@ function AppContent({ business }: { business?: Business }) {
           saved = b.saveCustomer(f);
           done = val("id") ? "Cliente actualizado" : "Cliente creado";
           break;
-        case "Campaña":
-          saved = b.saveCampaign({ ...f, budget: cents(val("budget") || "0") });
-          done = "Campaña guardada";
-          break;
-        case "Compañía":
-          saved = b.saveCompany(f);
-          break;
-        case "Ubicación":
-          saved = b.saveLocation(f);
-          break;
         case "Cuenta":
           saved = b.addAccount(
             val("name"),
@@ -2979,36 +2974,55 @@ function AppContent({ business }: { business?: Business }) {
           done = "Cuenta creada";
           break;
         case "Entrada": {
+          assert(val("productId"), "Selecciona el producto.");
+          if (val("scanProductId")) {
+            assert(
+              val("productId") === val("scanProductId"),
+              "Esta entrada corresponde al producto escaneado. Vuelve a leer el código para elegir otro.",
+            );
+            assert(
+              b
+                .stock()
+                .some(
+                  (product) =>
+                    product.id === val("scanProductId") && !product.archived,
+                ),
+              "El producto ya no está disponible para recibir stock. Vuelve a abrir su ficha.",
+            );
+          }
+          assert(
+            val("cost").trim(),
+            "Indica el costo unitario; escribe 0 si fue sin costo.",
+          );
           const qty = Number(val("qty"));
           assert(
             Number.isSafeInteger(qty) && qty > 0,
             "La cantidad debe ser un número entero mayor que cero.",
           );
-          b.receiveAt(
-            val("productId"),
-            val("label") || "Entrada",
-            val("expires"),
-            qty,
-            cents(val("cost")),
-            val("mode") === "Compra pagada"
-              ? val("accountId") || "required"
-              : null,
-            val("locationId") || null,
-          );
+          b.transaction(() => {
+            if (val("barcode"))
+              b.linkProductCode(val("productId"), val("barcode"));
+            b.receive(
+              val("productId"),
+              val("label") || "Entrada",
+              val("expires"),
+              qty,
+              cents(val("cost")),
+              val("mode") === "Compra pagada"
+                ? val("accountId") || "required"
+                : null,
+            );
+          });
           done = `Entrada registrada · ${units(qty)}`;
           break;
         }
-        case "Asignar ubicación":
-          b.assignLot(val("lotId"), val("locationId"));
-          done = "Ubicación asignada";
-          break;
         case "Movimiento":
           b.movement(
             val("kind"),
             val("accountId"),
             cents(val("amount")),
             val("note"),
-            val("campaignId") || null,
+            null,
             val("toId"),
           );
           done = "Movimiento registrado";
@@ -3069,10 +3083,6 @@ function AppContent({ business }: { business?: Business }) {
               : "Venta modificada";
           break;
         }
-        case "Paquete":
-          b.addBundle(val("name"), cents(val("price")), cart);
-          done = "Paquete creado";
-          break;
         case "Ajuste de inventario": {
           const counted = Number(val("counted"));
           assert(val("productId"), "Elige el producto.");
@@ -3141,29 +3151,18 @@ function AppContent({ business }: { business?: Business }) {
   const cartEditor = (
     <>
       {form === "Venta" && checkoutFromBasket.current ? (
-        <>
+        <View style={[s.between, { marginBottom: 6, paddingHorizontal: 4 }]}>
           <Text
-            style={s.subtitle}
-          >{`🛒 Tu carrito · ${cart.reduce((n, i) => n + i.qty, 0)} ${cart.reduce((n, i) => n + i.qty, 0) === 1 ? "pieza" : "piezas"}`}</Text>
-          <View style={s.wrap}>
-            <Button
-              title="＋ Agregar más"
-              secondary
-              small
-              onPress={keepShopping}
-            />
-            <Button
-              title="🗑 Vaciar carrito"
-              secondary
-              small
-              onPress={emptyBasket}
-            />
-          </View>
-        </>
+            style={[s.subtitle, { marginBottom: 0 }]}
+          >{`Tu carrito · ${cart.reduce((n, i) => n + i.qty, 0)} ${cart.reduce((n, i) => n + i.qty, 0) === 1 ? "pieza" : "piezas"}`}</Text>
+          <TextButton title="＋ Agregar más" bold onPress={keepShopping} />
+        </View>
       ) : (
         <>
           <Text style={s.subtitle}>Productos</Text>
           <ProductGrid
+            lookupStore={b}
+            onUnknownCode={(code) => open("Producto", { barcode: code }, "cartAdd")}
             products={
               (form === "Venta" &&
               !cart.some((i) => productById.get(i.productId)?.archived)
@@ -3200,68 +3199,63 @@ function AppContent({ business }: { business?: Business }) {
           )}
         </>
       )}
-      {cart.map((i) => {
-        const p = products.find((x) => x.id === i.productId);
-        const limit = cartLimit(i.productId);
-        const atMax = i.qty >= limit;
-        return (
-          <View key={i.productId} style={s.cartRow}>
-            {!!p && (
-              <ProductPhoto product={p} style={{ width: 44, height: 56 }} />
-            )}
-            <View style={{ flex: 1 }}>
-              <Text style={s.body} numberOfLines={2}>
-                {p?.name}
-              </Text>
-              <Note>
-                {((unit) =>
-                  `${i.qty} × ${money(unit)} = ${money(unit * i.qty)}`)(
-                  form === "Venta"
-                    ? grossUp(p?.price || 0, data.feeBps)
-                    : p?.price || 0,
+      {!!cart.length && (
+        <View style={[s.list, { paddingHorizontal: 16 }]}>
+          {cart.map((i, idx) => {
+            const p = products.find((x) => x.id === i.productId);
+            const limit = cartLimit(i.productId);
+            const atMax = i.qty >= limit;
+            const unit =
+              form === "Venta"
+                ? grossUp(p?.price || 0, data.feeBps)
+                : p?.price || 0;
+            return (
+              <View
+                key={i.productId}
+                style={[s.cartRow, idx === cart.length - 1 && { borderBottomWidth: 0 }]}
+              >
+                {!!p && (
+                  <ProductPhoto product={p} style={{ width: 48, height: 58 }} />
                 )}
-              </Note>
-              {Number.isFinite(limit) && (
-                <Note color={i.qty > limit ? C.red : atMax ? C.amber : C.muted}>
-                  {i.qty > limit
-                    ? limit
-                      ? `Solo hay ${units(limit)}: quita ${i.qty - limit}`
-                      : "Sin existencias: quítalo de la venta"
-                    : atMax
-                      ? `Máximo disponible (${limit})`
-                      : `${limit} ${limit === 1 ? "disponible" : "disponibles"}`}
-                </Note>
-              )}
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Quitar una"
-              style={s.stepper}
-              onPress={() =>
-                i.qty > 1
-                  ? changeQty(i.productId, -1)
-                  : setCart((old) =>
-                      old.filter((x) => x.productId !== i.productId),
-                    )
-              }
-            >
-              <Text style={s.subtitle}>{i.qty > 1 ? "−" : "✕"}</Text>
-            </Pressable>
-            <Text style={[s.subtitle, { minWidth: 26, textAlign: "center" }]}>
-              {i.qty}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Agregar una"
-              accessibilityState={{ disabled: atMax }}
-              style={[s.stepper, atMax && { opacity: 0.35 }]}
-              onPress={() => changeQty(i.productId, 1)}
-            >
-              <Text style={s.subtitle}>＋</Text>
-            </Pressable>
-          </View>
-        );
-      })}
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.body, { fontWeight: "500" }]} numberOfLines={2}>
+                    {p?.name}
+                  </Text>
+                  <Note>{`${i.qty} × ${money(unit)} = ${money(unit * i.qty)}`}</Note>
+                  {Number.isFinite(limit) && (
+                    <Note color={i.qty > limit ? C.red : atMax ? C.amber : C.muted}>
+                      {i.qty > limit
+                        ? limit
+                          ? `Solo hay ${units(limit)}: quita ${i.qty - limit}`
+                          : "Sin existencias: quítalo de la venta"
+                        : atMax
+                          ? `Máximo disponible (${limit})`
+                          : `${limit} ${limit === 1 ? "disponible" : "disponibles"}`}
+                    </Note>
+                  )}
+                </View>
+                <Stepper
+                  qty={i.qty}
+                  plusDisabled={atMax}
+                  onMinus={() =>
+                    i.qty > 1
+                      ? changeQty(i.productId, -1)
+                      : setCart((old) =>
+                          old.filter((x) => x.productId !== i.productId),
+                        )
+                  }
+                  onPlus={() => changeQty(i.productId, 1)}
+                />
+              </View>
+            );
+          })}
+        </View>
+      )}
+      {form === "Venta" && checkoutFromBasket.current && !!cart.length && (
+        <View style={{ alignItems: "center", marginTop: -4, marginBottom: 4 }}>
+          <TextButton title="Vaciar carrito" color={C.red} onPress={emptyBasket} />
+        </View>
+      )}
       {!cart.length && (
         <Note>
           {form === "Modificar venta"
@@ -3363,7 +3357,7 @@ function AppContent({ business }: { business?: Business }) {
           )}
         {pay.outcome === "notpdv" && (pay.draft || pay.abono) && (
           <Button
-            title="✅ Ya cobré en la terminal · buscar el pago"
+            icon="circle-check" title="Ya cobré en la terminal · buscar el pago"
             onPress={() => void findManualPayment()}
           />
         )}
@@ -3448,7 +3442,7 @@ function AppContent({ business }: { business?: Business }) {
           )}
         {pay.outcome === "done" && !!pay.saleId && (
           <Button
-            title="📲 Enviar comprobante por WhatsApp"
+            icon="send" title="Enviar comprobante por WhatsApp"
             onPress={() => {
               const v = b!.saleDetail(pay.saleId!);
               const entry = terminalPayments(v).find(
@@ -3492,6 +3486,18 @@ function AppContent({ business }: { business?: Business }) {
     !showBasket &&
     ["Ventas", "Stock", "Catálogo", "Clientes"].includes(page);
   const isTabRoot = TABS.some((t) => t.name === page);
+  const tabOf = (p: string) =>
+    TABS.some((t) => t.name === p)
+      ? p
+      : ["Catálogo", "Detalle producto", "Lotes"].includes(p)
+        ? "Stock"
+        : ["Detalle venta", "Corte de caja", "Resumen de ventas", "Cobros"].includes(p)
+          ? "Ventas"
+          : "";
+  const activeTab =
+    tabOf(page) ||
+    [...history].reverse().map(tabOf).find(Boolean) ||
+    "";
 
   return (
     <SafeAreaView style={s.safe} edges={["top", "left", "right"]}>
@@ -3507,54 +3513,41 @@ function AppContent({ business }: { business?: Business }) {
         }
         beforeRestart={flushSession}
       />
-      <View style={s.header}>
-        {page === HOME ? (
-          <>
-            <View style={{ flex: 1 }}>
-              <Image
-                source={LOGO_HEADER}
-                accessibilityLabel="GNS · Nova Negocio"
-                resizeMode="contain"
-                style={{
-                  height: 40,
-                  width: 40 * LOGO_HEADER_RATIO,
-                  maxWidth: "100%",
-                }}
-              />
-            </View>
-            <View style={s.badge}>
-              <Text style={s.badgeText}>● Local</Text>
-            </View>
-          </>
-        ) : (
-          <>
-            {!isTabRoot && (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Volver"
-                onPress={back}
-                style={s.backBtn}
-                hitSlop={8}
-              >
-                <Text style={{ fontSize: 26, color: C.ink, lineHeight: 28 }}>
-                  ‹
-                </Text>
-                <Text style={{ color: C.ink, fontWeight: "700", fontSize: 15 }}>
-                  {" "}
-                  Volver
-                </Text>
-              </Pressable>
-            )}
-            <Text style={s.headerTitle} numberOfLines={1}>
-              {page === "Control Operativo"
-                ? "Gastos operativos"
-                : page === "Catálogo"
-                  ? "Stock"
-                  : page}
-            </Text>
-          </>
-        )}
-      </View>
+      <AppHeader
+        title={pageTitle(page)}
+        large={isTabRoot}
+        center={
+          page === HOME ? (
+            <Image
+              source={LOGO_HEADER}
+              accessibilityLabel="GGG · Nova Supps"
+              resizeMode="contain"
+              style={{
+                height: 40,
+                width: 40 * LOGO_HEADER_RATIO,
+                maxWidth: "100%",
+              }}
+            />
+          ) : undefined
+        }
+        back={
+          isTabRoot
+            ? undefined
+            : {
+                label: pageTitle(history[history.length - 1] || HOME),
+                onPress: back,
+              }
+        }
+        right={
+          isTabRoot ? (
+            <IconButton
+              icon="settings"
+              label="Ajustes"
+              onPress={() => go("Parámetros")}
+            />
+          ) : undefined
+        }
+      />
       <View style={{ flex: 1 }}>
         {listBody ? (
           <FlatList
@@ -3580,14 +3573,31 @@ function AppContent({ business }: { business?: Business }) {
             {body && "scroll" in body ? body.scroll : null}
           </ScrollView>
         )}
+      </View>
+      <BottomDock>
+        {toast && (
+          <View
+            key={toast.key}
+            style={[
+              s.toast,
+              { flexDirection: "row", gap: 10, alignItems: "center" },
+              toast.bad && { backgroundColor: C.red },
+            ]}
+            pointerEvents="none"
+          >
+            <Icon name={toast.bad ? "triangle-alert" : "circle-check"} size={20} color="#fff" />
+            <Text style={[s.toastText, { flex: 1 }]}>{toast.text}</Text>
+          </View>
+        )}
         {showFab && (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Nueva venta"
             onPress={() => openSale()}
-            style={[s.fab, { bottom: 16 }]}
+            style={({ pressed }) => [s.fab, pressed && { opacity: 0.85 }]}
           >
-            <Text style={s.fabText}>＋ Venta</Text>
+            <Icon name="plus" size={20} color="#fff" />
+            <Text style={s.fabText}>Venta</Text>
           </Pressable>
         )}
         {showBasket && (
@@ -3595,81 +3605,31 @@ function AppContent({ business }: { business?: Business }) {
             accessibilityRole="button"
             accessibilityLabel="Abrir carrito"
             onPress={openCheckout}
-            style={s.cartBar}
+            style={({ pressed }) => [s.cartBar, { flexDirection: "row", gap: 12 }, pressed && { opacity: 0.9 }]}
           >
-            <Text
-              style={s.cartBarText}
-            >{`🛒 Carrito · ${basketPieces} ${basketPieces === 1 ? "pieza" : "piezas"} · ${money(basketTotal)} · Cobrar ›`}</Text>
+            <Icon name="shopping-cart" size={20} color="#fff" />
+            <Text style={[s.cartBarText, { flex: 1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+              {`Carrito · ${basketPieces} ${basketPieces === 1 ? "pieza" : "piezas"}`}
+            </Text>
+            <Text style={[s.cartBarText, { fontWeight: "700" }]} numberOfLines={1}>{money(basketTotal)}</Text>
+            <View style={{ backgroundColor: C.brand, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 }}>
+              <Text style={[s.cartBarText, { fontSize: 14 }]}>Cobrar</Text>
+            </View>
           </Pressable>
         )}
-        {toast && (
-          <View
-            key={toast.key}
-            style={[
-              s.toast,
-              { bottom: showFab || showBasket ? 84 : 16 },
-              toast.bad && { backgroundColor: C.red },
-            ]}
-            pointerEvents="none"
-          >
-            <Text style={s.toastText}>
-              {toast.bad ? "⚠ " : "✓ "}
-              {toast.text}
-            </Text>
-          </View>
-        )}
-      </View>
-      <SafeAreaView edges={["bottom"]} style={s.nav}>
-        <View style={s.navRow}>
-          {TABS.map((t) => {
-            const on =
-              page === t.name ||
-              (t.name === "Stock" &&
-                ["Catálogo", "Detalle producto", "Lotes"].includes(page)) ||
-              (t.name === "Ventas" &&
-                [
-                  "Detalle venta",
-                  "Corte de caja",
-                  "Resumen de ventas",
-                  "Cobros",
-                ].includes(page)) ||
-              (t.name === "Parámetros" &&
-                ![
-                  ...TABS.map((x) => x.name),
-                  "Catálogo",
-                  "Detalle producto",
-                  "Lotes",
-                  "Detalle venta",
-                  "Corte de caja",
-                  "Resumen de ventas",
-                  "Cobros",
-                ].includes(page));
-            return (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected: on }}
-                key={t.name}
-                style={[s.navItem, on && s.navOn]}
-                onPress={() => (
-                  setFilters((old) => ({
-                    ...old,
-                    [t.name]: "",
-                    ...(t.name === "Ventas" ? { VentasPago: "" } : {}),
-                  })),
-                  go(t.name)
-                )}
-              >
-                <Text style={s.navIcon}>{t.icon}</Text>
-                <Text
-                  style={[s.navText, on && { color: C.ink, fontWeight: "800" }]}
-                >
-                  {t.name}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </SafeAreaView>
+        <TabBar
+          tabs={TABS}
+          active={activeTab}
+          onPress={(name) => (
+            setFilters((old) => ({
+              ...old,
+              [name]: "",
+              ...(name === "Ventas" ? { VentasPago: "" } : {}),
+            })),
+            go(name)
+          )}
+        />
+      </BottomDock>
       {!form && payOverlay}
       <Modal
         visible={!!form}
@@ -3685,7 +3645,7 @@ function AppContent({ business }: { business?: Business }) {
           >
             <View style={s.modalHeader}>
               <View style={{ flex: 1 }}>
-                <Text style={[s.title, { fontSize: 24 }]}>
+                <Text style={[s.title, { fontSize: 24, marginBottom: 2 }]}>
                   {selector
                     ? selector.label
                     : val("id") &&
@@ -3695,11 +3655,11 @@ function AppContent({ business }: { business?: Business }) {
                       ? "Editar " + form.toLowerCase()
                       : form === "Venta"
                         ? checkoutFromBasket.current
-                          ? "🛒 Carrito"
+                          ? "Carrito"
                           : "Nueva venta"
                         : form}
                 </Text>
-                {!selector && (
+                {!selector && form !== "Venta" && (
                   <Note>
                     {stack.length
                       ? "Guarda y volverás a la captura anterior."
@@ -3707,10 +3667,8 @@ function AppContent({ business }: { business?: Business }) {
                   </Note>
                 )}
               </View>
-              <Button
+              <TextButton
                 title={selector ? "Volver" : "Cerrar"}
-                secondary
-                small
                 onPress={() => (selector ? setSelector(null) : close())}
               />
             </View>
@@ -3735,12 +3693,7 @@ function AppContent({ business }: { business?: Business }) {
                     onPress={() =>
                       open(
                         selector.create!,
-                        {
-                          ...(selector.create === "Ubicación"
-                            ? { companyId: val("companyId") }
-                            : {}),
-                          name: search,
-                        },
+                        { name: search },
                         selector.key,
                       )
                     }
@@ -3828,9 +3781,127 @@ function AppContent({ business }: { business?: Business }) {
                     <Text style={[s.body, { color: C.red }]}>{formError}</Text>
                   </View>
                 )}
+                {form === "Inventario por código" && (
+                  <InventoryCodeForm
+                    b={b}
+                    code={val("barcode")}
+                    products={products}
+                    selectedId={val("productId")}
+                    startScanning={val("startScanning") === "1"}
+                    autoSell={val("autoSell") === "1"}
+                    onEnrich={(product, online) =>
+                      act(() =>
+                        b.saveProductLookupPhoto(String(product.id), online),
+                      )
+                    }
+                    picker={choose(
+                      "productId",
+                      "Elegir producto existente",
+                      products.filter((p) => !p.archived),
+                    )}
+                    onCode={(code) => {
+                      set("barcode", code);
+                      set("productId", "");
+                    }}
+                    onCreate={(barcode, online) => {
+                      if (findProductByCode(b.stock(), barcode)) {
+                        open("Inventario por código", { barcode });
+                        return;
+                      }
+                      open("Producto", {
+                        barcode,
+                        scanOrigin: "1",
+                        ...(online
+                          ? {
+                              name: online.name,
+                              brand: online.brand,
+                              presentation: online.presentation,
+                              flavor: online.flavor || "",
+                              description: online.description,
+                              imageUri: online.imageUri,
+                              lookupSource: online.source,
+                              lookupSourceUrl: online.sourceUrl,
+                            }
+                          : {}),
+                      });
+                    }}
+                    onReceive={(product, barcode) =>
+                      open("Entrada", {
+                        productId: String(product.id),
+                        scanProductId: String(product.id),
+                        barcode,
+                        qty: "1",
+                      })
+                    }
+                    onLink={(product, barcode, source) =>
+                      act(() =>
+                        b.linkProductCode(String(product.id), barcode, source),
+                      )
+                    }
+                    onRestore={(product) =>
+                      act(
+                        () => b.setProductArchived(String(product.id), false),
+                        "Producto restaurado",
+                      )
+                    }
+                    onDetail={(product) => {
+                      close();
+                      setProductDetailId(String(product.id));
+                      go("Detalle producto");
+                    }}
+                    onSell={(product) => {
+                      if (addToBasket(String(product.id))) {
+                        close();
+                        go("Vender");
+                      }
+                    }}
+                  />
+                )}
                 {form === "Producto" && (
                   <>
                     {field("name", "Nombre *")}
+                    {!!val("lookupSource") && (
+                      <Note>
+                        Datos obtenidos de {val("lookupSource")}. Confirma la
+                        presentación, el sabor y el precio de venta.
+                      </Note>
+                    )}
+                    {field("barcode", "Código de barras del empaque")}
+                    {canScan() && (
+                      <Button
+                        icon="scan-barcode" title="Leer código de barras"
+                        secondary
+                        small
+                        onPress={() => {
+                                                setBarcodeScanner(true);
+                        }}
+                      />
+                    )}
+                    <CameraScanner
+                      visible={barcodeScanner}
+                      continuous={false}
+                      instruction="Lee el código de barras del empaque para guardarlo en este producto."
+                      onClose={() => setBarcodeScanner(false)}
+                      onScan={(raw, tools) => {
+                        const code = normalizeProductCode(raw);
+                        if (!code || code.length > 40)
+                          return { text: "Código no válido. Vuelve a leerlo.", bad: true };
+                        const owner = findProductByCode(
+                          b.stock().filter((p) => p.id !== val("id")),
+                          code,
+                        );
+                        if (owner)
+                          return {
+                            text: `Ese código ya es de ${owner.name}`,
+                            bad: true,
+                            detail: `Código ${code}. Cada código identifica a un solo producto.`,
+                            actions: [{ label: "Leer otro", onPress: () => tools.update({ text: "Listo para leer otro código." }) }],
+                          };
+                        set("barcode", code);
+                        return { text: "Código guardado en el producto", detail: code, done: true };
+                      }}
+                    />
+                    <Note>Con este código, el lector reconoce el producto. El SKU se genera solo.</Note>
                     {moneyField("price", "Precio de venta MXN *")}
                     {(() => {
                       const base = tryCents(val("price"));
@@ -3844,13 +3915,6 @@ function AppContent({ business }: { business?: Business }) {
                         {Number(val("qty")) > 0 && (
                           <>
                             {moneyField("cost", "Costo por unidad MXN *")}
-                            {choose(
-                              "locationId",
-                              "Ubicación inicial",
-                              locations,
-                              true,
-                              "Ubicación",
-                            )}
                           </>
                         )}
                       </>
@@ -3879,30 +3943,9 @@ function AppContent({ business }: { business?: Business }) {
                           disabled={busy}
                           onPress={photo}
                         />
-                        <Note>
-                          Fotos JPG de cualquier tamaño: la app las reduce y las
-                          endereza sola. PNG o WebP de máximo 1 MB.
-                        </Note>
+                        <Note>La app reduce y endereza las fotos JPG. PNG o WebP de máximo 1 MB.</Note>
                         <View style={{ height: 12 }} />
                         {field("sku", "SKU — automático si lo dejas vacío")}
-                        {field("barcode", "Código de barras (para el lector)")}
-                        {canScan() && (
-                          <Button
-                            title="📷 Leer código de barras"
-                            secondary
-                            small
-                            onPress={() => setBarcodeScanner(true)}
-                          />
-                        )}
-                        <CameraScanner
-                          visible={barcodeScanner}
-                          continuous={false}
-                          onClose={() => setBarcodeScanner(false)}
-                          onScan={(code) => {
-                            set("barcode", code);
-                            return { text: "Código guardado en el producto." };
-                          }}
-                        />
                         {field("category", "Categoría")}
                         {field("brand", "Marca")}
                         {field("flavor", "Sabor")}
@@ -3915,13 +3958,6 @@ function AppContent({ business }: { business?: Business }) {
                           true,
                         )}
                         {field("minimum", "Alerta de stock mínimo", true)}
-                        {choose(
-                          "companyId",
-                          "Proveedor / compañía",
-                          companies,
-                          true,
-                          "Compañía",
-                        )}
                         {!val("id") &&
                           dateField(
                             "expires",
@@ -3959,7 +3995,6 @@ function AppContent({ business }: { business?: Business }) {
                     {more()}
                     {advanced && (
                       <>
-                        {relation()}
                         {field(
                           "notes",
                           "Notas / preferencias",
@@ -3983,80 +4018,6 @@ function AppContent({ business }: { business?: Business }) {
                     )}
                   </>
                 )}
-                {form === "Campaña" && (
-                  <>
-                    {field("name", "Nombre *")}
-                    {chips("channel", "Canal *", options(channels))}
-                    {chips(
-                      "status",
-                      "Estado *",
-                      options(["Borrador", "Activa", "Pausada", "Finalizada"]),
-                    )}
-                    {more()}
-                    {advanced && (
-                      <>
-                        {moneyField("budget", "Presupuesto MXN")}
-                        {dateField("start", "Inicio", QUICK_CAMPAIGN)}
-                        {dateField("end", "Fin", QUICK_CAMPAIGN)}
-                        {field("code", "Código — automático si lo dejas vacío")}
-                        {relation()}
-                        {field("notes", "Objetivo / notas", false, "", true)}
-                        <Note>
-                          El presupuesto es una meta. El gasto real se registra
-                          en Cuentas o con Registrar gasto.
-                        </Note>
-                      </>
-                    )}
-                  </>
-                )}
-                {form === "Compañía" && (
-                  <>
-                    {field("name", "Nombre *")}
-                    {chips(
-                      "kind",
-                      "Tipo *",
-                      options([
-                        "Mi negocio",
-                        "Proveedor",
-                        "Cliente empresa",
-                        "Socio",
-                        "Otro",
-                      ]),
-                    )}
-                    {more()}
-                    {advanced && (
-                      <>
-                        {field("phone", "Teléfono")}
-                        {field("email", "Correo")}
-                        {field("notes", "Notas", false, "", true)}
-                      </>
-                    )}
-                  </>
-                )}
-                {form === "Ubicación" && (
-                  <>
-                    {field("name", "Nombre *")}
-                    {choose(
-                      "companyId",
-                      "Compañía",
-                      companies,
-                      true,
-                      "Compañía",
-                    )}
-                    {chips(
-                      "kind",
-                      "Tipo *",
-                      options(["Tienda", "Almacén", "Entrega", "Otra"]),
-                    )}
-                    {more()}
-                    {advanced && (
-                      <>
-                        {field("address", "Dirección")}
-                        {field("notes", "Notas", false, "", true)}
-                      </>
-                    )}
-                  </>
-                )}
                 {form === "Cuenta" && (
                   <>
                     {field("name", "Nombre *")}
@@ -4074,12 +4035,73 @@ function AppContent({ business }: { business?: Business }) {
                 )}
                 {form === "Entrada" && (
                   <>
-                    {choose(
-                      "productId",
-                      "Producto *",
-                      saleable,
-                      false,
-                      "Producto",
+                    {val("scanProductId")
+                      ? (() => {
+                          const product = products.find(
+                            (p) => p.id === val("scanProductId"),
+                          );
+                          return product ? (
+                            <Card>
+                              <Pill
+                                text="Ficha precargada de tu catálogo"
+                                tone="ok"
+                              />
+                              <View style={s.productRow}>
+                                <ProductPhoto
+                                  product={product}
+                                  style={s.productImage}
+                                />
+                                <View style={{ flex: 1 }}>
+                                  <Text style={s.subtitle}>{product.name}</Text>
+                                  <Note>
+                                    {[
+                                      product.brand,
+                                      product.presentation,
+                                      product.flavor,
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" · ")}
+                                  </Note>
+                                  <Note>SKU: {product.sku}</Note>
+                                  <Text style={s.price}>
+                                    Precio de venta: {money(product.price)}
+                                  </Text>
+                                </View>
+                              </View>
+                              <Note>
+                                Precio registrado · no se puede cambiar desde
+                                esta entrada.
+                              </Note>
+                              <Note>
+                                {product.inventoryKnown
+                                  ? `${product.stock} piezas físicas · ${product.available} disponibles`
+                                  : "Inventario por confirmar"}
+                              </Note>
+                            </Card>
+                          ) : (
+                            <Note color={C.red}>
+                              El producto ya no está disponible. Vuelve a leer
+                              el código.
+                            </Note>
+                          );
+                        })()
+                      : choose(
+                          "productId",
+                          "Producto *",
+                          val("scanProductId")
+                            ? saleable.filter(
+                                (product) =>
+                                  product.id === val("scanProductId"),
+                              )
+                            : saleable,
+                          false,
+                          val("scanProductId") ? undefined : "Producto",
+                        )}
+                    {!!val("barcode") && (
+                      <Note>
+                        Código leído: {val("barcode")}. Se conserva vinculado a
+                        esta ficha junto con sus otros códigos.
+                      </Note>
                     )}
                     {field("qty", "Cantidad *", true)}
                     {moneyField("cost", "Costo unitario MXN *")}
@@ -4090,34 +4112,12 @@ function AppContent({ business }: { business?: Business }) {
                     )}
                     {val("mode") === "Compra pagada" &&
                       accountField("accountId", "Cuenta que paga *")}
-                    {choose(
-                      "locationId",
-                      "Ubicación",
-                      locations,
-                      true,
-                      "Ubicación",
-                    )}
                     {dateField("expires", "Caducidad", QUICK_EXPIRY)}
                     {more()}
                     {advanced && field("label", "Nombre de lote")}
                     <Note>
                       Inventario inicial no mueve dinero. Compra pagada
                       descuenta de la cuenta seleccionada.
-                    </Note>
-                  </>
-                )}
-                {form === "Asignar ubicación" && (
-                  <>
-                    {choose(
-                      "locationId",
-                      "Ubicación del lote *",
-                      locations,
-                      false,
-                      "Ubicación",
-                    )}
-                    <Note>
-                      Se asignan todas las unidades restantes de este lote. La
-                      cantidad total no cambia.
                     </Note>
                   </>
                 )}
@@ -4146,14 +4146,6 @@ function AppContent({ business }: { business?: Business }) {
                       )}
                     {moneyField("amount", "Importe MXN *")}
                     {field("note", "Concepto *")}
-                    {val("kind") === "expense" &&
-                      choose(
-                        "campaignId",
-                        "Campaña",
-                        campaigns,
-                        true,
-                        "Campaña",
-                      )}
                   </>
                 )}
                 {form === "Venta" && (
@@ -4169,7 +4161,7 @@ function AppContent({ business }: { business?: Business }) {
                       true,
                       "Cliente",
                     )}
-                    {accountField("accountId", "Forma de cobro *")}
+                    {accountField("accountId", "Forma de cobro *", saleAccounts)}
                     {["Banco", "Billetera"].includes(
                       accounts.find((a) => a.id === val("accountId"))?.kind ||
                         "",
@@ -4180,13 +4172,15 @@ function AppContent({ business }: { business?: Business }) {
                             ? all.filter(
                                 (t) => t.accountId === val("accountId"),
                               )
-                            : all)(b!.setting("transferAccounts", []))}
+                            : all.filter((t) => !t.ownerHidden))(
+                          b!.setting("transferAccounts", []),
+                        )}
                         amount={saleTotal}
                         phone={
                           customers.find((c) => c.id === val("customerId"))
                             ?.phone || ""
                         }
-                        emptyText="Captura tus datos de transferencia en Parámetros → Datos para transferencia para mandárselos al cliente."
+                        emptyText="Captura tus datos de transferencia en Ajustes → Formas de pago para mandárselos al cliente."
                       />
                     )}
                     {more()}
@@ -4203,14 +4197,6 @@ function AppContent({ business }: { business?: Business }) {
                           "Vacío = pago completo",
                         )}
                         {chips("channel", "Canal *", options(channels))}
-                        {choose(
-                          "campaignId",
-                          "Campaña",
-                          campaigns,
-                          true,
-                          "Campaña",
-                        )}
-                        {relation()}
                         {field("notes", "Notas", false, "", true)}
                         <View style={[s.between, { marginBottom: 6 }]}>
                           <Text style={[s.body, { flex: 1 }]}>
@@ -4218,13 +4204,9 @@ function AppContent({ business }: { business?: Business }) {
                           </Text>
                           <Switch value={allow} onValueChange={setAllow} />
                         </View>
-                        <Note>
-                          La ubicación limita la salida a sus lotes. Sin asignar
-                          permite tomar de cualquier ubicación.
-                        </Note>
                       </>
                     )}
-                    <Card tone="ok">
+                    <Card>
                       {(() => {
                         const cost = cart.reduce((n, i) => {
                           const p = products.find((x) => x.id === i.productId);
@@ -4243,12 +4225,12 @@ function AppContent({ business }: { business?: Business }) {
                           value: string,
                           opts: { bold?: boolean; color?: string } = {},
                         ) => (
-                          <View key={label} style={[s.between, { gap: 8 }]}>
+                          <View key={label} style={[s.between, { gap: 8, paddingVertical: 2 }]}>
                             <Text
                               style={[
                                 s.body,
-                                { flex: 1 },
-                                opts.bold && { fontWeight: "800" },
+                                { flex: 1, color: opts.bold ? C.ink : C.muted },
+                                opts.bold && { fontWeight: "600" },
                               ]}
                             >
                               {label}
@@ -4256,7 +4238,7 @@ function AppContent({ business }: { business?: Business }) {
                             <Text
                               style={[
                                 s.body,
-                                { fontWeight: opts.bold ? "800" : "600" },
+                                { fontWeight: opts.bold ? "700" : "500", fontVariant: ["tabular-nums"] },
                                 opts.color ? { color: opts.color } : null,
                               ]}
                             >
@@ -4279,9 +4261,12 @@ function AppContent({ business }: { business?: Business }) {
                                 minus(saleCharge.discount),
                                 { color: C.red },
                               )}
-                            {row("Total a cobrar", money(saleTotal), {
-                              bold: true,
-                            })}
+                            <View style={[s.between, { marginTop: 8 }]}>
+                              <Text style={[s.body, { fontWeight: "600" }]}>Total a cobrar</Text>
+                              <Text style={{ fontSize: 30, fontWeight: "700", color: C.ink, fontVariant: ["tabular-nums"] }}>
+                                {money(saleTotal)}
+                              </Text>
+                            </View>
                             {salePaid !== null &&
                               salePaid !== saleTotal &&
                               row("Cobro de hoy", money(salePaid))}
@@ -4292,8 +4277,11 @@ function AppContent({ business }: { business?: Business }) {
                                 money(Math.max(0, saleTotal - salePaid)),
                                 { color: C.amber },
                               )}
-                            {divider()}
-                            <Text style={s.label}>Solo lo ves tú</Text>
+                            <View style={{ backgroundColor: C.soft, borderRadius: 18, padding: 14, marginTop: 12, gap: 1 }}>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                              <Icon name="lock" size={14} color={C.muted} />
+                              <Text style={[s.label, { margin: 0 }]}>Solo lo ves tú</Text>
+                            </View>
                             {row("Tu precio", money(saleBase))}
                             {row(
                               "Comisión que absorbe el cliente",
@@ -4322,6 +4310,7 @@ function AppContent({ business }: { business?: Business }) {
                                   costo. Se permite porque tú la configuraste.
                                 </Note>
                               )}
+                            </View>
                           </>
                         );
                       })()}
@@ -4338,14 +4327,6 @@ function AppContent({ business }: { business?: Business }) {
                       "Cliente",
                     )}
                     {chips("channel", "Canal *", options(channels))}
-                    {choose(
-                      "campaignId",
-                      "Campaña",
-                      campaigns,
-                      true,
-                      "Campaña",
-                    )}
-                    {relation()}
                     {field("notes", "Notas", false, "", true)}
                     <Note>
                       Solo cambia el seguimiento comercial. Importes, fecha,
@@ -4420,11 +4401,7 @@ function AppContent({ business }: { business?: Business }) {
                       </Note>
                     </Card>
                     {cartEditor}
-                    <Note>
-                      Quita o reduce productos para registrar una devolución:
-                      las unidades regresan a su lote. También puedes agregar
-                      productos.
-                    </Note>
+                    <Note>Quita productos para devolverlos (regresan a su lote) o agrega más.</Note>
                     <View style={{ height: 10 }} />
                     {moneyField(
                       "total",
@@ -4485,19 +4462,6 @@ function AppContent({ business }: { business?: Business }) {
                         cobro original con tarjeta no cambia.
                       </Note>
                     </Card>
-                  </>
-                )}
-                {form === "Paquete" && (
-                  <>
-                    {field("name", "Nombre *")}
-                    {moneyField("price", "Precio del paquete MXN *")}
-                    {(() => {
-                      const base = tryCents(val("price"));
-                      return (
-                        <Note>{`Tu precio: lo que recibes completo.${base ? ` El cliente paga ${money(grossUp(base, data.feeBps))} (absorbe la comisión ${feeLabel(data.feeBps)}).` : ""}`}</Note>
-                      );
-                    })()}
-                    {cartEditor}
                   </>
                 )}
                 {form === "Ajuste de inventario" &&
@@ -4573,26 +4537,21 @@ function AppContent({ business }: { business?: Business }) {
                 {form === "Configuración" && (
                   <>
                     {field("rate", "Comisión (%) *", true, "4.06")}
-                    <Note>
-                      Por defecto 4.06% (3.5% + IVA de Mercado Pago). El cliente
-                      la absorbe con cualquier forma de pago y tú recibes tu
-                      precio completo. Al guardar se envía a tus vendedores; las
-                      ventas anteriores no cambian.
-                    </Note>
+                    <Note>Normalmente 4.06% (3.5% + IVA de Mercado Pago). Se envía a tus vendedores; las ventas anteriores no cambian.</Note>
                   </>
                 )}
                 <View style={{ height: 16 }} />
                 {!!formError && <Note color={C.red}>{formError}</Note>}
-                {form === "Venta" &&
-                mpActive &&
-                saleIsCard &&
-                (salePaid ?? 0) > 0 ? (
+                {form === "Inventario por código" ? null : form === "Venta" &&
+                  mpActive &&
+                  saleIsCard &&
+                  (salePaid ?? 0) > 0 ? (
                   <>
                     <Button
-                      title={
+                      icon="credit-card" title={
                         busy
                           ? "Enviando…"
-                          : `💳 Cobrar ${money(salePaid ?? 0)} en la terminal`
+                          : `Cobrar ${money(salePaid ?? 0)} en la terminal`
                       }
                       disabled={busy || !cart.length}
                       onPress={() => save("terminal")}
@@ -4612,7 +4571,7 @@ function AppContent({ business }: { business?: Business }) {
                 ) : form === "Enviar comprobante" ? (
                   <>
                     <Button
-                      title="💬 Enviar por WhatsApp"
+                      icon="message-circle" title="Enviar por WhatsApp"
                       disabled={!validWhatsapp(val("phone"))}
                       onPress={() => void sendTypedReceipt()}
                     />
@@ -4634,10 +4593,10 @@ function AppContent({ business }: { business?: Business }) {
                   (tryCents(val("amount")) ?? 0) > 0 ? (
                   <>
                     <Button
-                      title={
+                      icon="credit-card" title={
                         busy
                           ? "Enviando…"
-                          : `💳 Cobrar abono de ${money(tryCents(val("amount")) ?? 0)} en la terminal`
+                          : `Cobrar abono de ${money(tryCents(val("amount")) ?? 0)} en la terminal`
                       }
                       disabled={busy}
                       onPress={() => save("terminal")}
@@ -4660,7 +4619,7 @@ function AppContent({ business }: { business?: Business }) {
                       busy
                         ? "Guardando…"
                         : form === "Venta"
-                          ? "Cobrar y confirmar venta"
+                          ? `Cobrar ${money(salePaid ?? saleTotal)}`
                           : form === "Modificar venta"
                             ? val("mpRefund") === "1" && canMpRefund
                               ? "Devolver y guardar cambios"
@@ -4767,13 +4726,14 @@ function OwnerSetup({
         contentContainerStyle={[s.content, { paddingTop: 30 }]}
       >
         <Image
-          source={LOGO_HEADER}
-          accessibilityLabel="GNS · Nova Negocio"
+          source={LOGO_FULL}
+          accessibilityLabel="GGG · Nova Supps"
           resizeMode="contain"
           style={{
-            width: 260,
-            height: 260 / LOGO_HEADER_RATIO,
-            marginBottom: 18,
+            width: 220,
+            height: 220 / LOGO_FULL_RATIO,
+            marginBottom: 22,
+            alignSelf: "center",
           }}
         />
         {!!msg && (
@@ -4782,25 +4742,21 @@ function OwnerSetup({
           </View>
         )}
         <Text style={s.title}>Restaura tu negocio</Text>
-        <Note>
-          Entraste como dueño ✓. Elige tu archivo de respaldo
-          (Nova-respaldo-….json) para traer inventario, ventas, clientes y
-          cuentas a este teléfono.
-        </Note>
+        <Note>Entraste como dueño ✓. Elige tu archivo de respaldo (Nova-respaldo-….json) para traer tu negocio a este teléfono.</Note>
         <View style={{ height: 10 }} />
         {!!cloudList?.length && (
           <Button
-            title={
+            icon="cloud-upload" title={
               busy
                 ? "Restaurando…"
-                : `☁️ Restaurar de la nube (${when(cloudList[0].created_at)})`
+                : `Restaurar de la nube (${when(cloudList[0].created_at)})`
             }
             disabled={busy}
             onPress={() => void restoreCloud(cloudList[0])}
           />
         )}
         <Button
-          title={busy ? "Restaurando…" : "📂 Elegir mi respaldo"}
+          icon="file-text" title={busy ? "Restaurando…" : "Elegir mi respaldo"}
           secondary={!!cloudList?.length}
           disabled={busy}
           onPress={() => void restoreBackup()}
@@ -4928,6 +4884,12 @@ function Root() {
   );
 }
 export default function App() {
+  // 2.4: Inter se registra antes de pintar (máximo 1.5 s); si no se puede, letra del sistema.
+  const [fontsOk, setFontsOk] = useState(() => fontsReady() || !canLoadFonts());
+  useEffect(() => {
+    if (!fontsOk) void loadFonts().then(() => setFontsOk(true));
+  }, []);
+  if (!fontsOk) return <View style={{ flex: 1, backgroundColor: C.bg }} />;
   return (
     <SafeAreaProvider>
       <Root />

@@ -1,6 +1,7 @@
 import React from "react";
-import { Pressable, Text, View } from "react-native";
-import { grossUp, localDay, money, today, type Row } from "../business";
+import { Linking, View } from "react-native";
+import { Text } from "../text";
+import { grossUp, localDay, money, today } from "../business";
 import { catalogueImages } from "../catalogueImages";
 import {
   Button,
@@ -14,9 +15,14 @@ import {
   fmtDay,
   followUpsDue,
   s,
+  MenuList,
+  QuickActions,
+  TextButton,
+  Icon,
 } from "../ui";
+import { TILE } from "../theme";
 import type { Body, OwnerPageContext } from "./ownerContext";
-import { amount, normalize, units } from "./ownerShared";
+import { normalize, units } from "./ownerShared";
 
 export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
   if (
@@ -26,7 +32,6 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
       "Catálogo",
       "Detalle producto",
       "Lotes",
-      "Paquetes",
     ].includes(ctx.page)
   )
     return null;
@@ -57,23 +62,13 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
     query,
     productDetailId,
     act,
-    openSale,
   } = ctx;
   const d = data!;
   const {
     products,
     customers,
-    campaigns,
-    companies,
-    locations,
-    accounts,
-    sales,
     lots,
-    m,
   } = d;
-  const low = products.filter(
-    (p) => !p.archived && p.inventoryKnown && p.available <= p.minimum,
-  );
   const soon = followUpsDue(customers);
   if (page === "Vender") {
     const lastDays = d.lastBackup
@@ -85,7 +80,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
           {!!d.mpPending && (
             <Card tone="warn">
               <Text style={s.subtitle}>
-                🏧 Cobro en terminal sin confirmar · {money(d.mpPending.amount)}
+                Cobro en terminal sin confirmar · {money(d.mpPending.amount)}
               </Text>
               <Note>
                 La app se cerró mientras se cobraba. Revísalo: la venta se
@@ -110,48 +105,60 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
             <Card tone="warn">
               <Text
                 style={s.subtitle}
-              >{`👥 ${cloudStatus.conflicts} ${cloudStatus.conflicts === 1 ? "venta de vendedor por revisar" : "ventas de vendedores por revisar"}`}</Text>
+              >{`${cloudStatus.conflicts} ${cloudStatus.conflicts === 1 ? "venta de vendedor por revisar" : "ventas de vendedores por revisar"}`}</Text>
               <Button title="Revisar" small onPress={() => go("Equipo")} />
             </Card>
           )}
-          {!!soon.length && (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => go("Clientes", "Próximos 5 días")}
-              style={[s.menuRow, { borderBottomWidth: 0 }]}
-            >
-              <Text style={s.menuIcon}>🔔</Text>
-              <Text style={[s.body, { flex: 1 }]}>
-                {soon.length === 1
-                  ? "1 seguimiento próximo"
-                  : `${soon.length} seguimientos próximos`}
-              </Text>
-              <Text style={{ color: C.muted, fontSize: 18 }}>›</Text>
-            </Pressable>
-          )}
-          {(lastDays === null || lastDays >= 7) && (
-            <Pressable
-              accessibilityRole="button"
-              onPress={exportBackup}
-              style={[s.menuRow, { borderBottomWidth: 0 }]}
-            >
-              <Text style={s.menuIcon}>💾</Text>
-              <Text style={[s.body, { flex: 1 }]}>
-                {lastDays === null
-                  ? "Aún no guardas un respaldo"
-                  : `Último respaldo hace ${lastDays} días`}
-              </Text>
-              <Text style={{ color: C.muted, fontSize: 18 }}>Respaldar ›</Text>
-            </Pressable>
+          {(!!soon.length || lastDays === null || lastDays >= 7) && (
+            <MenuList
+              items={[
+                ...(soon.length
+                  ? [
+                      {
+                        key: "soon",
+                        title:
+                          soon.length === 1
+                            ? "1 seguimiento próximo"
+                            : `${soon.length} seguimientos próximos`,
+                        icon: "bell" as const,
+                        tint: TILE.gold,
+                        onPress: () => go("Clientes", "Próximos 5 días"),
+                      },
+                    ]
+                  : []),
+                ...(lastDays === null || lastDays >= 7
+                  ? [
+                      {
+                        key: "backup",
+                        title:
+                          lastDays === null
+                            ? "Aún no guardas un respaldo"
+                            : `Último respaldo hace ${lastDays} días`,
+                        icon: "hard-drive" as const,
+                        tint: TILE.graphite,
+                        value: "Respaldar",
+                        onPress: exportBackup,
+                      },
+                    ]
+                  : []),
+              ]}
+            />
           )}
           <ProductGrid
             products={gridProducts as any}
             qtyOf={(id) => basket.find((i) => i.productId === id)?.qty ?? 0}
             limitOf={(id) => Math.max(0, productById.get(id)?.available ?? 0)}
-            onAdd={(id) => void addToBasket(id, 1, true)}
+            onAdd={(id) => addToBasket(id, 1, true)}
+            lookupStore={b!}
+            onPhotoResolved={(product, online) =>
+              act(() => b!.saveProductLookupPhoto(product.id, online))
+            }
             onRemove={removeFromBasket}
             segment={saleSeg}
             onSegment={setSaleSeg}
+            onInventoryCode={(barcode) =>
+              open("Inventario por código", { barcode, autoSell: "1" })
+            }
           />
           <View style={s.wrap}>
             <Button
@@ -162,7 +169,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
             />
             {!!basket.length && (
               <Button
-                title="🗑 Vaciar carrito"
+                icon="trash-2" title="Vaciar carrito"
                 secondary
                 small
                 onPress={emptyBasket}
@@ -191,26 +198,18 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
         data: list,
         header: (
           <>
-            <View style={s.wrap}>
-              <Button
-                title="＋ Producto"
-                small
-                onPress={() => open("Producto")}
-              />
-              <Button
-                title="＋ Entrada"
-                secondary
-                small
-                onPress={() => open("Entrada")}
-              />
-              <Button
-                title="Ajustar conteo"
-                secondary
-                small
-                onPress={() => open("Ajuste de inventario")}
-              />
-            </View>
-            <View style={{ height: 6 }} />
+            <QuickActions
+              items={[
+                { label: "Nuevo producto", icon: "plus", tint: C.brand, onPress: () => open("Producto") },
+                {
+                  label: "Escanear",
+                  icon: "scan-barcode",
+                  onPress: () => open("Inventario por código", { startScanning: "1" }),
+                },
+                { label: "Nueva entrada", icon: "download", onPress: () => open("Entrada") },
+                { label: "Conteo", icon: "list-checks", onPress: () => open("Ajuste de inventario") },
+              ]}
+            />
             {searchBox("Buscar nombre, SKU o marca")}
             {filterChips(page, [
               "Todos",
@@ -230,37 +229,30 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               }}
             >
               <View style={s.productRow}>
-                <ProductPhoto product={p} style={s.productImage} />
+                <ProductPhoto product={p} style={{ width: 72, height: 88 }} />
                 <View style={{ flex: 1 }}>
-                  <Text style={s.subtitle} numberOfLines={2}>
+                  <Text style={[s.body, { fontWeight: "600" }]} numberOfLines={2}>
                     {p.name}
                   </Text>
-                  <Note>
+                  <Text style={[s.muted, { fontSize: 13 }]} numberOfLines={1}>
                     {p.brand || p.category} · {p.sku}
-                  </Note>
-                  <Text style={s.price}>{money(p.price)}</Text>
-                  <Note>{`Cliente paga ${money(grossUp(p.price, d.feeBps))}`}</Note>
-                  {p.inventoryKnown ? (
-                    <Pill
-                      text={`${p.available} disponibles · ${p.stock} físicas`}
-                      tone={p.available < 1 ? "bad" : lowStock ? "warn" : "ok"}
-                    />
-                  ) : (
-                    <Pill text="Existencias por confirmar" tone="warn" />
-                  )}
+                  </Text>
+                  <Text style={[s.price, { marginTop: 6, marginBottom: 0 }]}>{money(p.price)}</Text>
+                  <Text style={[s.muted, { fontSize: 12.5 }]}>{`Cliente paga ${money(grossUp(p.price, d.feeBps))}`}</Text>
+                  <View style={{ marginTop: 6 }}>
+                    {p.inventoryKnown ? (
+                      <Pill
+                        text={`${p.available} disponibles · ${p.stock} físicas`}
+                        tone={p.available < 1 ? "bad" : lowStock ? "warn" : "ok"}
+                      />
+                    ) : (
+                      <Pill text="Existencias por confirmar" tone="warn" />
+                    )}
+                  </View>
                 </View>
+                <Icon name="chevron-right" size={18} color={C.faint} />
               </View>
-              <View style={[s.row, { marginTop: 10 }]}>
-                <View style={{ flex: 1 }}>{sellButton(p)}</View>
-                <View style={{ flex: 1 }}>
-                  <Button
-                    title="Editar"
-                    secondary
-                    small
-                    onPress={() => editProduct(p)}
-                  />
-                </View>
-              </View>
+              <View style={{ marginTop: 10 }}>{sellButton(p)}</View>
             </Card>
           );
         },
@@ -293,17 +285,13 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
       scroll: (
         <>
           <Card>
-            <Text style={s.title}>{p.name}</Text>
-            <Note>
-              {p.brand || p.category} · {p.sku}
-            </Note>
-            {p.archived && <Pill text="Archivado" tone="warn" />}
             <View
               style={{
                 flexDirection: "row",
                 flexWrap: "wrap",
+                justifyContent: "center",
                 gap: 10,
-                marginVertical: 12,
+                marginBottom: 14,
               }}
             >
               {(photos.length ? photos : [null]).map((_: any, i: number) => (
@@ -314,19 +302,21 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                   style={{
                     width: 145,
                     height: 190,
-                    backgroundColor: "#fff",
-                    borderRadius: 12,
+                    backgroundColor: C.paper,
+                    borderRadius: 16,
                   }}
                 />
               ))}
             </View>
-            <Text style={s.price}>{money(p.price)}</Text>
-            {!!p.description && <Text style={s.body}>{p.description}</Text>}
-            <Note>
-              {[p.flavor, p.presentation].filter(Boolean).join(" · ") ||
-                "Presentación por confirmar"}
-            </Note>
-            <View style={{ height: 6 }} />
+            <Text style={[s.title, { fontSize: 24 }]}>{p.name}</Text>
+            <Text style={[s.muted, { fontSize: 13 }]}>
+              {p.brand || p.category} · {p.sku}
+            </Text>
+            {p.archived && <Pill text="Archivado" tone="warn" />}
+            <View style={{ flexDirection: "row", alignItems: "baseline", gap: 10, marginTop: 10 }}>
+              <Text style={[s.price, { fontSize: 26 }]}>{money(p.price)}</Text>
+              <Text style={s.muted}>{`Cliente paga ${money(grossUp(p.price, d.feeBps))}`}</Text>
+            </View>
             <Pill
               text={
                 p.inventoryKnown
@@ -335,50 +325,80 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               }
               tone={p.available < 1 ? "bad" : "ok"}
             />
+            {!!p.description && <Text style={[s.body, { marginTop: 10 }]}>{p.description}</Text>}
+            <Note>
+              {[p.flavor, p.presentation].filter(Boolean).join(" · ") ||
+                "Presentación por confirmar"}
+            </Note>
+            {!!p.lookupSource && (
+              <>
+                <Note>
+                  Fuente de la ficha: {p.lookupSource}
+                  {p.lookupSource === "Open Food Facts"
+                    ? " · datos ODbL · foto CC BY-SA"
+                    : ""}
+                </Note>
+                {!!p.lookupSourceUrl && (
+                  <TextButton
+                    title="Consultar fuente"
+                    onPress={() =>
+                      void Linking.openURL(p.lookupSourceUrl).catch(() => {})
+                    }
+                  />
+                )}
+              </>
+            )}
             <View style={{ height: 10 }} />
             {sellButton(p)}
-            <View style={s.row}>
-              <View style={{ flex: 1 }}>
-                <Button
-                  title="Editar"
-                  secondary
-                  small
-                  onPress={() => editProduct(p)}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Button
-                  title="＋ Entrada"
-                  secondary
-                  small
-                  onPress={() => open("Entrada", { productId: p.id })}
-                />
-              </View>
-            </View>
-            <Button
-              title="Ajustar existencias (conteo, merma, regalo)"
-              secondary
-              small
-              onPress={() => open("Ajuste de inventario", { productId: p.id })}
-            />
-            <Button
-              title={p.archived ? "Restaurar producto" : "Archivar producto"}
-              secondary
-              small
-              onPress={() =>
-                act(
-                  () => b!.setProductArchived(p.id, !p.archived),
-                  p.archived ? "Producto restaurado" : "Producto archivado",
-                )
-              }
-            />
-            <Note>
-              Archivar oculta el producto del stock y de nuevas ventas; conserva
-              su historial.
-            </Note>
           </Card>
+          <QuickActions
+            items={[
+              { label: "Editar", icon: "pencil", onPress: () => editProduct(p) },
+              { label: "Entrada", icon: "download", onPress: () => open("Entrada", { productId: p.id }) },
+              { label: "Conteo", icon: "list-checks", onPress: () => open("Ajuste de inventario", { productId: p.id }) },
+            ]}
+          />
+          <MenuList
+            items={[
+              {
+                key: "archive",
+                title: p.archived ? "Restaurar producto" : "Archivar producto",
+                desc: "Lo oculta del stock y de nuevas ventas; conserva su historial.",
+                icon: "layers",
+                tint: TILE.graphite,
+                danger: !p.archived,
+                onPress: () =>
+                  act(
+                    () => b!.setProductArchived(p.id, !p.archived),
+                    p.archived ? "Producto restaurado" : "Producto archivado",
+                  ),
+              },
+            ]}
+          />
+          {(!!p.barcode || (Array.isArray(p.barcodeAliases) && p.barcodeAliases.length > 0)) && (
+            <Card>
+              <Text style={s.subtitle}>Códigos</Text>
+              {!!p.barcode && <Note>Código de barras principal: {p.barcode}</Note>}
+              {Array.isArray(p.barcodeAliases) &&
+                p.barcodeAliases.map((code: string) => (
+                  <View key={code} style={s.between}>
+                    <Note>Código adicional: {code}</Note>
+                    <TextButton
+                      title="Quitar"
+                      color={C.red}
+                      onPress={() =>
+                        act(
+                          () => b!.unlinkAdditionalProductCode(p.id, code),
+                          "Código adicional desvinculado",
+                        )
+                      }
+                    />
+                  </View>
+                ))}
+            </Card>
+          )}
           <Card>
-            <Text style={s.subtitle}>Lotes, costo y ubicación</Text>
+            <Text style={s.subtitle}>Lotes y costo</Text>
             {lots
               .filter((l) => l.productId === p.id)
               .map((l) => (
@@ -387,8 +407,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                     {l.label} · {units(l.qty)} · {money(l.cost)} c/u
                   </Text>
                   <Note>
-                    Caducidad: {l.expires ? fmtDay(l.expires) : "Pendiente"} ·{" "}
-                    {l.location || "Sin ubicación"}
+                    Caducidad: {l.expires ? fmtDay(l.expires) : "Pendiente"}
                   </Note>
                 </View>
               ))}
@@ -432,20 +451,8 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                           : days !== null && days <= 60
                             ? ` · en ${days} días`
                             : "")
-                      : "Pendiente"}{" "}
-                    · {l.location || "Sin ubicación"}
+                      : "Pendiente"}
                   </Note>
-                  <Button
-                    title="Asignar / cambiar ubicación"
-                    secondary
-                    small
-                    onPress={() =>
-                      open("Asignar ubicación", {
-                        lotId: l.id,
-                        locationId: l.locationId || "",
-                      })
-                    }
-                  />
                 </Card>
               );
             })}
@@ -453,43 +460,5 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
       ),
     };
 
-  if (page === "Paquetes")
-    return {
-      scroll: (
-        <>
-          <Button title="＋ Paquete" onPress={() => open("Paquete")} />
-          <Note>Cada venta descuenta los productos que lo componen.</Note>
-          <View style={{ height: 8 }} />
-          {b!.bundles().map((bundle) => {
-            const items = bundle.items as Row[];
-            return (
-              <Card key={bundle.id}>
-                <Text style={s.subtitle}>
-                  {bundle.name} · {money(bundle.price)}
-                </Text>
-                {items.map((i) => (
-                  <Note key={i.productId}>
-                    {i.qty} × {i.name}
-                  </Note>
-                ))}
-                <Button
-                  title="Vender paquete"
-                  small
-                  onPress={() =>
-                    openSale(
-                      { total: amount(bundle.price) },
-                      items.map((i) => ({
-                        productId: i.productId,
-                        qty: i.qty,
-                      })),
-                    )
-                  }
-                />
-              </Card>
-            );
-          })}
-        </>
-      ),
-    };
   return null;
 }

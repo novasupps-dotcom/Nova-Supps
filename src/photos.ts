@@ -139,16 +139,33 @@ export function compressJpegBase64(b64: string, maxSide = MAX_SIDE, quality = QU
   const orientation = exifOrientation(bytes);
   const img = decodeJpeg(bytes, { useTArray: true, formatAsRGBA: true, maxMemoryUsageInMB: 400, maxResolutionInMP: 60 } as any);
   const small = resizeOriented(img.data as Uint8Array, img.width, img.height, orientation, maxSide);
-  // jpeg-js devuelve Buffer.from(...); Hermes no tiene Buffer: se presta uno mínimo solo durante la llamada.
+  return bytesToBase64(encodeJpegBytes(small.data, small.width, small.height, quality));
+}
+/**
+ * RGBA → JPG. jpeg-js devuelve Buffer.from(...) y Hermes (Android) no tiene Buffer: se presta uno
+ * mínimo solo durante la llamada. 2.5.2: usar SIEMPRE esta función, nunca jpeg-js directo.
+ */
+export function encodeJpegBytes(rgba: Uint8Array, width: number, height: number, quality: number): Uint8Array {
   const g = globalThis as any;
   const hadBuffer = typeof g.Buffer !== "undefined";
   if (!hadBuffer) g.Buffer = { from: (a: ArrayLike<number>) => Uint8Array.from(a) };
   try {
-    const encoded = encodeJpeg(small as any, quality);
-    return bytesToBase64(encoded.data instanceof Uint8Array ? encoded.data : Uint8Array.from(encoded.data as any));
+    const encoded = encodeJpeg({ data: rgba, width, height } as any, quality);
+    return encoded.data instanceof Uint8Array ? new Uint8Array(encoded.data) : Uint8Array.from(encoded.data as any);
   } finally {
     if (!hadBuffer) delete g.Buffer;
   }
+}
+/** RGB (3 bytes por píxel) → JPG en base64. */
+export function rgbToJpegBase64(img: { width: number; height: number; rgb: Uint8Array }, quality = 80): string {
+  const rgba = new Uint8Array(img.width * img.height * 4);
+  for (let i = 0, j = 0; i < img.rgb.length; i += 3, j += 4) {
+    rgba[j] = img.rgb[i];
+    rgba[j + 1] = img.rgb[i + 1];
+    rgba[j + 2] = img.rgb[i + 2];
+    rgba[j + 3] = 255;
+  }
+  return bytesToBase64(encodeJpegBytes(rgba, img.width, img.height, quality));
 }
 
 // ---------- archivos ----------

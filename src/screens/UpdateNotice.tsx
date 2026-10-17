@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import { AppState, Text, View } from "react-native";
+import { AppState, View } from "react-native";
+import { Text } from "../text";
 import type { Business } from "../business";
 import { Button, C, Note, s } from "../ui";
 import { checkForUpdates, restartForUpdate, updateIsReady } from "../updates";
@@ -38,7 +39,7 @@ export function UpdateNotice({
   }, [b]);
   if (!ready) return null;
   return (
-    <View style={{ padding: 12, backgroundColor: "#e7f1e9" }}>
+    <View style={{ padding: 12, backgroundColor: C.goldSoft, borderBottomWidth: 1, borderColor: C.amberLine }}>
       <Text style={s.subtitle}>Actualización lista · Reiniciar</Text>
       {!canRestart() && (
         <Note>Termina el cobro y cierra los formularios para reiniciar.</Note>

@@ -1,14 +1,17 @@
 import React from "react";
-import { Linking, Pressable, Text, View } from "react-native";
-import { money, today, type Row } from "../business";
+import { Linking, Pressable, View } from "react-native";
+import { Text } from "../text";
+import { localDay, money, today, type Row } from "../business";
 import { whatsappNumber } from "../receipt";
 import {
   Button,
   C,
   Card,
-  FOLLOW_UP_DAYS,
+  Icon,
+  IconButton,
   Note,
   Pill,
+  TextButton,
   daysBetween,
   fmtDay,
   followUpLabel,
@@ -22,10 +25,6 @@ export function renderCustomersPages(ctx: OwnerPageContext): Body | null {
   if (
     ![
       "Clientes",
-      "Campañas",
-      "Compañías",
-      "Ubicaciones",
-      "Oportunidades",
       "Datos importados",
     ].includes(ctx.page)
   )
@@ -35,7 +34,6 @@ export function renderCustomersPages(ctx: OwnerPageContext): Body | null {
     page,
     b,
     open,
-    cashAccount,
     filters,
     matching,
     searchBox,
@@ -43,25 +41,18 @@ export function renderCustomersPages(ctx: OwnerPageContext): Body | null {
     query,
     setFilters,
     openSale,
-    editCampaign,
+    go,
   } = ctx;
   const d = data!;
   const {
-    products,
     customers,
-    campaigns,
-    companies,
-    locations,
-    accounts,
-    sales,
-    lots,
-    m,
   } = d;
-  const low = products.filter(
-    (p) => !p.archived && p.inventoryKnown && p.available <= p.minimum,
-  );
   const soon = followUpsDue(customers);
   if (page === "Clientes") {
+    // 2.5 · Último catálogo enviado a cada cliente.
+    const lastCatalog = new Map<string, string>();
+    for (const x of (b!.setting("catalogSends", []) || []) as { customerId: string; at: string }[])
+      if (x.customerId && !lastCatalog.has(x.customerId)) lastCatalog.set(x.customerId, x.at);
     const filter = filters.Clientes || "Todos";
     const soonIds = new Set(soon.map((c) => c.id));
     const list = matching(customers).filter((c) =>
@@ -81,65 +72,110 @@ export function renderCustomersPages(ctx: OwnerPageContext): Body | null {
         data: list,
         header: (
           <>
-            <Button title="＋ Cliente" onPress={() => open("Cliente")} />
-            {!!soon.length && filter !== "Próximos 5 días" && (
-              <Card tone="warn">
-                <Text
-                  style={s.subtitle}
-                >{`🔔 ${soon.length === 1 ? "1 seguimiento próximo" : `${soon.length} seguimientos próximos`}`}</Text>
-                {soon.slice(0, 3).map((c) => (
-                  <Pressable
-                    key={c.id}
-                    accessibilityRole="button"
-                    onPress={() => open("Cliente", strings(c))}
-                    style={s.cartRow}
-                  >
-                    <Text
-                      style={[s.body, { flex: 1, fontWeight: "700" }]}
-                      numberOfLines={1}
-                    >
-                      {c.name}
-                    </Text>
-                    <Note color={c.daysLeft < 0 ? C.red : C.amber}>
-                      {followUpLabel(c.daysLeft, c.nextDate)}
-                    </Note>
-                  </Pressable>
-                ))}
-                <Button
-                  title={
-                    soon.length > 3
-                      ? `Ver los ${soon.length}`
-                      : "Ver seguimientos"
-                  }
-                  secondary
-                  small
-                  onPress={() =>
-                    setFilters((old) => ({
-                      ...old,
-                      Clientes: "Próximos 5 días",
-                    }))
-                  }
-                />
-              </Card>
-            )}
-            <View style={{ height: 8 }} />
-            {searchBox("Buscar nombre o teléfono")}
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <View style={{ flex: 1 }}>{searchBox("Buscar nombre o teléfono")}</View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Nuevo cliente"
+                onPress={() => open("Cliente")}
+                style={({ pressed }) => [
+                  {
+                    width: 46,
+                    height: 46,
+                    borderRadius: 23,
+                    backgroundColor: C.brand,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  },
+                  pressed && { opacity: 0.8 },
+                ]}
+              >
+                <Icon name="user-plus" size={21} color="#fff" />
+              </Pressable>
+            </View>
             {filterChips("Clientes", [
               "Todos",
               "Próximos 5 días",
               "Por contactar",
               "Archivados",
             ])}
+            {!!soon.length && filter !== "Próximos 5 días" && (
+              <View style={[s.list, { paddingHorizontal: 16, marginTop: 8 }]}>
+                <View style={[s.between, { paddingTop: 14, paddingBottom: 4 }]}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Icon name="bell" size={18} color={C.amber} />
+                    <Text style={[s.subtitle, { marginBottom: 0 }]}>
+                      {soon.length === 1 ? "1 seguimiento próximo" : `${soon.length} seguimientos próximos`}
+                    </Text>
+                  </View>
+                  <TextButton
+                    title={soon.length > 3 ? `Ver los ${soon.length}` : "Ver seguimientos"}
+                    onPress={() =>
+                      setFilters((old) => ({
+                        ...old,
+                        Clientes: "Próximos 5 días",
+                      }))
+                    }
+                  />
+                </View>
+                {soon.slice(0, 3).map((c, i) => (
+                  <Pressable
+                    key={c.id}
+                    accessibilityRole="button"
+                    onPress={() => open("Cliente", strings(c))}
+                    style={[s.cartRow, i === Math.min(2, soon.length - 1) && { borderBottomWidth: 0 }]}
+                  >
+                    <Text style={[s.body, { flex: 1, fontWeight: "500" }]} numberOfLines={1}>
+                      {c.name}
+                    </Text>
+                    <Text style={[s.muted, { color: c.daysLeft < 0 ? C.red : C.amber }]}>
+                      {followUpLabel(c.daysLeft, c.nextDate)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+            <View style={{ height: 6 }} />
           </>
         ),
         item: (c) => {
           const stats = d.byCustomer.get(c.id) ?? { count: 0, total: 0 };
           const late = c.nextDate ? daysBetween(c.nextDate, today()) : null;
           const wa = whatsappNumber(c.phone);
+          const initials = String(c.name || "?")
+            .split(/\s+/)
+            .slice(0, 2)
+            .map((w: string) => w[0] || "")
+            .join("")
+            .toUpperCase();
           return (
             <Card>
-              <View style={s.between}>
-                <Text style={[s.subtitle, { flex: 1 }]}>{c.name}</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <View
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    backgroundColor: C.soft,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Text style={{ fontSize: 15, fontWeight: "600", color: C.ink }}>{initials}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.body, { fontWeight: "600", fontSize: 17 }]} numberOfLines={1}>
+                    {c.name}
+                  </Text>
+                  <Text style={[s.muted, { fontSize: 13 }]} numberOfLines={1}>
+                    {[
+                      c.phone,
+                      `${stats.count} ${stats.count === 1 ? "compra" : "compras"} · ${money(stats.total)}`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </Text>
+                </View>
                 <Pill
                   text={c.stage}
                   tone={
@@ -149,53 +185,55 @@ export function renderCustomersPages(ctx: OwnerPageContext): Body | null {
                   }
                 />
               </View>
-              <Note>{c.phone || "Teléfono pendiente"}</Note>
               {late !== null && (
-                <Note color={late >= 0 ? C.red : C.muted}>
+                <Text style={[s.muted, { marginTop: 8, color: late >= 0 ? C.red : C.muted }]}>
                   {late > 0
                     ? `Contactar: vencido hace ${late} ${late === 1 ? "día" : "días"}`
                     : late === 0
                       ? "Contactar: hoy"
                       : `Próximo contacto: ${fmtDay(c.nextDate)}`}
-                </Note>
+                </Text>
               )}
-              {!!c.notes && <Note>{c.notes}</Note>}
-              <Text style={s.body}>
-                {stats.count} {stats.count === 1 ? "compra" : "compras"} ·{" "}
-                {money(stats.total)}
-              </Text>
-              <View style={s.wrap}>
+              {lastCatalog.has(c.id) && (
+                <Text style={[s.muted, { marginTop: 4, fontSize: 13 }]}>
+                  {`Catálogo enviado · ${fmtDay(localDay(lastCatalog.get(c.id)!))}`}
+                </Text>
+              )}
+              {!!c.notes && !/^importado del excel/i.test(String(c.notes)) && (
+                <Text style={[s.muted, { marginTop: 4 }]} numberOfLines={1}>
+                  {c.notes}
+                </Text>
+              )}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12 }}>
                 {!!c.phone && (
-                  <Button
-                    title="📞 Llamar"
-                    secondary
-                    small
-                    onPress={() =>
-                      Linking.openURL("tel:" + c.phone).catch(() => {})
-                    }
+                  <IconButton
+                    icon="phone"
+                    label="Llamar"
+                    bg={C.soft}
+                    onPress={() => void Linking.openURL("tel:" + c.phone).catch(() => {})}
                   />
                 )}
                 {!!wa && (
-                  <Button
-                    title="💬 WhatsApp"
-                    secondary
-                    small
-                    onPress={() =>
-                      Linking.openURL("https://wa.me/" + wa).catch(() => {})
-                    }
+                  <IconButton
+                    icon="message-circle"
+                    label="WhatsApp"
+                    bg={C.soft}
+                    onPress={() => void Linking.openURL("https://wa.me/" + wa).catch(() => {})}
                   />
                 )}
-                <Button
-                  title="Editar"
-                  secondary
-                  small
-                  onPress={() => open("Cliente", strings(c))}
+                <IconButton icon="pencil" label="Editar" bg={C.soft} onPress={() => open("Cliente", strings(c))} />
+                <IconButton
+                  icon="book-open"
+                  label={`Enviar catálogo a ${c.name}`}
+                  bg={C.soft}
+                  onPress={() => (
+                    setFilters((old) => ({ ...old, "Catálogo para clientes": c.id })),
+                    go("Catálogo para clientes")
+                  )}
                 />
-                <Button
-                  title="Nueva venta"
-                  small
-                  onPress={() => openSale({ customerId: c.id })}
-                />
+                <View style={{ flex: 1 }} />
+                {/* 2.5: "Vender" cabe junto a los 4 botones en pantallas de 360 dp. */}
+                <Button title="Vender" label="Nueva venta" small onPress={() => openSale({ customerId: c.id })} />
               </View>
             </Card>
           );
@@ -216,198 +254,6 @@ export function renderCustomersPages(ctx: OwnerPageContext): Body | null {
       },
     };
   }
-
-  if (page === "Campañas")
-    return {
-      scroll: (
-        <>
-          <Button title="＋ Campaña" onPress={() => open("Campaña")} />
-          <View style={{ height: 8 }} />
-          {searchBox("Buscar campaña o canal")}
-          {matching(campaigns).map((c) => (
-            <Card key={c.id}>
-              <View style={s.between}>
-                <Text style={[s.subtitle, { flex: 1 }]}>{c.name}</Text>
-                <Pill
-                  text={c.status || "Borrador"}
-                  tone={c.status === "Activa" ? "ok" : "neutral"}
-                />
-              </View>
-              <Note>
-                {c.channel} · {c.code}
-              </Note>
-              <Text style={s.body}>
-                Venta atribuida {money(c.revenue)} · Gasto {money(c.spend)}
-              </Text>
-              <Note>
-                Presupuesto {money(c.budget || 0)} · Margen bruto{" "}
-                {money(c.gross)}
-              </Note>
-              <Note>
-                {c.spend
-                  ? `ROAS: ${(c.revenue / c.spend).toFixed(2)}×`
-                  : "ROAS: pendiente de gasto registrado"}{" "}
-                · Resultado atribuido {money(c.gross - c.spend)}
-              </Note>
-              <View style={s.wrap}>
-                <Button
-                  title="Actualizar"
-                  secondary
-                  small
-                  onPress={() => editCampaign(c)}
-                />
-                <Button
-                  title="Registrar gasto"
-                  secondary
-                  small
-                  onPress={() =>
-                    open("Movimiento", {
-                      campaignId: c.id,
-                      note: `Campaña ${c.name}`,
-                      accountId: cashAccount(),
-                    })
-                  }
-                />
-                <Button
-                  title="Registrar venta"
-                  small
-                  onPress={() =>
-                    openSale({
-                      campaignId: c.id,
-                      channel: c.channel,
-                      companyId: c.companyId || "",
-                      locationId: c.locationId || "",
-                    })
-                  }
-                />
-              </View>
-            </Card>
-          ))}
-          {!campaigns.length && (
-            <Note>
-              Aún no hay campañas cargadas. Crea la primera con nombre, canal y
-              estado.
-            </Note>
-          )}
-        </>
-      ),
-    };
-
-  if (page === "Compañías" || page === "Ubicaciones") {
-    const isCompany = page === "Compañías";
-    return {
-      scroll: (
-        <>
-          <Button
-            title={"＋ " + (isCompany ? "Compañía" : "Ubicación")}
-            onPress={() => open(isCompany ? "Compañía" : "Ubicación")}
-          />
-          <View style={{ height: 8 }} />
-          {searchBox("Buscar por nombre")}
-          {matching(isCompany ? companies : locations).map((r) => (
-            <Card
-              key={r.id}
-              onPress={() =>
-                open(isCompany ? "Compañía" : "Ubicación", strings(r))
-              }
-            >
-              <Text style={s.subtitle}>{r.name}</Text>
-              <Note>
-                {r.kind}
-                {r.company ? ` · ${r.company}` : ""}
-              </Note>
-              <Note>
-                {r.address || r.phone || r.email || "Detalles pendientes"}
-              </Note>
-              {!!r.notes && <Note>{r.notes}</Note>}
-              {!isCompany && (
-                <Note>
-                  {units(
-                    lots
-                      .filter((l) => l.locationId === r.id)
-                      .reduce((n, l) => n + l.qty, 0),
-                  )}{" "}
-                  asignadas
-                </Note>
-              )}
-              <Note color={C.ink}>Toca para editar ›</Note>
-            </Card>
-          ))}
-          <Note>
-            {isCompany
-              ? "Registra tu negocio, proveedores, socios o clientes empresa."
-              : "Las existencias importadas están sin ubicación hasta que asignes sus lotes."}
-          </Note>
-        </>
-      ),
-    };
-  }
-
-  if (page === "Oportunidades")
-    return {
-      scroll: (
-        <>
-          <Card>
-            <Text style={s.subtitle}>Reposición</Text>
-            {low.length ? (
-              low.map((p) => (
-                <View key={p.id} style={s.cartRow}>
-                  <Text style={[s.body, { flex: 1 }]}>
-                    {p.name} · {p.available} disponibles
-                  </Text>
-                  <Button
-                    title="＋ Entrada"
-                    secondary
-                    small
-                    onPress={() => open("Entrada", { productId: p.id })}
-                  />
-                </View>
-              ))
-            ) : (
-              <Note>No hay productos en mínimo.</Note>
-            )}
-          </Card>
-          <Card>
-            <Text
-              style={s.subtitle}
-            >{`Seguimientos (vencidos y próximos ${FOLLOW_UP_DAYS} días)`}</Text>
-            {soon.length ? (
-              soon.map((c) => (
-                <View key={c.id} style={s.cartRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.body}>{c.name}</Text>
-                    <Note color={c.daysLeft < 0 ? C.red : C.amber}>
-                      {followUpLabel(c.daysLeft, c.nextDate)}
-                    </Note>
-                  </View>
-                  <Button
-                    title="Actualizar"
-                    secondary
-                    small
-                    onPress={() => open("Cliente", strings(c))}
-                  />
-                </View>
-              ))
-            ) : (
-              <Note>{`No hay seguimientos vencidos ni en los próximos ${FOLLOW_UP_DAYS} días.`}</Note>
-            )}
-          </Card>
-          <Card>
-            <Text style={s.subtitle}>Paquetes por probar</Text>
-            <Note>
-              Combina productos complementarios y valida el costo antes de
-              vender. Las sugerencias comerciales aún se registran manualmente.
-            </Note>
-            <Button
-              title="Crear paquete"
-              secondary
-              small
-              onPress={() => open("Paquete")}
-            />
-          </Card>
-        </>
-      ),
-    };
 
   if (page === "Datos importados")
     return {
@@ -452,8 +298,7 @@ export function renderCustomersPages(ctx: OwnerPageContext): Body | null {
               </Text>
             ))}
             <Note>
-              Campañas, compañías, ubicaciones y bancos reales no venían en las
-              fuentes y requieren captura.
+              Los bancos reales no venían en las fuentes y requieren captura.
             </Note>
           </Card>
           <Card>

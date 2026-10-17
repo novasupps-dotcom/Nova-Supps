@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
-import { Pressable, ScrollView, Share, Text, View } from "react-native";
+import { Pressable, ScrollView, Share, View } from "react-native";
+import { Text } from "../text";
 import { localDay, money, today, type Business } from "../business";
 import { paymentRows } from "../payments";
 import { Button, C, Card, Chips, Note, SearchBox, s } from "../ui";
@@ -73,6 +74,7 @@ export function PaymentsPage({
   return (
     <>
       <Chips
+        row
         options={["Hoy", "7 días", "Mes", "Todo"].map((name) => ({
           id: name,
           name,
@@ -86,6 +88,7 @@ export function PaymentsPage({
         placeholder="Buscar cobro por folio, cliente o cuenta"
       />
       <Chips
+        row
         options={["Todos", ...new Set(rows.map((r) => r.method))].map(
           (name) => ({ id: name, name }),
         )}
@@ -96,10 +99,7 @@ export function PaymentsPage({
         <Text style={s.subtitle}>{shown.length} movimientos</Text>
         <Note>{`Cobros y abonos: ${money(received)} · Devoluciones: ${money(returned)}`}</Note>
         <Text style={s.price}>{`Neto: ${money(received - returned)}`}</Text>
-        <Note>
-          El neto de esta tabla corresponde a cobros menos devoluciones. Las
-          comisiones y gastos se consultan en Reportes y Corte de caja.
-        </Note>
+        <Note>Neto = cobros menos devoluciones. Comisiones y gastos están en Reportes y Corte de caja.</Note>
       </Card>
       <ScrollView
         horizontal

@@ -9,7 +9,7 @@ export type Outcome = "pending" | "approved" | "canceled" | "failed" | "expired"
 type Fetch = (url: string, init?: any) => Promise<{ ok: boolean; status: number; json: () => Promise<any>; text?: () => Promise<string> }>;
 
 const MESSAGES: Record<string, string> = {
-  unauthorized: "La clave de Mercado Pago no es válida o venció. Revísala en Parámetros → Terminal Mercado Pago.",
+  unauthorized: "La clave de Mercado Pago no es válida o venció. Revísala en Ajustes → Terminal Mercado Pago.",
   user_not_authorized: "La clave no tiene permiso para esta operación.",
   forbidden_checking_terminal_owner: "La terminal elegida no pertenece a la cuenta de esta clave.",
   already_queued_order_for_terminal: "La terminal ya tiene un cobro en espera. Termínalo o cancélalo en la terminal y vuelve a intentar.",

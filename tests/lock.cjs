@@ -34,7 +34,7 @@ function text(node){if(typeof node==='string')return node;return (node.children|
 const H=(ui)=>({
  all:()=>text(ui.root),
  has:(label)=>ui.root.findAll(n=>n.type==='Pressable'&&text(n).includes(label)).length>0,
- async press(label){let c=ui.root.findAll(n=>n.type==='Pressable'&&text(n).trim()===label&&typeof n.props.onPress==='function');if(!c.length)c=ui.root.findAll(n=>n.type==='Pressable'&&text(n).includes(label)&&typeof n.props.onPress==='function').slice(-1);assert(c.length,'botón '+label);await act(async()=>c[0].props.onPress());},
+ async press(label){if(label==='Ajustes'&&!ui.root.findAll(n=>n.type==='Pressable'&&(n.props.accessibilityLabel==='Ajustes'||text(n).trim()==='Ajustes')).length){const v=ui.root.findAll(n=>n.type==='Pressable'&&n.props.accessibilityState&&'selected' in n.props.accessibilityState&&text(n).trim()==='Vender');if(v.length)await act(async()=>v[v.length-1].props.onPress());}if(label==='Cuenta'&&!ui.root.findAll(n=>n.type==='Pressable'&&n.props.accessibilityLabel==='Cuenta').length&&text(ui.root).includes('Cerrar sesión'))return;let c=ui.root.findAll(n=>n.type==='Pressable'&&text(n).trim()===label&&typeof n.props.onPress==='function');if(!c.length)c=ui.root.findAll(n=>n.type==='Pressable'&&n.props.accessibilityLabel===label&&typeof n.props.onPress==='function');if(!c.length)c=ui.root.findAll(n=>n.type==='Pressable'&&text(n).includes(label)&&typeof n.props.onPress==='function').slice(-1);assert(c.length,'botón '+label);await act(async()=>c[0].props.onPress());},
  input:(label)=>ui.root.findAll(n=>n.type==='TextInput'&&n.props.accessibilityLabel===label)[0],
  async type(label,v){const i=this.input(label);assert(i,'campo '+label);await act(async()=>i.props.onChangeText(v));},
  async code(label,raw){for(const ch of raw){const i=this.input(label);assert(i,'campo '+label);await act(async()=>i.props.onChangeText(String(i.props.value||'')+ch));}},
@@ -55,7 +55,7 @@ const mount=async(db)=>{current=db;let ui;await act(async()=>{ui=renderer.create
  await h.type('Correo','dueno@gns.mx');await h.type('Contraseña','mala');await h.press('Entrar');await flush(6);assert(h.all().includes('Correo o contraseña incorrectos'));
  await h.type('Correo','intruso@x.mx');await h.type('Contraseña','secreto2');await h.press('Entrar');await flush(6);assert(h.all().includes('no tiene acceso a la tienda'),'cuenta sin acceso');assert.equal(new Business(A.db).setting('appRole',null),null);
  // Olvidé mi contraseña: correo con código → contraseña nueva
- await h.press('¿Olvidaste tu contraseña?');await h.type('Tu correo','dueno@gns.mx');await h.press('📧 Enviarme el correo');await flush(6);
+ await h.press('¿Olvidaste tu contraseña?');await h.type('Tu correo','dueno@gns.mx');await h.press('Enviarme el correo');await flush(6);
  const mail=fake.state.mails.at(-1);assert.equal(mail.to,'dueno@gns.mx');assert(h.all().includes('te llegó un correo'));
  await h.type('Código del correo','000000');await h.type('Contraseña nueva (mínimo 8)','nueva-clave-1');await h.type('Repite la contraseña nueva','nueva-clave-1');await h.press('Guardar contraseña nueva');await flush(6);assert(h.all().includes('venció o no es correcto'),'código equivocado');
  await h.type('Código del correo',mail.code);await h.press('Guardar contraseña nueva');await flush(6);assert(h.all().includes('contraseña cambiada'),'contraseña cambiada');
@@ -64,11 +64,11 @@ const mount=async(db)=>{current=db;let ui;await act(async()=>{ui=renderer.create
  await h.type('Contraseña','nueva-clave-1');await h.press('Entrar');await flush(8);assert(h.all().includes('Restaura tu negocio'),'dueño entra');
  assert.equal(await old.rpc('request_join',{p_name:''}),'other_device','el teléfono anterior deja de ser el del dueño');
  await act(async()=>ui.unmount());ui=await mount(A.db);h=H(ui);assert(h.all().includes('Restaura tu negocio'),'si cierra la app vuelve a restaurar');
- pickedFile='{"no":"es un respaldo"}';await h.press('📂 Elegir mi respaldo');await flush(4);assert(h.all().includes('No se pudo restaurar'));assert.equal(new Business(A.db).setting('appRole',null),null);
- pickedFile=sb.backup();await h.press('📂 Elegir mi respaldo');await flush(8);assert(h.all().includes('Parámetros')&&h.all().includes('Vender'),'ve su negocio');assert(!h.all().includes('PIN'));
+ pickedFile='{"no":"es un respaldo"}';await h.press('Elegir mi respaldo');await flush(4);assert(h.all().includes('No se pudo restaurar'));assert.equal(new Business(A.db).setting('appRole',null),null);
+ pickedFile=sb.backup();await h.press('Elegir mi respaldo');await flush(8);assert(h.all().includes('Clientes')&&h.all().includes('Vender'),'ve su negocio');assert(!h.all().includes('PIN'));
  const b=new Business(A.db);assert.equal(b.setting('appRole',null),'owner');assert.equal(b.setting('ownerVerified',null),null);
  assert(!b.backup().includes('ownerVerified')&&!b.backup().includes(b.setting('cloudSession',null).access_token),'el respaldo no lleva la sesión');
- await h.press('Parámetros');await h.press('Invitar, formas de pago y sincronizar');await flush(6);assert(h.all().includes('Base en línea'),'ya conectado como dueño');assert(!h.all().includes('recuperación'),'sin código de recuperación');
+ await h.press('Ajustes');await h.press('Invitar, formas de pago y sincronizar');await flush(6);assert(h.all().includes('Base en línea'),'ya conectado como dueño');assert(!h.all().includes('recuperación'),'sin código de recuperación');
  // 2.1: otro teléfono nuevo del dueño restaura desde la nube (sin buscar el archivo).
  {const {uploadBackup}=require('../src/cloudBackup.ts');const {Cloud}=require('../src/cloud.ts');const {deviceId}=require('../src/device.ts');
   const c=new Cloud(b.setting('cloudConfig',null),b.setting('cloudSession',null),ns=>b.setSetting('cloudSession',ns),fake.fetch);c.device=deviceId(b);const up=await uploadBackup(b,c,'test');
@@ -76,23 +76,23 @@ const mount=async(db)=>{current=db;let ui;await act(async()=>{ui=renderer.create
   await act(async()=>ui.unmount());ui=await mount(Z.db);h=H(ui);await flush(6);assert(h.all().includes('Restaura tu negocio')&&h.all().includes('Restaurar de la nube'),'ofrece el respaldo de la nube');
   const part=fake.T.owner_backup_parts.find(x=>x.backup_id===up.id);const good=part.data;part.data='AAAA'+good.slice(4);
   await h.press('Restaurar de la nube');await flush(8);assert(h.all().includes('No se pudo restaurar')&&h.all().includes('verificación'),'respaldo dañado: '+h.all().slice(0,300));assert.equal(new Business(Z.db).setting('appRole',null),null);
-  part.data=good;await h.press('Restaurar de la nube');await flush(10);assert(h.all().includes('Parámetros')&&h.all().includes('Vender'),'restaurado desde la nube');
+  part.data=good;await h.press('Restaurar de la nube');await flush(10);assert(h.all().includes('Clientes')&&h.all().includes('Vender'),'restaurado desde la nube');
   const zr=new Business(Z.db);assert.equal(zr.setting('appRole',null),'owner');assert.equal(zr.stock().length,b.stock().length,'mismo inventario');assert.equal(zr.sales().length,b.sales().length,'mismas ventas');
   await act(async()=>ui.unmount());ui=await mount(A.db);h=H(ui);}
  // El teléfono anterior: se le pide la contraseña para volver a ser dueño (no un código)
  const O=mk();const ob=seed(O.db);ob.setSetting('appRole','owner');ob.setSetting('cloudConfig',global.__STORE_CLOUD);ob.setSetting('deviceId','dev-viejo-0123456789');ob.setSetting('cloudSession',old.session);
- await act(async()=>ui.unmount());ui=await mount(O.db);h=H(ui);await h.press('Parámetros');await h.press('Invitar, formas de pago y sincronizar');await flush(8);
+ await act(async()=>ui.unmount());ui=await mount(O.db);h=H(ui);await h.press('Ajustes');await h.press('Invitar, formas de pago y sincronizar');await flush(8);
  assert(h.all().includes('se abrió en otro teléfono'),'aviso en el teléfono anterior');await h.type('Tu contraseña','nueva-clave-1');await h.press('Usar este teléfono como dueño');await flush(8);
  assert(h.all().includes('volvió a ser el del dueño'));assert.equal(fake.T.members.find(m=>m.role==='owner').device_id,'dev-viejo-0123456789');
  await act(async()=>ui.unmount());
  console.log('  ✓ inicio de sesión solo con correo y contraseña (sin REC ni empezar de cero), recuperación de contraseña por correo y respaldo del dueño');
  // ---------- Huella opcional, sin PIN ----------
  bio.hardware=true;bio.result=false;ui=await mount(A.db);h=H(ui);await flush(4);
- assert(h.all().includes('Nova Negocio está protegido')&&!h.all().includes('Parámetros'),'huella fallida: bloqueado');assert(!h.all().includes('PIN'));
- bio.result=true;await h.press('Desbloquear con huella o rostro');await flush(2);assert(h.all().includes('Parámetros'),'abre con huella');
- await h.press('Parámetros');await h.press('Bloquear ahora');assert(h.all().includes('Nova Negocio está protegido'));await h.press('Desbloquear con huella o rostro');await flush(2);
+ assert(h.all().includes('Nova Negocio está protegido')&&!h.all().includes('Clientes'),'huella fallida: bloqueado');assert(!h.all().includes('PIN'));
+ bio.result=true;await h.press('Desbloquear con huella o rostro');await flush(2);assert(h.all().includes('Clientes'),'abre con huella');
+ await h.press('Ajustes');await h.press('Bloquear ahora');assert(h.all().includes('Nova Negocio está protegido'));await h.press('Desbloquear con huella o rostro');await flush(2);
  await h.press('Desactivar bloqueo');assert.equal(new Business(A.db).setting('biometricEnabled',true),false);await act(async()=>ui.unmount());
- ui=await mount(A.db);h=H(ui);await flush(2);assert(h.all().includes('Parámetros'),'sin bloqueo si se desactivó');await act(async()=>ui.unmount());
+ ui=await mount(A.db);h=H(ui);await flush(2);assert(h.all().includes('Clientes'),'sin bloqueo si se desactivó');await act(async()=>ui.unmount());
  bio.hardware=false;
  console.log('  ✓ sin PIN: huella o rostro opcionales, Bloquear ahora y desactivar');
  // ---------- Vendedor: directo a conectarse ----------
