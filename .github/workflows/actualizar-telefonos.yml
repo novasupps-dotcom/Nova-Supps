@@ -1,6 +1,47 @@
+name: Actualizar teléfonos
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "App.tsx"
+      - "index.ts"
+      - "src/**"
+      - "assets/**"
+      - "app.json"
+      - "app.config.*"
+      - "eas.json"
+      - "package.json"
+      - "package-lock.json"
+      - ".npmrc"
+      - "babel.config.*"
+      - "metro.config.*"
+      - "tsconfig.json"
+      - "tests/**"
+      - "scripts/**"
+      - ".github/workflows/actualizar-telefonos.yml"
+
+  # Permite ejecutarlo desde el botón "Run workflow" de GitHub.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Evita publicar dos actualizaciones simultáneamente.
+concurrency:
+  group: nova-negocio-preview
+  cancel-in-progress: false
+
 jobs:
-  Pruebas:
+  probar-y-publicar:
+    name: Pruebas y publicación
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # También limita las ejecuciones manuales a master.
+    if: github.ref == 'refs/heads/master'
+
     steps:
       - name: Descargar código del repositorio
         uses: actions/checkout@v4
@@ -8,15 +49,45 @@ jobs:
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
+          cache: npm
 
       - name: Configurar Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.10"
+
+      - name: Instalar dependencias de Node.js
+        run: npm ci
 
       - name: Instalar dependencias de Python
         run: python -m pip install openpyxl
 
       - name: Ejecutar pruebas del sistema
         run: node tests/v17.cjs
+
+      - name: Verificar configuración de Expo
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Falta configurar el secreto EXPO_TOKEN en GitHub."
+            exit 1
+          fi
+
+      - name: Configurar EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # Si algún paso anterior falla, este paso no se ejecuta.
+      - name: Publicar actualización en preview
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          eas update \
+            --channel preview \
+            --environment preview \
+            --message "Nova Negocio - ${COMMIT_SHA}" \
+            --non-interactive
