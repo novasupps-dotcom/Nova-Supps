@@ -791,7 +791,7 @@ export function catalogWorkbook(b: Business, when = new Date()): { bytes: Uint8A
 // ---------------------------------------------------------------- 2.7 · arreglar renglones desde la app
 
 /** Campos que se pueden modificar desde la app (en este orden). */
-export const EDITABLE: Field[] = ["name", "sku", "category", "price", "flavor", "stock", "barcode", "cost"];
+export const EDITABLE: Field[] = ["name", "sku", "category", "price", "flavor", "stock", "addQty", "barcode", "cost"];
 export const fieldLabel = (f: Field) => LABEL[f];
 
 /** Valores de un renglón como texto (para precargar el formulario de «Modificar»). */

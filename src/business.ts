@@ -1510,6 +1510,45 @@ export class Business {
     return result;
   }
   /**
+   * 2.8.4 · Corregir la cantidad (por ejemplo, inventario que se cargó dos veces). No es
+   * merma: al bajar se quitan primero las piezas cargadas más recientemente (las duplicadas)
+   * y el movimiento queda como «correction», fuera de mermas y utilidad.
+   */
+  correctStock(productId: string, target: number, note = "Inventario duplicado") {
+    integer(target);
+    const result = { before: 0, after: target };
+    this.transaction(() => {
+      this.one("SELECT id FROM products WHERE id=?", productId);
+      const lots = this.all("SELECT * FROM lots WHERE productId=? ORDER BY rowid DESC", productId);
+      const before = lots.reduce((n, l) => n + l.qty, 0);
+      assert(target !== before, "Es la misma cantidad que ya tienes.");
+      const key = id();
+      const now = new Date().toISOString();
+      const label = "Corrección" + (note.trim() ? `: ${note.trim()}` : "");
+      if (target < before) {
+        let remove = before - target;
+        for (const lot of lots) {
+          if (!remove) break;
+          const take = Math.min(remove, lot.qty - this.reservedForLot(lot.id));
+          if (take <= 0) continue;
+          this.run("UPDATE lots SET qty=qty-? WHERE id=?", take, lot.id);
+          this.run("INSERT INTO stock_moves VALUES(?,?,?,?,?,?,?)", id(), now, lot.id, -take, "correction", key, label);
+          remove -= take;
+        }
+        assert(remove === 0, "No puedes dejar menos piezas que las apartadas para entregas pendientes.");
+      } else {
+        const cost = lots[0]?.cost ?? this.setting("product:" + productId, {}).referenceCost ?? 0;
+        integer(cost);
+        this.run("INSERT INTO lots VALUES(?,?,?,?,?,?)", key, productId, label, "", cost, target - before);
+        this.run("INSERT INTO stock_moves VALUES(?,?,?,?,?,?,?)", id(), now, key, target - before, "correction", key, label);
+      }
+      this.setSetting("product:" + productId, { ...this.setting("product:" + productId, {}), inventoryKnown: true });
+      this.audit("stock.correct", productId, `${before} → ${target} · ${label}`);
+      result.before = before;
+    });
+    return result;
+  }
+  /**
    * Elimina por completo una venta YA CANCELADA, como si nunca se hubiera
    * registrado: renglones, lotes asignados, cobros, devolución y su comisión.
    * Solo procede si el inventario y el dinero de esa venta ya están en cero.

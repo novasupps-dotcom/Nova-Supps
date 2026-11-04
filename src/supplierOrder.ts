@@ -514,6 +514,11 @@ export function catalogPrice(b: Business, client: number): number {
 // ---------------------------------------------------------------- aplicar
 
 export type GroupDecision = { client: number; keepCurrent: boolean };
+
+/** 2.8.4 · El plan con las cantidades que el dueño cambió (por renglón). El costo por pieza no cambia. */
+export function withQuantities(plan: OrderPlan, qty: Record<string, number>): OrderPlan {
+  return { ...plan, items: plan.items.map((it) => (qty[it.key] === undefined ? it : { ...it, line: { ...it.line, qty: qty[it.key] } })) };
+}
 export type ApplyResult = { created: number; restocked: number; units: number; repriced: number; paid: number };
 
 export function applySupplierOrder(
@@ -540,6 +545,8 @@ export function applySupplierOrder(
       const members = g.items.map((i) => plan.items[i]);
       const grouped = members.length > 1 || b.stock().some((p: Row) => p.family === g.family && !members.some((m) => m.productId === p.id));
       for (const it of members) {
+        // 2.8.4: la cantidad se puede cambiar antes de cargar; 0 = no se carga ese renglón.
+        if (it.line.qty <= 0) continue;
         let productId = it.productId;
         if (!productId) {
           productId = b.addProduct(it.newSku, it.newName, it.category, price, 1);
