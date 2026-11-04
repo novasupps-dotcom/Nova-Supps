@@ -54,7 +54,9 @@ La comprobación local revisa Expo, URL de actualizaciones, Firebase, paquete, v
 eas build -p android --profile preview
 ```
 
-Permite que Expo genere o use **su propia llave de compilación**. La llave original de Nova está en `signing/` y debe permanecer en tu PC. No la importes a EAS. `.easignore` excluye firma, credenciales, APK, fuentes archivadas y cuentas de servicio.
+> **Desde la 2.6.0 esta sección cambió:** la llave original se sube una vez a Expo y EAS firma el APK directamente (sin refirmar). Sigue [FIRMA_EXPO.md](FIRMA_EXPO.md); los pasos 5 y 6 de abajo quedan solo como referencia histórica.
+
+Antes de la 2.6.0: Expo usaba su propia llave de compilación y la llave original de Nova (`signing/`) se aplicaba en tu PC. `.easignore` excluye firma, credenciales, APK, fuentes archivadas y cuentas de servicio.
 
 Descarga el APK con otro nombre, por ejemplo **Nova_2.2.3_EAS.apk**. Aún tiene la firma de Expo y debe refirmarse antes de instalarlo encima de la app actual.
 

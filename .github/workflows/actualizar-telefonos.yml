@@ -1,94 +1,98 @@
+# Nova Negocio · cada vez que llega una versión a GitHub (rama master):
+#   1) revisa la configuración y corre TODAS las pruebas, y si pasan
+#   2) la publica por internet (EAS Update, canal "preview") y los teléfonos se actualizan solos.
+# Si una prueba falla, NO se publica nada y los teléfonos siguen con la versión anterior.
+# Configuración única: docs/ACTUALIZACIONES_AUTOMATICAS.md (secreto EXPO_TOKEN).
+#
+# 2.6.0: vuelve a correr todas las pruebas (la versión anterior de este archivo solo corría
+# tests/v17.cjs) e instala openpyxl, que necesita la prueba del Excel de ventas.
 name: Actualizar teléfonos
 
 on:
   push:
-    branches:
-      - master
+    branches: [master]
     paths:
       - "App.tsx"
       - "index.ts"
       - "src/**"
       - "assets/**"
       - "app.json"
-      - "app.config.*"
+      - "app.config.js"
       - "eas.json"
       - "package.json"
       - "package-lock.json"
-      - ".npmrc"
-      - "babel.config.*"
-      - "metro.config.*"
-      - "tsconfig.json"
       - "tests/**"
       - "scripts/**"
       - ".github/workflows/actualizar-telefonos.yml"
-
-  # Permite ejecutarlo desde el botón "Run workflow" de GitHub.
+  # Botón "Run workflow" en GitHub → Actions.
   workflow_dispatch:
+
+concurrency:
+  group: actualizar-telefonos
+  cancel-in-progress: false
 
 permissions:
   contents: read
 
-# Evita publicar dos actualizaciones simultáneamente.
-concurrency:
-  group: nova-negocio-preview
-  cancel-in-progress: false
-
 jobs:
-  probar-y-publicar:
-    name: Pruebas y publicación
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    # También limita las ejecuciones manuales a master.
-    if: github.ref == 'refs/heads/master'
-
+  pruebas:
+    name: Pruebas
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
     steps:
-      - name: Descargar código del repositorio
-        uses: actions/checkout@v4
-
-      - name: Configurar Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
-          node-version: "22"
-          check-latest: true
+          node-version: 22
           cache: npm
-
-      - name: Configurar Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
-          python-version: "3.10"
+          python-version: "3.12"
+      - name: Instalar
+        run: |
+          npm ci --no-audit --no-fund
+          python -m pip install --disable-pip-version-check openpyxl
+      - name: Revisar versión y runtime 2.2.4
+        run: node scripts/check_android_config.cjs --ota
+      - name: TypeScript
+        run: npx tsc --noEmit -p . --noUnusedLocals
+      - name: Todas las pruebas
+        env:
+          NOVA_TEST_PYTHON: python
+        run: npm run test:all
 
-      - name: Instalar dependencias de Node.js
-        run: npm ci
-
-      - name: Instalar dependencias de Python
-        run: python -m pip install openpyxl
-
-      - name: Ejecutar pruebas del sistema
-        run: node tests/v17.cjs
-
-      - name: Verificar configuración de Expo
+  publicar:
+    name: Publicar a los teléfonos
+    needs: pruebas
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Revisar el token de Expo
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           if [ -z "$EXPO_TOKEN" ]; then
-            echo "::error::Falta configurar el secreto EXPO_TOKEN en GitHub."
+            echo "::error::Falta el secreto EXPO_TOKEN en GitHub (docs/ACTUALIZACIONES_AUTOMATICAS.md, paso 1). No se publicó nada."
             exit 1
           fi
-
-      - name: Configurar EAS CLI
-        uses: expo/expo-github-action@v8
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Instalar
+        run: npm ci --no-audit --no-fund
+      - uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
-
-      # Si algún paso anterior falla, este paso no se ejecuta.
-      - name: Publicar actualización en preview
-        env:
-          COMMIT_SHA: ${{ github.sha }}
+      - name: Canal "preview" (el que usan los teléfonos)
+        run: eas channel:view preview --non-interactive > /dev/null 2>&1 || eas channel:create preview --non-interactive
+      - name: Publicar la versión
         run: |
-          eas update \
-            --channel preview \
-            --environment preview \
-            --message "Nova Negocio - ${COMMIT_SHA}" \
-            --non-interactive
+          VERSION=$(node -p "require('./app.json').expo.version")
+          eas update --channel preview --environment preview --platform android \
+            --message "Nova Negocio $VERSION (${GITHUB_SHA::7})" --non-interactive
+          echo "### Publicada Nova Negocio $VERSION" >> "$GITHUB_STEP_SUMMARY"
+          echo "Los teléfonos la descargan solos y la instalan al volver a abrir la app." >> "$GITHUB_STEP_SUMMARY"

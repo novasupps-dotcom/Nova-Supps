@@ -1,0 +1,64 @@
+# Nova Negocio · Compilar el APK de Android en Expo (EAS Build) con la firma guardada en Expo.
+# Solo se ejecuta a mano: GitHub → Actions → «Compilar APK» → Run workflow.
+# Hace falta solo cuando cambia algo nativo (permisos, módulos, ícono). Los cambios de la app
+# llegan solos a los teléfonos con «Actualizar teléfonos».
+# Configuración única (llave de firma y google-services.json en Expo): docs/FIRMA_EXPO.md
+name: Compilar APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      perfil:
+        description: "Perfil de eas.json"
+        type: choice
+        options: [preview, production]
+        default: preview
+
+permissions:
+  contents: read
+
+jobs:
+  compilar:
+    name: Pruebas y compilación en Expo
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Revisar el token de Expo
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Falta el secreto EXPO_TOKEN en GitHub (docs/ACTUALIZACIONES_AUTOMATICAS.md, paso 1)."
+            exit 1
+          fi
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Instalar
+        run: |
+          npm ci --no-audit --no-fund
+          python -m pip install --disable-pip-version-check openpyxl
+      - name: Pruebas
+        env:
+          NOVA_TEST_PYTHON: python
+        run: |
+          node scripts/check_android_config.cjs --ota
+          npx tsc --noEmit -p . --noUnusedLocals
+          npm run test:all
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      # Sin llave de firma en Expo, EAS se detiene (en modo no interactivo nunca crea una llave
+      # nueva): así un APK con otra firma no puede llegar por error a los teléfonos.
+      - name: Compilar en Expo
+        run: |
+          eas build --platform android --profile "${{ inputs.perfil }}" --non-interactive --no-wait --json > build.json
+          URL=$(node -p "(require('./build.json')[0]||{}).buildDetailsPageUrl||''")
+          echo "### Compilación enviada a Expo" >> "$GITHUB_STEP_SUMMARY"
+          echo "Tarda de 10 a 20 minutos. Descarga el APK aquí: $URL" >> "$GITHUB_STEP_SUMMARY"

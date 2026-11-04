@@ -1,6 +1,12 @@
-# Nova Negocio · 2.5.3
+# Nova Negocio · 2.6.0
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
+
+**2.6.0 · Actualizar catálogo desde Excel y firma en Expo (versionCode 52, solo JavaScript sobre el runtime 2.2.4):**
+
+- Ajustes → **Actualizar catálogo**: descarga tu catálogo en Excel, cámbialo (precios, nombres, categorías, códigos de barras, marca, sabor, presentación, descripción, activo) o agrega productos nuevos, y vuelve a cargarlo (.xlsx o CSV). La app muestra los cambios y los errores por renglón antes de aplicar, guarda una copia de tus datos, aplica todo en una sola transacción y publica el catálogo a los vendedores. «Agregar piezas» suma existencias como lote nuevo sin mover dinero. Nunca cambia ventas, cobros ni costos anteriores. Código: `src/catalogImport.ts` (lector de Excel/CSV sin dependencias nuevas, usa fflate) y `src/screens/CatalogImport.tsx`; pruebas en `tests/catalogImport.test.ts` y `tests/catalogui.cjs`.
+- **Firma administrada por Expo:** la llave original se sube una vez a EAS y Expo firma el APK (sin `resign_apk.py`). `eas.json` usa credenciales remotas en preview y production, `app.config.js` toma `google-services.json` de la variable de archivo `GOOGLE_SERVICES_JSON` de EAS y el flujo **Compilar APK** (`.github/workflows/compilar-apk.yml`) compila desde GitHub. Pasos en `docs/FIRMA_EXPO.md`.
+- Correcciones: «Actualizar teléfonos» volvía a correr solo `tests/v17.cjs` (sin TypeScript, sin revisar la configuración ni las otras 17 pruebas) porque la primera publicación falló por falta de `openpyxl`; ahora instala `openpyxl`, corre todas las pruebas y publica solo Android. Permisos duplicados en `app.json`. Acciones de GitHub actualizadas (Node 20 ya no se admite) y runner fijo `ubuntu-24.04`.
 
 **2.5.3 · Actualizaciones automáticas (versionCode 51):** cada versión llega sola a los teléfonos. La PC la sube a GitHub (`scripts/windows/`), GitHub Actions corre las pruebas y publica con EAS Update (canal `preview`), y la app la descarga y la aplica al volver a abrirla, nunca a media venta. Configuración única y detalles en `docs/ACTUALIZACIONES_AUTOMATICAS.md`.
 
@@ -136,7 +142,8 @@ Se compila en la nube de Expo (EAS) desde tu computadora y se instala con TestFl
 | `src/sync.ts`, `src/cloud.ts` | Sincronización con Supabase (publicar catálogo, registrar ventas de vendedores) |
 | `src/salesExcel.ts`, `src/xlsx.ts` | Excel de ventas (generador .xlsx propio, sin dependencias) |
 | `src/iosPhoto.ts` | Foto del producto en iPhone (solo se carga en iOS) |
-| `src/screens/` | Pantallas 2.1: Promociones, Reportes, Catálogo para clientes y Respaldo en la nube |
+| `src/screens/` | Pantallas 2.1: Promociones, Reportes, Catálogo para clientes y Respaldo en la nube; 2.6: Actualizar catálogo |
+| `src/catalogImport.ts` | 2.6: lectura de Excel/CSV, vista previa y aplicación de cambios al catálogo, Excel del catálogo |
 | `src/reports.ts` | Reporte por producto, por vendedor y de promociones |
 | `src/pdf.ts`, `src/catalogPdf.ts`, `src/catalogueThumbs.ts` | PDF propio (sin dependencias) y catálogo para clientes |
 | `src/cloudBackup.ts`, `src/sha256.ts` | Respaldo en la nube (gzip con fflate, en partes, verificado con SHA-256) |
@@ -163,6 +170,7 @@ El código vive en un repositorio **privado** de GitHub. `.gitignore` deja fuera
   - `v21`: promociones (dueño, vendedor y servidor), lector de códigos, reportes, catálogo para clientes, respaldo en la nube y base en línea anterior a 2.1.
   - `hermes`: catálogo por WhatsApp sin `Buffer` (como en Android con Hermes).
   - `iosphoto`: foto del producto en iPhone (Fotos, cámara, Archivos → JPG de 1024 px).
+  - `catalogui` (y `tests/catalogImport.test.ts`): Actualizar catálogo desde Excel/CSV (2.6).
   - `v17`: precios originales, comisión que absorbe el cliente (2.0), Excel, avisos, venta por categoría, carrito y Parámetros.
 - `node tests/screens.cjs`: recorre todas las pantallas del dueño y falla si hay textos fuera de `<Text>`, valores rotos (NaN, undefined) o avisos de React.
 

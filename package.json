@@ -1,6 +1,6 @@
 {
   "name": "nova-negocio",
-  "version": "2.5.3",
+  "version": "2.6.0",
   "private": true,
   "main": "index.ts",
   "scripts": {
@@ -26,6 +26,7 @@
     "test:secure": "node tests/secure.cjs",
     "test:v22": "node tests/v22.cjs",
     "test:sql22": "node tests/sql22.cjs",
+    "test:catalog": "node --experimental-strip-types --import ./tests/ts-resolve.mjs --test tests/catalogImport.test.ts && node tests/catalogui.cjs",
     "android:config": "node scripts/check_android_config.cjs"
   },
   "dependencies": {

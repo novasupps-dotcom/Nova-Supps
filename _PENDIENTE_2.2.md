@@ -1,3 +1,22 @@
+# Nova Negocio 2.6.0 · 4-nov-2026
+
+Actualización de JavaScript sobre el runtime nativo 2.2.4: llega sola a los teléfonos cuando GitHub la publica.
+
+Hecho en 2.6.0:
+- Ajustes → Actualizar catálogo: descargar el catálogo en Excel, editarlo y volver a cargarlo (.xlsx o CSV) con vista previa,
+  errores por renglón, copia previa de los datos y publicación a vendedores.
+- Firma administrada por Expo (docs/FIRMA_EXPO.md) y flujo «Compilar APK» en GitHub.
+- «Actualizar teléfonos» vuelve a correr todas las pruebas (solo corría una) y publica solo Android.
+
+PENDIENTE TUYO (una sola vez, ~10 min): docs/FIRMA_EXPO.md
+1) Subir signing\nova-release.jks a Expo (eas credentials) y revisar la huella 3B:71:F0:2D…AE:94.
+2) Subir google-services.json como variable de archivo GOOGLE_SERVICES_JSON en expo.dev.
+
+Probar en el teléfono del dueño:
+1. Ajustes debe decir «Nova Negocio 2.6.0».
+2. Ajustes → Actualizar catálogo → Descargar catálogo en Excel. Cambia el precio de un producto y agrega uno nuevo.
+3. Elegir archivo → revisa la vista previa → Aplicar. Revisa el precio en Vender y en el teléfono de un vendedor.
+
 # Nova Negocio 2.5.3 · 17-oct-2026
 
 Actualización de JavaScript sobre el APK nativo 2.2.4 (mismo runtime de expo-updates 2.2.4).
