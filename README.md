@@ -1,6 +1,11 @@
-# Nova Negocio · 2.8.3
+# Nova Negocio · 2.8.4
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
+
+**2.8.4 · Cambiar la cantidad (inventario duplicado) (versionCode 60):**
+
+- **Stock → producto → Cantidad**: escribe cuántas piezas tienes de verdad. Con el motivo «Se duplicó» no es merma: se quitan primero las piezas cargadas más recientemente (las duplicadas), no mueve dinero y no baja tu utilidad (movimiento «correction»). Los demás motivos del Conteo siguen contando como merma.
+- **Al cargar**: en el Excel, cada producto que ya existe tiene «Cantidad» para cambiar las piezas antes de aplicar (y «Modificar» ya incluye Agregar piezas). En el PDF, al tocar un producto se puede cambiar la cantidad de cada sabor (0 = no se carga); el costo por pieza no cambia.
 
 **2.8.3 · Punto de control al volver a cargar (versionCode 59):**
 

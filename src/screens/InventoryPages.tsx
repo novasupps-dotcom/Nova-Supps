@@ -440,6 +440,11 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
             items={[
               { label: "Editar", icon: "pencil", onPress: () => editProduct(p) },
               { label: "Entrada", icon: "download", onPress: () => open("Entrada", { productId: p.id }) },
+              {
+                label: "Cantidad",
+                icon: "boxes",
+                onPress: () => open("Ajuste de inventario", { productId: p.id, reason: "Se duplicó", counted: String(p.stock) }),
+              },
               { label: "Conteo", icon: "list-checks", onPress: () => open("Ajuste de inventario", { productId: p.id }) },
             ]}
           />

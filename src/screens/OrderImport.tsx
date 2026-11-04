@@ -15,6 +15,7 @@ import {
   orderCheckpoint,
   planSupplierOrder,
   priceCalc,
+  withQuantities,
   readSupplierOrderPdf,
   type GroupDecision,
   type OrderPlan,
@@ -46,6 +47,8 @@ export function OrderImportPage({
   const [open, setOpen] = useState<string | null>(null);
   const [account, setAccount] = useState("");
   const [again, setAgain] = useState(false);
+  // 2.8.4: piezas que se cargan por renglón (si el dueño las cambia).
+  const [qtys, setQtys] = useState<Record<string, string>>({});
 
   const plan: OrderPlan | null = useMemo(() => (order ? planSupplierOrder(b, order, choices) : null), [b, order, choices]);
   const markup = Math.max(0, Math.min(1000, Number(markupText.replace(",", ".")) || 0));
@@ -62,6 +65,13 @@ export function OrderImportPage({
     setOpen(null);
     setAccount("");
     setAgain(false);
+    setQtys({});
+  };
+  const qtyOf = (it: { key: string; line: { qty: number } }) => {
+    const t = qtys[it.key];
+    if (t === undefined) return it.line.qty;
+    const n = Number(t);
+    return Number.isSafeInteger(n) && n >= 0 ? n : it.line.qty;
   };
   async function pick() {
     setError("");
@@ -98,7 +108,9 @@ export function OrderImportPage({
       const decisions: Record<string, GroupDecision> = {};
       for (const g of plan.groups) decisions[g.family] = { client: calcOf(g).client, keepCurrent: keepOf(g) };
       b.setSetting("orderMarkupPct", markup);
-      const r = applySupplierOrder(b, plan, decisions, account === NO_PAY ? null : account);
+      const changed: Record<string, number> = {};
+      for (const it of plan.items) if (qtyOf(it) !== it.line.qty) changed[it.key] = qtyOf(it);
+      const r = applySupplierOrder(b, withQuantities(plan, changed), decisions, account === NO_PAY ? null : account);
       reset();
       onChanged();
       notify(`Pedido cargado · ${r.units} piezas`);
@@ -144,12 +156,12 @@ export function OrderImportPage({
       </>
     );
   }
-  const units = o.lines.reduce((n, l) => n + l.qty, 0);
-  const created = plan.items.filter((i) => !i.productId).length;
-  const existing = new Set(plan.items.filter((i) => i.productId).map((i) => i.productId)).size;
+  const units = plan.items.reduce((n, it) => n + qtyOf(it), 0);
+  const created = plan.items.filter((i) => !i.productId && qtyOf(i) > 0).length;
+  const existing = new Set(plan.items.filter((i) => i.productId && qtyOf(i) > 0).map((i) => i.productId)).size;
   const projected = plan.groups.reduce((n, g) => {
     const c = priceCalc(g.cost, markup, bps, clientOf(g));
-    return n + g.items.reduce((u, i) => u + plan.items[i].line.qty, 0) * c.profit;
+    return n + g.items.reduce((u, i) => u + qtyOf(plan.items[i]), 0) * c.profit;
   }, 0);
 
   // ---------------- 2. Revisar
@@ -187,7 +199,7 @@ export function OrderImportPage({
         <Card>
           {plan.groups.map((g, gi) => {
             const items = g.items.map((i) => plan.items[i]);
-            const qty = items.reduce((n, it) => n + it.line.qty, 0);
+            const qty = items.reduce((n, it) => n + qtyOf(it), 0);
             const allNew = items.every((it) => !it.productId);
             const have = [...new Set(items.filter((it) => it.productId).map((it) => it.productId!))].reduce(
               (n, id) => n + (Number(stockOf.get(id)) || 0),
@@ -251,9 +263,16 @@ export function OrderImportPage({
                       {`Costo ${money(g.cost)} · terminal ${money(c.fee)} · te queda ${money(c.net)}`}
                     </Text>
                     {items.map((it) => (
-                      <View key={it.key} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                      <View key={it.key} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 4 }}>
+                        <TextInput
+                          style={[s.input, { width: 52, textAlign: "center", marginBottom: 0, paddingVertical: 4 }]}
+                          value={qtys[it.key] ?? String(it.line.qty)}
+                          onChangeText={(t) => setQtys((q) => ({ ...q, [it.key]: t.replace(/[^0-9]/g, "") }))}
+                          keyboardType="number-pad"
+                          accessibilityLabel={`Piezas de ${it.line.flavor || it.line.name}`}
+                        />
                         <Text style={[s.muted, { fontSize: 12.5, flex: 1 }]} numberOfLines={1}>
-                          {`${it.line.qty} × ${it.line.flavor || it.line.name} · ${it.productId ? "ya existe" : it.newSku}`}
+                          {`${it.line.flavor || it.line.name} · ${it.productId ? "ya existe" : it.newSku}${qtyOf(it) !== it.line.qty ? ` · PDF ${it.line.qty}` : ""}`}
                         </Text>
                         {it.productId && (
                           <TextButton title="No es" onPress={() => setChoices((ch) => ({ ...ch, [it.key]: null }))} />

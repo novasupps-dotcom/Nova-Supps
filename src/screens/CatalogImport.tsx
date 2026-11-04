@@ -51,7 +51,7 @@ const FILE_TYPES = [
 const SHOW = 60;
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 type View3 = "Cambios" | "Errores" | "Sin cambios" | "No vienen";
-const NUMERIC: Field[] = ["price", "stock", "cost"];
+const NUMERIC: Field[] = ["price", "stock", "addQty", "cost"];
 
 export function CatalogImportPage({
   b,
@@ -226,17 +226,22 @@ export function CatalogImportPage({
   const dups = plan ? plan.rows.filter((r) => r.kind === "error" && r.dupOf).length : 0;
   const inPrice = b.feeInPrice();
 
+  // 2.8.4: un producto que ya existe (por descripción) solo cambia su cantidad.
+  const editFields = (r: PlanRow): Field[] =>
+    r.match === "desc" ? [table && !rowFields(table, r.line).stock && rowFields(table, r.line).addQty ? "addQty" : "stock"] : EDITABLE;
+  const editLabel = (r: PlanRow, f: Field) =>
+    r.match === "desc" ? (r.mode === "replace" && f === "stock" ? "Existencias" : "Piezas a sumar") : fieldLabel(f);
   const editor = (r: PlanRow) => (
     <View style={{ marginTop: 6, gap: 6 }}>
-      {EDITABLE.map((f) => (
+      {editFields(r).map((f) => (
         <View key={f}>
-          <Text style={[s.muted, { fontSize: 13 }]}>{fieldLabel(f)}</Text>
+          <Text style={[s.muted, { fontSize: 13 }]}>{editLabel(r, f)}</Text>
           <TextInput
             style={s.input}
             value={draft[f] ?? ""}
             onChangeText={(t) => setDraft((d) => ({ ...d, [f]: t }))}
             keyboardType={NUMERIC.includes(f) ? "decimal-pad" : "default"}
-            accessibilityLabel={`${fieldLabel(f)} del renglón ${r.line}`}
+            accessibilityLabel={`${editLabel(r, f)} del renglón ${r.line}`}
             autoCapitalize={f === "sku" ? "characters" : "sentences"}
           />
         </View>
@@ -399,7 +404,7 @@ export function CatalogImportPage({
                       onPress={() => change(mergeRows(table, r.dupOf!, r.line), `Renglón ${r.line} unificado`)}
                     />
                   )}
-                  {r.match !== "desc" && <TextButton title="Modificar" onPress={() => startEdit(r)} />}
+                  <TextButton title={r.match === "desc" ? "Cantidad" : "Modificar"} onPress={() => startEdit(r)} />
                   <TextButton title="Quitar" color={C.red} onPress={() => change(dropRow(table, r.line), `Renglón ${r.line} quitado`)} />
                 </View>
               )}
