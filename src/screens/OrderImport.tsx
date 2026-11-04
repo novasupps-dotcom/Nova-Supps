@@ -12,6 +12,7 @@ import { feeLabel, money, type Business, type Row } from "../business";
 import { base64ToBytes } from "../photos";
 import {
   applySupplierOrder,
+  orderCheckpoint,
   planSupplierOrder,
   priceCalc,
   readSupplierOrderPdf,
@@ -20,7 +21,7 @@ import {
   type PriceGroup,
   type SupplierOrder,
 } from "../supplierOrder";
-import { Button, C, Card, Chips, Note, Steps, TextButton, s, tryCents } from "../ui";
+import { Button, C, Card, Chips, Note, Steps, TextButton, fmtDay, s, tryCents } from "../ui";
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const NO_PAY = "__none__";
@@ -50,6 +51,7 @@ export function OrderImportPage({
   const markup = Math.max(0, Math.min(1000, Number(markupText.replace(",", ".")) || 0));
   const bps = b.feeBps();
   const accounts: Row[] = useMemo(() => b.accounts(), [b, order]);
+  const stockOf = useMemo(() => new Map(b.stock().map((p: Row) => [p.id, p.stock])), [b, order]);
 
   const reset = () => {
     setStep(0);
@@ -69,7 +71,7 @@ export function OrderImportPage({
       setBusy(true);
       await new Promise((ok) => setTimeout(ok, 30));
       const raw = await FS.readAsStringAsync(r.assets[0].uri, { encoding: FS.EncodingType.Base64 });
-      const next = readSupplierOrderPdf(base64ToBytes(raw));
+      const next = readSupplierOrderPdf(base64ToBytes(raw), r.assets[0].name || "");
       reset();
       setOrder(next);
       setStep(1);
@@ -123,6 +125,25 @@ export function OrderImportPage({
     );
 
   const o = plan.order;
+
+  // ---------------- Punto de control (2.8.2): el pedido ya se cargó → solo confirmar.
+  if (step === 1 && plan.duplicate && !again) {
+    const cp = orderCheckpoint(b, plan);
+    return (
+      <>
+        <Steps step={0} names={["PDF", "Revisar", "Cargar"]} />
+        <Card>
+          <Text style={s.subtitle}>Este pedido ya se cargó</Text>
+          <Text style={[s.body, { marginTop: 4 }]}>
+            {`${cp.when ? `El ${fmtDay(cp.when)}. ` : ""}Actualmente tienes ${cp.have} piezas y vas a agregar ${cp.add} piezas más del ${cp.source}.`}
+          </Text>
+          <View style={{ height: 8 }} />
+          <Button title="Confirmar" onPress={() => setAgain(true)} />
+          <Button title="Cancelar" secondary onPress={reset} />
+        </Card>
+      </>
+    );
+  }
   const units = o.lines.reduce((n, l) => n + l.qty, 0);
   const created = plan.items.filter((i) => !i.productId).length;
   const existing = new Set(plan.items.filter((i) => i.productId).map((i) => i.productId)).size;
@@ -158,10 +179,8 @@ export function OrderImportPage({
             </View>
           </View>
           <Text style={[s.muted, { fontSize: 12.5, marginTop: 4 }]}>{`+ terminal ${feeLabel(bps)} · redondeado al peso`}</Text>
-          {(!!o.warnings.length || !!plan.duplicate) && (
-            <Text style={[s.muted, { fontSize: 12.5, marginTop: 6, color: plan.duplicate ? C.red : C.amber }]}>
-              {plan.duplicate ? "Este pedido ya se cargó antes." : o.warnings[0]}
-            </Text>
+          {!!o.warnings.length && (
+            <Text style={[s.muted, { fontSize: 12.5, marginTop: 6, color: C.amber }]}>{o.warnings[0]}</Text>
           )}
         </Card>
 
@@ -170,6 +189,10 @@ export function OrderImportPage({
             const items = g.items.map((i) => plan.items[i]);
             const qty = items.reduce((n, it) => n + it.line.qty, 0);
             const allNew = items.every((it) => !it.productId);
+            const have = [...new Set(items.filter((it) => it.productId).map((it) => it.productId!))].reduce(
+              (n, id) => n + (Number(stockOf.get(id)) || 0),
+              0,
+            );
             const c = priceCalc(g.cost, markup, bps, clientOf(g));
             const doubt = items.find((it) => !it.productId && it.candidates.length);
             const expanded = open === g.family;
@@ -187,7 +210,7 @@ export function OrderImportPage({
                       {g.name}
                     </Text>
                     <Text style={[s.muted, { fontSize: 12.5 }]} numberOfLines={1}>
-                      {`${qty} pzas · ${allNew ? "nuevo" : "ya lo tienes"}${flavors.length > 1 ? ` · ${flavors.length} sabores` : flavors.length ? ` · ${flavors[0]}` : ""}`}
+                      {`${allNew ? `${qty} pzas · nuevo` : `Tienes ${have} · +${qty} pzas`}${flavors.length > 1 ? ` · ${flavors.length} sabores` : flavors.length ? ` · ${flavors[0]}` : ""}`}
                     </Text>
                   </Pressable>
                   {keepOf(g) ? (
@@ -278,13 +301,6 @@ export function OrderImportPage({
         onPress={() => void load()}
       />
       <Button title="Atrás" secondary disabled={busy} onPress={() => setStep(1)} />
-      {!!plan.duplicate && (
-        <TextButton
-          title={again ? "✓ Cargar otra vez aunque ya se cargó" : "Este pedido ya se cargó · cargarlo otra vez"}
-          color={C.red}
-          onPress={() => setAgain((x) => !x)}
-        />
-      )}
     </>
   );
 }

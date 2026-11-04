@@ -57,7 +57,7 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   // Paso 2: un renglón por producto, con su precio.
   const t = all();
   assert(t.includes("#0700001 · 7 piezas") && t.includes("$3,002.06"), t);
-  assert(t.includes("Creatine · GAT Sport · 1 kg") && t.includes("3 pzas · ya lo tienes"), t);
+  assert(t.includes("Creatine · GAT Sport · 1 kg") && t.includes("Tienes 1 · +3 pzas"), t);
   assert(t.includes("Psychotic Black · Insane Labz · 60 Servicios") && t.includes("3 pzas · nuevo · 2 sabores"), t);
   assert(t.includes("¿Es tu «Psychotic Gold · Insane Labz · Por confirmar»?"), t);
   assert(t.length < 1400, "pantalla breve: " + t.length);
@@ -77,7 +77,7 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   assert(all().includes("2 × Grape · NS-PRE-006-GRA"), all());
   // Psychotic Gold: sí es el que ya tenía.
   await press("¿Es tu «Psychotic Gold · Insane Labz · Por confirmar»?");
-  assert(all().includes("1 pzas · ya lo tienes"), all());
+  assert(all().includes("Tienes 0 · +1 pzas"), all());
   await press("Continuar");
   // Paso 3: con qué se pagó y cargar.
   issues.push(...screenIssues(ui, "paso 3"));
@@ -94,6 +94,16 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   assert(Object.keys(written).some((u) => /Nova-antes-de-pedido-\d+\.json$/.test(u)), "copia previa");
   assert.equal(b.setting("orderMarkupPct", 0), 40);
   issues.push(...screenIssues(ui, "cargado"));
+  // 2.8.2 · Punto de control: el mismo pedido otra vez → primero se confirma.
+  await press("Elegir PDF");
+  issues.push(...screenIssues(ui, "ya se cargó"));
+  assert(all().includes("Este pedido ya se cargó"), all());
+  assert(all().includes("Actualmente tienes 8 piezas y vas a agregar 7 piezas más del Pedido #0700001 (Pedido 0700001.pdf)."), all());
+  assert(!all().includes("Ganancia"), "nada más hasta confirmar");
+  await press("Confirmar");
+  assert(all().includes("Tienes 4 · +3 pzas"), all());
+  await press("Cancelar");
+  assert(all().includes("Elegir PDF"), all());
   await act(async () => ui.unmount());
 
   // Margen y proyección (Resumen de ventas).
@@ -121,5 +131,5 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   await act(async () => ui.unmount());
 
   if (issues.length) throw new Error(issues.join("\n"));
-  console.log("CARGAR PEDIDO: OK (PDF, existentes y nuevos, calculadora, confirmar producto, cuenta obligatoria, carga, margen y elegir sabor al vender)");
+  console.log("CARGAR PEDIDO: OK (PDF, existentes y nuevos, calculadora, confirmar producto, cuenta obligatoria, carga, punto de control, margen y elegir sabor al vender)");
 })().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });

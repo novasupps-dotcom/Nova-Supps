@@ -11,6 +11,7 @@
 // Todo se aplica en una sola transacción y el mismo pedido no se carga dos veces.
 import { baseOf, cardFee, grossUp, type Business, type Row } from "./business";
 import { extractPdfText, pdfLines, type PdfLine } from "./pdfText";
+import { sha256Hex } from "./sha256";
 
 export type OrderLine = {
   brand: string;
@@ -35,6 +36,9 @@ export type SupplierOrder = {
   /** Piezas que dice el PDF («Productos Pedidos (24)»), para comprobar la lectura. */
   declaredUnits: number | null;
   warnings: string[];
+  /** 2.8.2 · Huella del archivo (SHA-256) y su nombre: para saber si ya se cargó. */
+  fileHash?: string;
+  fileName?: string;
 };
 
 const MONEY = /^-?\$\s?[\d,]+(\.\d{1,2})?$/;
@@ -133,8 +137,8 @@ export function parseSupplierOrder(lines: PdfLine[]): SupplierOrder {
 const fmt = (n: number) => "$" + (n / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** PDF (bytes) → pedido. */
-export function readSupplierOrderPdf(bytes: Uint8Array): SupplierOrder {
-  return parseSupplierOrder(pdfLines(extractPdfText(bytes)));
+export function readSupplierOrderPdf(bytes: Uint8Array, fileName = ""): SupplierOrder {
+  return { ...parseSupplierOrder(pdfLines(extractPdfText(bytes))), fileHash: sha256Hex(bytes), fileName };
 }
 
 // ---------------------------------------------------------------- nombres, tamaños y sabores
@@ -372,6 +376,7 @@ export type OrderPlan = { order: SupplierOrder; items: PlanItem[]; groups: Price
 
 const lineKey = (l: OrderLine) => fold(`${l.brand}|${l.name}|${l.flavor}`);
 export const ORDER_KEY = (n: string) => "supplierOrder:" + n;
+export const ORDER_FILE_KEY = (hash: string) => "supplierOrderFile:" + hash;
 
 /** Costo real por pieza: el subtotal de cada renglón se ajusta al Total pagado (exacto al centavo). */
 export function realCosts(order: SupplierOrder): number[] {
@@ -455,8 +460,24 @@ export function planSupplierOrder(b: Business, order: SupplierOrder, choices: Re
       if (p) g.currentClient = inPrice ? p.price : grossUp(p.price, bps);
     }
   });
-  const duplicate = order.number ? (b.setting(ORDER_KEY(order.number), null) as Row | null) : null;
+  const duplicate =
+    (order.number ? (b.setting(ORDER_KEY(order.number), null) as Row | null) : null) ??
+    (order.fileHash ? (b.setting(ORDER_FILE_KEY(order.fileHash), null) as Row | null) : null);
   return { order, items, groups, duplicate };
+}
+
+/**
+ * 2.8.2 · Punto de control: lo que ya tienes de los productos del pedido y lo que se suma.
+ * «Actualmente tienes X piezas y vas a agregar N piezas más del Pedido #… (archivo.pdf)».
+ */
+export function orderCheckpoint(b: Business, plan: OrderPlan): { have: number; add: number; source: string; when: string } {
+  const stock = new Map(b.stock().map((p: Row) => [p.id, Number(p.stock) || 0]));
+  const ids = new Set(plan.items.filter((i) => i.productId).map((i) => i.productId!));
+  const have = [...ids].reduce((n, id) => n + (stock.get(id) ?? 0), 0);
+  const add = plan.order.lines.reduce((n, l) => n + l.qty, 0);
+  const o = plan.order;
+  const source = `Pedido ${o.number ? "#" + o.number : ""}${o.fileName ? ` (${o.fileName})` : ""}`.replace(/\s+/g, " ").trim();
+  return { have, add, source, when: String(plan.duplicate?.at || "").slice(0, 10) };
 }
 
 // ---------------------------------------------------------------- calculadora
@@ -555,14 +576,16 @@ export function applySupplierOrder(
       b.payPurchase(accountId, order.total, ref, `${label}${order.number ? "" : ""}`);
       result.paid = order.total;
     }
-    if (order.number)
-      b.setSetting(ORDER_KEY(order.number), {
-        at: new Date().toISOString(),
-        supplier: order.supplier,
-        total: order.total,
-        units: result.units,
-        products: [...touched],
-      });
+    const record = {
+      at: new Date().toISOString(),
+      supplier: order.supplier,
+      total: order.total,
+      units: result.units,
+      products: [...touched],
+      fileName: order.fileName || "",
+    };
+    if (order.number) b.setSetting(ORDER_KEY(order.number), record);
+    if (order.fileHash) b.setSetting(ORDER_FILE_KEY(order.fileHash), record);
     b.audit("supplier.order", ref, `${result.created} nuevos · ${result.restocked} con más piezas · ${result.units} piezas · ${fmt(order.total)}`);
   });
   return result;
