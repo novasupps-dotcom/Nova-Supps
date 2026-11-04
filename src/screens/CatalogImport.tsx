@@ -123,7 +123,9 @@ export function CatalogImportPage({
       setFileName("");
       onChanged();
       notify(
-        `Catálogo actualizado · ${r.created} nuevos · ${r.updated} con cambios` + (r.units ? ` · +${r.units} piezas` : ""),
+        `Catálogo actualizado · ${r.created} nuevos · ${r.updated} con cambios` +
+          (r.counted ? ` · existencias de ${r.counted}` : "") +
+          (r.units ? ` · +${r.units} piezas` : ""),
       );
     } catch (e) {
       setError("No se aplicó ningún cambio: " + errText(e));
@@ -213,6 +215,7 @@ export function CatalogImportPage({
                   </Note>
                 ))
               )}
+              {!!r.warning && r.kind !== "error" && <Note color={C.amber}>{r.warning}</Note>}
             </View>
           ))}
           {rows.length > SHOW && <Note>{`…y ${rows.length - SHOW} más.`}</Note>}
@@ -231,8 +234,8 @@ export function CatalogImportPage({
         <Note>• SKU: identifica el producto. Si lo dejas vacío en un producto nuevo, la app lo crea. Nunca se cambia.</Note>
         <Note>• Celda vacía: no cambia nada. Para borrar un texto escribe un guion (-).</Note>
         <Note>• Activo = No: deja de venderse y se oculta a tus vendedores (no se borra).</Note>
-        <Note>• Agregar piezas + Costo unitario + Caducidad: suma existencias como un lote nuevo, sin mover dinero.</Note>
-        <Note>• Existencias: solo informativa. Para corregir lo que hay usa Stock → Conteo.</Note>
+        <Note>• Existencias: cuántas piezas tienes; la app deja ese número. Si no lo cambias, se respeta lo vendido después de descargar el Excel.</Note>
+        <Note>• Agregar piezas: suma piezas como un lote nuevo. Costo unitario y Caducidad aplican a las piezas que se suman. Nada mueve dinero.</Note>
       </Card>
     </>
   );
