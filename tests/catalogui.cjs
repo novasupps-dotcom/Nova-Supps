@@ -47,8 +47,9 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   await act(async () => { ui = renderer.create(React.createElement(CatalogImportPage, { b, notify: (t) => notes.push(t), onChanged: () => changed++ })); });
   const issues = screenIssues(ui, "inicio");
 
-  // 1. Descargar
-  await press("Descargar catálogo en Excel");
+  // 1. Archivo (paso 1 de 3): descargar el Excel o elegir el archivo.
+  assert(all().includes("1. Archivo") && all().includes("2. Revisar") && all().includes("3. Aplicar"));
+  await press("Descargar mi catálogo");
   const xlsx = Object.keys(written).find((u) => /Catalogo_Nova_\d{4}-\d{2}-\d{2}\.xlsx$/.test(u));
   assert(xlsx, Object.keys(written).join(","));
   assert.equal(written[xlsx].o.encoding, "base64");
@@ -69,12 +70,12 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   await press("Elegir archivo");
   issues.push(...screenIssues(ui, "vista previa"));
   assert(all().includes("precios.csv"));
-  assert(all().includes("2 con error"), all());
-  // Abre en Errores: cada renglón se puede unificar, modificar o quitar.
-  assert(all().includes("Renglón 5: Repetido: el mismo producto ya viene en el renglón 4"), all());
-  assert(all().includes("Renglón 6: Producto nuevo: falta el Precio"), all());
-  await press("Unificar con renglón 4");
-  assert(all().includes("1 con error") && !all().includes("Renglón 5:"), all());
+  assert(all().includes("Errores 2"), all());
+  // Paso 2 abre en Errores: cada renglón se puede unificar, modificar o quitar.
+  assert(all().includes("Repetido: el mismo producto ya viene en el renglón 4"), all());
+  assert(all().includes("Producto nuevo: falta el Precio"), all());
+  await press("Unificar con 4");
+  assert(all().includes("Errores 1") && !all().includes("Repetido:"), all());
   // Modificar: escribir el precio que faltaba.
   const editBtns = pressables((n) => text(n).trim() === "Modificar");
   await act(async () => editBtns[editBtns.length - 1].props.onPress());
@@ -82,33 +83,28 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   assert(priceInput, "campo Precio del renglón 6");
   await act(async () => priceInput.props.onChangeText("30"));
   await press("Guardar renglón");
-  assert(all().includes("0 con error") || !all().includes("con error"), all());
+  assert(all().includes("Errores 0"), all());
   // Deshacer y mejor quitarlo.
-  await press("Deshacer último cambio (2)");
-  assert(all().includes("Renglón 6: Producto nuevo: falta el Precio"), all());
+  await press("Deshacer");
+  assert(all().includes("Producto nuevo: falta el Precio"), all());
   await press("Quitar");
-  assert(!all().includes("con error"), all());
-  await press("Cambios");
+  assert(all().includes("Errores 0"), all());
+  await press("Cambios 3");
   issues.push(...screenIssues(ui, "arreglado"));
-  // Comisión: activada por omisión, con ejemplo; se puede apagar para ver los precios tal cual.
-  assert(all().includes("Sumar la comisión de la terminal (4.06%) a los precios"), all());
   assert(all().includes(`Precio: $899.00 → ${money(grossUp(95000))}`), all());
-  const sw = ui.root.findAll((n) => n.type === "Switch" && n.props.accessibilityLabel === "Sumar la comisión de la terminal a los precios")[0];
-  await act(async () => sw.props.onValueChange(false));
-  assert(all().includes("Precio: $899.00 → $950.00"), all());
-  await act(async () => sw.props.onValueChange(true));
   assert(all().includes("Existencias: 1 → 5"), all());
-  assert(all().includes("Nuevo: Barra"));
+  assert(all().includes("Nuevo · Barra"), all());
   assert.equal(b.stock().find((x) => x.id === p).price, 89900, "nada se guarda antes de aplicar");
+  await press("Continuar");
 
-  // 3. Aplicar: pregunta si suma la comisión → guarda copia, aplica, avisa y publica.
-  await press("Aplicar 3 cambios");
-  const [title, body, buttons] = alerts.at(-1);
-  assert.equal(title, "¿Sumar la comisión de la terminal (4.06%)?");
-  assert(body.includes("al cobrar no se suma otra vez"), body);
-  assert.deepEqual(buttons.map((x) => x.text), ["Cancelar", "No sumar", "Sí, sumar y cargar"]);
-  await act(async () => buttons.find((x) => x.text === "Sí, sumar y cargar").onPress());
-  await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+  // Paso 3: elegir si se suma la comisión y aplicar (sin ventanas extra).
+  issues.push(...screenIssues(ui, "paso 3"));
+  assert(all().includes("3 cambios") && all().includes("Terminal 4.06%"), all());
+  await press("Precios tal cual");
+  assert(all().includes("La comisión se suma al cobrar."), all());
+  await press("Sumarla a los precios");
+  assert(all().includes(`$950.00 → ${money(grossUp(95000))}. Al cobrar ya no se suma.`), all());
+  await press("Aplicar");
   assert.equal(b.stock().find((x) => x.id === p).price, grossUp(95000));
   assert.equal(b.feeInPrice(), true);
   assert.equal(b.stock().find((x) => x.name === "Barra").stock, 6);
@@ -120,7 +116,7 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   assert.equal(changed, 1);
   assert.equal(notes.at(-1), "Catálogo actualizado · 2 nuevos · 1 con cambios · existencias de 2 · +6 piezas · precios + 4.06%");
   assert(Object.keys(written).some((u) => /Nova-antes-de-catalogo-\d+\.json$/.test(u)), "copia previa");
-  assert(!all().includes("precios.csv"), "la vista previa se cierra");
+  assert(!all().includes("precios.csv") && all().includes("Elegir archivo"), "regresa al paso 1");
   issues.push(...screenIssues(ui, "aplicado"));
 
   // 4. Archivo inválido: mensaje claro, nada cambia.

@@ -224,6 +224,29 @@ print(json.dumps({'sheets':wb.sheetnames,'hdr':hdr,'n':len(rows),'last':[str(x) 
   assert.deepEqual(b.all("SELECT id,price FROM products ORDER BY id"), prices0, "cambiar la comisión no cambia precios");
   b.setFeeBps(406);
   console.log("  ✓ Parámetros → comisión: porcentaje configurable (la absorbe el cliente) sin tocar los precios");
+  // 2.8.1: eliminar producto desde Stock (mantener presionado) y desde su detalle.
+  {
+    const soldIds = new Set(b.all("SELECT DISTINCT productId FROM sale_lines").map((r) => r.productId));
+    const fresh = b.stock().find((x) => !x.archived && !soldIds.has(x.id) && x.stock > 0);
+    const sold = b.stock().find((x) => !x.archived && soldIds.has(x.id));
+    await tab("Stock");
+    const cardOf = (name) => ui.root.findAll((n) => n.type === "Pressable" && typeof n.props.onLongPress === "function" && text(n).includes(name))[0];
+    await act(async () => cardOf(fresh.name).props.onLongPress());
+    let a = alerts.pop();
+    assert.equal(a[0], "Eliminar producto");
+    assert.equal(a[1], `${fresh.name} y sus ${fresh.stock} piezas se borra por completo.`);
+    await act(async () => a[2].find((x) => x.text === "Eliminar").onPress());
+    assert.equal(b.all("SELECT id FROM products WHERE id=?", fresh.id).length, 0, "borrado");
+    assert(!cardOf(fresh.name), "ya no aparece en Stock");
+    // Con ventas: desde el detalle, se archiva.
+    await act(async () => cardOf(sold.name).props.onPress());
+    await pressExact("Eliminar producto");
+    a = alerts.pop();
+    assert(a[1].includes("tiene ventas") && a[1].includes("Archivados"), a[1]);
+    await act(async () => a[2].find((x) => x.text === "Eliminar").onPress());
+    assert.equal(b.stock().find((x) => x.id === sold.id).archived, true);
+  }
+  console.log("  ✓ 2.8.1: eliminar producto desde Stock (sin ventas se borra; con ventas se archiva)");
 
   assert.equal(alerts.length, 0, JSON.stringify(alerts));
   await act(async () => ui.unmount());
