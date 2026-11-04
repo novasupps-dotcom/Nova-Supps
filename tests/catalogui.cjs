@@ -56,7 +56,7 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   assert.equal(notes.at(-1), "Catálogo en Excel · 1 productos");
 
   // 2. Archivo con un error, un cambio y un alta: el Excel descargado, editado.
-  files["file:///cache/precios.csv"] = Buffer.from("SKU,Nombre,Precio,Agregar piezas,Costo unitario\nNS-PRO-001,,950,,\n,Barra,45,6,20\nNS-X,Sin precio,,,\n", "utf8").toString("base64");
+  files["file:///cache/precios.csv"] = Buffer.from("SKU,Nombre,Precio,Existencias,Agregar piezas,Costo unitario\nNS-PRO-001,,950,5,,\n,Barra,45,,6,20\nNS-X,Sin precio,,,,\n", "utf8").toString("base64");
   picked = { canceled: false, assets: [{ uri: "file:///cache/precios.csv", name: "precios.csv" }] };
   await press("Elegir archivo");
   issues.push(...screenIssues(ui, "vista previa"));
@@ -64,6 +64,7 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   assert(all().includes("1 nuevos") && all().includes("1 con cambios") && all().includes("1 con error"), all());
   assert(/Precio: \$899\.00 → \$950\.00/.test(all()), all());
   assert(all().includes("Nuevo: Barra"));
+  assert(all().includes("Existencias: 1 → 5"), all());
   await press("Errores");
   assert(all().includes("Renglón 4: Producto nuevo: falta el Precio"), all());
   assert.equal(b.stock().find((x) => x.id === p).price, 89900, "nada se guarda antes de aplicar");
@@ -77,8 +78,9 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
   assert.equal(b.stock().find((x) => x.id === p).price, 95000);
   assert.equal(b.stock().find((x) => x.name === "Barra").stock, 6);
+  assert.equal(b.stock().find((x) => x.id === p).stock, 5);
   assert.equal(changed, 1);
-  assert.equal(notes.at(-1), "Catálogo actualizado · 1 nuevos · 1 con cambios · +6 piezas");
+  assert.equal(notes.at(-1), "Catálogo actualizado · 1 nuevos · 1 con cambios · existencias de 1 · +6 piezas");
   assert(Object.keys(written).some((u) => /Nova-antes-de-catalogo-\d+\.json$/.test(u)), "copia previa");
   assert(!all().includes("precios.csv"), "la vista previa se cierra");
   issues.push(...screenIssues(ui, "aplicado"));
