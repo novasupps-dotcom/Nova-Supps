@@ -68,7 +68,7 @@ test("cambios de precio, nombre, código, activo, alta nueva y piezas; ventas in
   const pro = plan.rows.find((r) => r.productId === a)!;
   assert.deepEqual(pro.changes.map((x) => x.label), ["Nombre", "Precio", "Marca", "Piezas"]);
   const r = applyCatalogImport(b, plan);
-  assert.deepEqual(r, { created: 1, updated: 2, units: 14, skipped: 2 });
+  assert.deepEqual(r, { created: 1, updated: 2, units: 14, counted: 0, skipped: 2 });
   const stock = b.stock();
   const p = stock.find((x) => x.id === a)!;
   assert.equal(p.price, 105050);
@@ -163,4 +163,47 @@ test("el Excel descargado lo abre otra herramienta (openpyxl) y uno guardado por
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("Existencias: deja ese número de piezas (sube con costo, baja por FEFO, alta nueva sin costo con aviso)", () => {
+  const { b, a, c } = shop();
+  const plan = planCatalogImport(b, readCsv([
+    "SKU,Nombre,Precio,Existencias,Costo unitario,Agregar piezas",
+    "NS-PRO-001,,,10,,",
+    "NS-CRE-001,,,1,,",
+    ",Gel energético,35,7,,",
+    ",Agua,15,3,,2",
+  ].join("\n")));
+  assert.deepEqual(plan.counts, { new: 1, update: 2, same: 0, error: 1 });
+  assert.equal(plan.rows[3].error, "Usa Existencias o Agregar piezas en este renglón, no las dos");
+  assert.deepEqual(plan.rows[0].changes.map((x) => `${x.label}: ${x.from} → ${x.to}`), ["Existencias: 4 → 10"]);
+  assert.match(plan.rows[2].warning!, /costo \$0/);
+  const r = applyCatalogImport(b, plan);
+  assert.equal(r.counted, 3);
+  const st = b.stock();
+  assert.equal(st.find((x) => x.id === a)!.stock, 10);
+  assert.equal(b.one("SELECT cost FROM lots WHERE productId=? ORDER BY rowid DESC", a).cost, 50000);
+  assert.equal(st.find((x) => x.id === c)!.stock, 1);
+  const gel = st.find((x) => x.name === "Gel energético")!;
+  assert.equal(gel.stock, 7);
+  assert.equal(gel.inventoryKnown, true);
+  assert.equal(b.one("SELECT COUNT(*) n FROM ledger WHERE kind='purchase'").n, 0);
+});
+
+test("Existencias del Excel descargado: si no las cambias, se respetan las ventas posteriores", () => {
+  const { b, a, c, cash } = shop();
+  const table = readXlsx(catalogWorkbook(b).bytes); // Proteína 4, Creatina 3 al descargar
+  b.sell([{ productId: a, qty: 1 }], 89900, 89900, cash, null, null, "Mostrador", true); // ahora 3
+  const head = table[0].map(String);
+  const col = head.indexOf("Existencias");
+  assert(col > 0);
+  const creatina = table.findIndex((r) => r[0] === "NS-CRE-001");
+  table[creatina][col] = 9; // esta sí la cambió el dueño
+  const plan = planCatalogImport(b, table);
+  assert.equal(plan.rows.find((r) => r.productId === a)!.kind, "same");
+  assert.equal(plan.rows.find((r) => r.productId === c)!.changes[0].to, "9");
+  assert.match(plan.notes.join(" "), /1 producto conserva las existencias de la app/);
+  applyCatalogImport(b, plan);
+  assert.equal(b.stock().find((x) => x.id === a)!.stock, 3);
+  assert.equal(b.stock().find((x) => x.id === c)!.stock, 9);
 });

@@ -1,6 +1,8 @@
-# Nova Negocio · 2.6.0
+# Nova Negocio · 2.6.1
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
+
+**2.6.1 (versionCode 53):** en Actualizar catálogo, la columna **Existencias** ahora carga las piezas (antes era solo informativa y se ignoraba): deja ese número como un conteo (sube con el Costo unitario o el último costo, baja por caducidad más próxima, sin mover dinero). Si el número es el mismo que traía el Excel al descargarlo, no se toca, para no deshacer ventas hechas después. También acepta encabezados como «Existencia», «Stock», «Inventario», «Cantidad» o «Piezas».
 
 **2.6.0 · Actualizar catálogo desde Excel y firma en Expo (versionCode 52, solo JavaScript sobre el runtime 2.2.4):**
 

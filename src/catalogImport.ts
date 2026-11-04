@@ -9,8 +9,9 @@
 // - Cada renglón se liga a un producto por SKU (con o sin guiones) y, si no hay SKU,
 //   por código de barras. Sin coincidencia → producto nuevo (requiere Nombre y Precio).
 // - Una celda vacía NO cambia nada (para borrar un texto escribe un guion "-").
-// - "Agregar piezas" suma existencias como un lote nuevo, sin movimiento de caja.
-// - La columna "Existencias" es solo informativa: para corregir existencias usa Conteo.
+// - "Existencias" deja ese número de piezas (como un conteo). Si el número es el mismo que
+//   traía el Excel al descargarlo, no se toca: así no se "regresan" piezas vendidas después.
+// - "Agregar piezas" suma existencias como un lote nuevo. Ninguna de las dos mueve dinero.
 import { strFromU8, unzipSync } from "fflate";
 import { cents, money as fmtMoney, today, type Business, type Row } from "./business";
 import { findProductByCode, normalizeProductCode, validGtin } from "./barcodes";
@@ -194,7 +195,7 @@ export const COLUMNS: { field: Field; header: string; aliases: string[] }[] = [
   { field: "presentation", header: "Presentación", aliases: ["presentacion", "tamano", "contenido"] },
   { field: "description", header: "Descripción", aliases: ["descripcion", "detalle", "descripcion del catalogo"] },
   { field: "active", header: "Activo", aliases: ["activo", "estado", "visible", "a la venta"] },
-  { field: "stock", header: "Existencias (solo lectura)", aliases: ["existencias", "existencia", "stock", "stock actual", "inventario", "disponibles"] },
+  { field: "stock", header: "Existencias", aliases: ["existencias", "existencia", "existencia actual", "stock", "stock actual", "inventario", "inventario actual", "disponibles", "cantidad", "piezas", "unidades", "en existencia"] },
   { field: "addQty", header: "Agregar piezas", aliases: ["agregar", "piezas a agregar", "entrada", "entrada de piezas", "piezas nuevas", "agregar piezas"] },
   { field: "cost", header: "Costo unitario", aliases: ["costo", "costo unitario", "costo por pieza", "cost"] },
   { field: "expires", header: "Caducidad", aliases: ["caducidad", "vence", "vencimiento", "fecha de caducidad"] },
@@ -294,6 +295,8 @@ export type PlanRow = {
   name: string;
   changes: Change[];
   error?: string;
+  /** Aviso que no impide aplicar (por ejemplo, piezas sin costo). */
+  warning?: string;
   /** Lo que se guardará (solo campos con valor). */
   values: Partial<Record<Field, any>>;
 };
@@ -324,6 +327,14 @@ export function planCatalogImport(b: Business, table: Cell[][]): ImportPlan {
   if (unknown.length) notes.push(`Columnas que no se usan: ${unknown.join(", ")}.`);
   if (!head.has("price")) notes.push("Sin columna Precio: los precios no cambian y no se pueden dar de alta productos nuevos.");
   const products = b.stock();
+  // Existencias que traía el Excel descargado de la app (para no deshacer ventas posteriores).
+  const exported = (b.setting(EXPORT_KEY, null) as { stock?: Record<string, number> } | null)?.stock ?? null;
+  let keptSinceExport = 0;
+  const reserved = new Map<string, number>();
+  for (const x of b.all(
+    "SELECT l.productId,COALESCE(SUM(CAST(s.value AS INTEGER)),0) n FROM allocations a JOIN settings s ON s.key='reservation:'||a.id JOIN lots l ON l.id=a.lotId GROUP BY l.productId",
+  ))
+    reserved.set(x.productId, Number(x.n) || 0);
   const lastCost = new Map<string, number>();
   for (const l of b.all("SELECT productId,cost FROM lots ORDER BY rowid")) lastCost.set(l.productId, l.cost);
   const seen = new Map<string, number>();
@@ -364,6 +375,8 @@ export function planCatalogImport(b: Business, table: Cell[][]): ImportPlan {
       for (const f of META_TEXT) if (str(get(r, f))) v[f] = str(get(r, f)) === "-" ? "" : str(get(r, f));
       if (str(get(r, "active"))) v.active = activeOf(get(r, "active"));
       if (str(get(r, "addQty"))) v.addQty = whole(get(r, "addQty"), "Agregar piezas");
+      if (str(get(r, "stock"))) v.stock = whole(get(r, "stock"), "Existencias");
+      if (v.addQty && v.stock !== undefined) throw new Error("Usa Existencias o Agregar piezas en este renglón, no las dos");
       if (str(get(r, "cost"))) {
         try {
           v.cost = money(get(r, "cost"));
@@ -372,7 +385,7 @@ export function planCatalogImport(b: Business, table: Cell[][]): ImportPlan {
         }
       }
       if (str(get(r, "expires"))) v.expires = dayOf(get(r, "expires"));
-      if (v.expires && v.expires < today() && v.addQty) throw new Error("Caducidad: la fecha ya pasó; esas piezas no se podrían vender");
+      if (v.expires && v.expires < today() && (v.addQty || v.stock)) throw new Error("Caducidad: la fecha ya pasó; esas piezas no se podrían vender");
 
       // ¿Qué producto es? Por SKU; si no trae SKU, por código de barras.
       const existing =
@@ -406,6 +419,13 @@ export function planCatalogImport(b: Business, table: Cell[][]): ImportPlan {
         row.kind = "new";
         row.changes.push({ field: "name", label: "Alta", from: "", to: `${v.name} · ${showMoney(v.price)}` });
         if (v.addQty) row.changes.push({ field: "addQty", label: "Piezas", from: "", to: `+${v.addQty}` });
+        if (v.stock !== undefined) {
+          row.changes.push({ field: "stock", label: "Existencias", from: "0", to: String(v.stock) });
+          if (v.stock && v.cost === undefined) {
+            v.cost = 0;
+            row.warning = "Sin Costo unitario: estas piezas quedan con costo $0 (la utilidad se verá más alta)";
+          }
+        }
         continue;
       }
       row.productId = existing.id;
@@ -429,6 +449,24 @@ export function planCatalogImport(b: Business, table: Cell[][]): ImportPlan {
       for (const f of META_TEXT) cmp(f, existing[f] || "", v[f]);
       if (v.active !== undefined) cmp("active", !existing.archived, v.active, (x) => (x ? "Sí" : "No"));
       if (v.addQty) row.changes.push({ field: "addQty", label: "Piezas", from: String(existing.stock), to: `+${v.addQty} a ${showMoney(v.cost)}` });
+      if (v.stock !== undefined) {
+        const now = Number(existing.stock) || 0;
+        if (v.stock === now) delete v.stock;
+        else if (exported && exported[existing.id] === v.stock) {
+          // Mismo número que al descargar: lo de hoy (ventas, entradas) manda.
+          delete v.stock;
+          keptSinceExport++;
+        } else {
+          const min = reserved.get(existing.id) ?? 0;
+          if (v.stock < min) throw new Error(`Existencias: no puedes dejar menos de ${min} (apartadas para entregas pendientes)`);
+          if (v.stock > now && v.cost === undefined) {
+            const c = lastCost.get(existing.id) ?? existing.referenceCost;
+            if (c === undefined) row.warning = "Sin Costo unitario: las piezas que se suman quedan con costo $0";
+            v.cost = Number(c) || 0;
+          }
+          row.changes.push({ field: "stock", label: "Existencias", from: String(now), to: String(v.stock) });
+        }
+      }
       row.kind = row.changes.length ? "update" : "same";
     } catch (e) {
       row.kind = "error";
@@ -436,16 +474,20 @@ export function planCatalogImport(b: Business, table: Cell[][]): ImportPlan {
     }
   }
   if (!rows.length) throw new Error("El archivo no trae productos debajo de los encabezados.");
+  if (keptSinceExport)
+    notes.push(
+      `${keptSinceExport} ${keptSinceExport === 1 ? "producto conserva" : "productos conservan"} las existencias de la app: en el Excel tienen el mismo número que cuando lo descargaste y desde entonces hubo ventas o entradas.`,
+    );
   const counts = { new: 0, update: 0, same: 0, error: 0 };
   for (const r of rows) counts[r.kind]++;
   return { rows, counts, columns: [...head.keys()].map((f) => LABEL[f]), notes };
 }
 
-export type ImportResult = { created: number; updated: number; units: number; skipped: number };
+export type ImportResult = { created: number; updated: number; units: number; counted: number; skipped: number };
 
 /** Aplica el plan (solo renglones nuevos o con cambios) en una sola transacción. Los renglones con error se omiten. */
 export function applyCatalogImport(b: Business, plan: ImportPlan): ImportResult {
-  const result: ImportResult = { created: 0, updated: 0, units: 0, skipped: plan.counts.error };
+  const result: ImportResult = { created: 0, updated: 0, units: 0, counted: 0, skipped: plan.counts.error };
   const label = "Carga de catálogo " + today();
   b.transaction(() => {
     for (const row of plan.rows) {
@@ -472,7 +514,7 @@ export function applyCatalogImport(b: Business, plan: ImportPlan): ImportResult 
       const meta: Row = {
         ...prev,
         imageKey: prev.imageKey || sku,
-        inventoryKnown: v.addQty ? true : (prev.inventoryKnown ?? row.kind !== "new"),
+        inventoryKnown: v.addQty || v.stock !== undefined ? true : (prev.inventoryKnown ?? row.kind !== "new"),
       };
       if (v.name !== undefined) meta.sourceName = v.name;
       for (const f of META_TEXT) if (v[f] !== undefined) meta[f] = v[f];
@@ -483,15 +525,22 @@ export function applyCatalogImport(b: Business, plan: ImportPlan): ImportResult 
         b.receive(productId!, label, v.expires || "", v.addQty, v.cost, null);
         result.units += v.addQty;
       }
+      if (v.stock !== undefined) {
+        const now = Number(b.one("SELECT COALESCE(SUM(qty),0) n FROM lots WHERE productId=?", productId).n);
+        if (v.stock > now) b.receive(productId!, label, v.expires || "", v.stock - now, v.cost ?? 0, null);
+        else if (v.stock < now) b.adjustStock(productId!, v.stock, "Carga de catálogo");
+        result.counted++;
+      }
     }
-    b.audit("catalog.import", today(), `${result.created} nuevos · ${result.updated} actualizados · ${result.units} piezas`);
+    b.audit("catalog.import", today(), `${result.created} nuevos · ${result.updated} actualizados · ${result.units} piezas · ${result.counted} existencias`);
   });
   return result;
 }
 
 // ---------------------------------------------------------------- plantilla
 
-/** Excel con el catálogo actual, listo para editar y volver a cargar. */
+export const EXPORT_KEY = "catalogExportStock";
+/** Excel con el catálogo actual, listo para editar y volver a cargar. Recuerda las existencias que trae. */
 export function catalogWorkbook(b: Business, when = new Date()): { bytes: Uint8Array; fileName: string; count: number } {
   const products = b.stock().sort((x, y) => String(x.category).localeCompare(String(y.category)) || String(x.name).localeCompare(String(y.name)));
   const catalog: Sheet = {
@@ -508,7 +557,7 @@ export function catalogWorkbook(b: Business, when = new Date()): { bytes: Uint8A
       { header: "Presentación", width: 14 },
       { header: "Descripción", width: 40 },
       { header: "Activo", width: 8 },
-      { header: "Existencias (solo lectura)", type: "int", width: 14 },
+      { header: "Existencias", type: "int", width: 12 },
       { header: "Agregar piezas", type: "int", width: 14 },
       { header: "Costo unitario", type: "money", width: 14 },
       { header: "Caducidad", width: 13 },
@@ -539,12 +588,13 @@ export function catalogWorkbook(b: Business, when = new Date()): { bytes: Uint8A
       ["2. Para un producto nuevo agrega un renglón con al menos Nombre y Precio (el SKU es opcional; si lo dejas vacío la app lo crea)."],
       ["3. Una celda vacía no cambia nada. Para borrar un texto (por ejemplo la marca) escribe un guion: -"],
       ["4. Activo = No quita el producto de la venta y del catálogo de tus vendedores (no se borra; puedes volver a ponerlo en Sí)."],
-      ["5. Agregar piezas suma existencias como un lote nuevo con su Costo unitario y Caducidad (opcional). No mueve dinero de tus cuentas."],
-      ["6. Existencias es solo para consulta. Para corregir lo que hay en anaquel usa Stock → Conteo en la app."],
+      ["5. Existencias: escribe cuántas piezas tienes y la app deja ese número (como un conteo). Si no lo cambias, no se toca, aunque hayas vendido después de descargar el Excel."],
+      ["6. Agregar piezas suma existencias como un lote nuevo. Costo unitario y Caducidad (opcionales) se usan para las piezas que se suman. Nada de esto mueve dinero de tus cuentas."],
       ["7. Guarda el archivo (.xlsx o CSV) y en la app ve a Ajustes → Actualizar catálogo → Elegir archivo. Verás los cambios antes de aplicarlos."],
       ["Las ventas, cobros y costos anteriores nunca cambian."],
     ],
   };
+  b.setSetting(EXPORT_KEY, { at: when.toISOString(), stock: Object.fromEntries(products.map((p: Row) => [p.id, Number(p.stock) || 0])) });
   const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, "0")}-${String(when.getDate()).padStart(2, "0")}`;
   return { bytes: buildXlsx([catalog, help], when), fileName: `Catalogo_Nova_${stamp}.xlsx`, count: products.length };
 }

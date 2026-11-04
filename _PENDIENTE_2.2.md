@@ -1,3 +1,8 @@
+# Nova Negocio 2.6.1 · 4-nov-2026
+
+Hecho en 2.6.1: Actualizar catálogo ya carga la columna Existencias (antes se ignoraba).
+Probar: Ajustes → Actualizar catálogo → cargar el archivo de nuevo → la vista previa debe decir «Existencias: X → Y» → Aplicar.
+
 # Nova Negocio 2.6.0 · 4-nov-2026
 
 Actualización de JavaScript sobre el runtime nativo 2.2.4: llega sola a los teléfonos cuando GitHub la publica.
