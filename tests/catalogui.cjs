@@ -135,7 +135,7 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   await press("Elegir archivo");
   issues.push(...screenIssues(ui, "ya existe"));
   assert(all().includes("Ya existe: «Creatine · GAT Sport · 1 kg» · Existencias 4 → 9 · se reemplazará"), all());
-  assert(all().includes("Ya existe: «Iso 100 · Dymatize · 5 lb» · sin imagen · +3 piezas"), all());
+  assert(all().includes("Ya existe: «Iso 100 · Dymatize · 5 lb» · tienes 2 · +3 piezas"), all());
   assert(all().includes("Cambios 2"), all());
   await act(async () => pressables((n) => text(n).trim() === "✓ Confirmado")[0].props.onPress());
   assert(all().includes("Cambios 1") && all().includes("No se toca"), all());
@@ -155,8 +155,18 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   assert.equal(b.stock().find((x) => x.id === crea).price, 64000, "sus datos no cambian");
   assert.equal(b.stock().find((x) => x.id === whey).stock, 5);
   assert(/eliminados/.test(notes.at(-1)), notes.at(-1));
+  // 2.8.2 · Punto de control: el mismo archivo otra vez → primero se confirma.
+  await press("Elegir archivo");
+  issues.push(...screenIssues(ui, "ya se cargó"));
+  assert(all().includes("Este archivo ya se cargó"), all());
+  assert(all().includes("Actualmente tienes 14 piezas y vas a agregar 3 piezas más de inventario.csv."), all());
+  assert(!all().includes("Cambios"), "nada más hasta confirmar");
+  await press("Confirmar");
+  assert(all().includes("Cambios 1"), all());
+  await press("Cancelar");
+  assert(all().includes("Elegir archivo") && !all().includes("ya se cargó"), all());
 
   await act(async () => ui.unmount());
   if (issues.length) throw new Error(issues.join("\n"));
-  console.log("ACTUALIZAR CATÁLOGO: OK (descargar Excel, unificar repetidos, modificar, deshacer, quitar, comisión con confirmación, copia previa, aplicar, ya existe por descripción y eliminar los que no vienen)");
+  console.log("ACTUALIZAR CATÁLOGO: OK (descargar Excel, unificar repetidos, modificar, deshacer, quitar, comisión con confirmación, copia previa, aplicar, ya existe por descripción, eliminar los que no vienen y punto de control)");
 })().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });
