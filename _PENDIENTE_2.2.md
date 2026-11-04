@@ -1,4 +1,8 @@
-# Nova Negocio 2.8.3 · 4-nov-2026
+# Nova Negocio 2.8.4 · 4-nov-2026
+
+Hecho en 2.8.4: cambiar la cantidad. Stock → producto → «Cantidad» (motivo «Se duplicó»: corrige sin merma, quita primero
+lo más reciente). Al cargar Excel/PDF se puede cambiar la cantidad antes de aplicar.
+
 
 Hecho en 2.8.3: punto de control al volver a cargar el mismo Excel o PDF: primero pide confirmar con
 «Actualmente tienes X piezas y vas a agregar N piezas más del Pedido #… (archivo.pdf)».

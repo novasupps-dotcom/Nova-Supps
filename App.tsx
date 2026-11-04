@@ -3095,6 +3095,12 @@ function AppContent({ business }: { business?: Business }) {
               counted >= 0,
             "Escribe cuántas unidades contaste (número entero).",
           );
+          // 2.8.4: «Se duplicó» corrige sin contar como merma (quita primero lo más reciente).
+          if (val("reason") === DUPLICATED) {
+            const r = b.correctStock(val("productId"), counted, val("note") || "Inventario duplicado");
+            done = `Cantidad corregida: ${r.before} → ${r.after}`;
+            break;
+          }
           const r = b.adjustStock(
             val("productId"),
             counted,
@@ -4501,15 +4507,20 @@ function AppContent({ business }: { business?: Business }) {
                         )}
                         {diff !== null && diff !== 0 && (
                           <Note color={diff < 0 ? C.red : C.green}>
-                            {diff < 0
-                              ? `Se descontarán ${-diff} ${-diff === 1 ? "unidad" : "unidades"} (primero de los lotes que caducan antes).`
-                              : `Se agregarán ${diff} ${diff === 1 ? "unidad" : "unidades"} con el último costo registrado.`}
+                            {val("reason") === DUPLICATED
+                              ? diff < 0
+                                ? `Se quitan ${-diff} ${-diff === 1 ? "pieza" : "piezas"} (primero las cargadas más recientemente). No cuenta como merma.`
+                                : `Se agregan ${diff} ${diff === 1 ? "pieza" : "piezas"} con el último costo. No cuenta como merma.`
+                              : diff < 0
+                                ? `Se descontarán ${-diff} ${-diff === 1 ? "unidad" : "unidades"} (primero de los lotes que caducan antes).`
+                                : `Se agregarán ${diff} ${diff === 1 ? "unidad" : "unidades"} con el último costo registrado.`}
                           </Note>
                         )}
                         {chips(
                           "reason",
                           "Motivo *",
                           options([
+                            DUPLICATED,
                             "Conteo físico",
                             "Merma o caducado",
                             "Regalo o muestra",
@@ -4519,9 +4530,9 @@ function AppContent({ business }: { business?: Business }) {
                         )}
                         {field("note", "Nota (opcional)")}
                         <Note>
-                          El ajuste no mueve dinero. Las bajas cuentan como
-                          merma (a su costo) en tu utilidad; las altas la
-                          compensan.
+                          {val("reason") === DUPLICATED
+                            ? "Corrige la cantidad sin mover dinero ni contar como merma."
+                            : "El ajuste no mueve dinero. Las bajas cuentan como merma (a su costo) en tu utilidad; las altas la compensan."}
                         </Note>
                       </>
                     );
@@ -4899,3 +4910,6 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
+
+/** 2.8.4 · Motivo de «Cantidad»: corregir inventario que se cargó dos veces (no es merma). */
+const DUPLICATED = "Se duplicó";
