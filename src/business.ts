@@ -642,20 +642,36 @@ export class Business {
       ? v
       : CARD_FEE_BPS;
   }
-  setFeeBps(bps: number) {
+  /**
+   * Cambia la comisión. 2.8.2: si la comisión va dentro del precio, todos los precios del
+   * catálogo se recalculan solos (se quita la comisión anterior y se suma la nueva), así
+   * lo que te queda por producto no cambia. Regresa cuántos precios cambiaron.
+   */
+  setFeeBps(bps: number): number {
     assert(
       Number.isSafeInteger(bps) && bps >= 0 && bps <= MAX_FEE_BPS,
       "La comisión debe estar entre 0% y 20%, con máximo dos decimales.",
     );
+    let changed = 0;
     this.transaction(() => {
       const before = this.feeBps();
+      if (before !== bps && this.feeInPrice())
+        for (const p of this.all("SELECT id,price FROM products")) {
+          const exact = grossUp(baseOf(p.price, before), bps);
+          // Un precio en pesos cerrados se queda en pesos cerrados (hacia arriba).
+          const next = p.price % 100 === 0 ? Math.ceil(exact / 100) * 100 : exact;
+          if (next === p.price) continue;
+          this.run("UPDATE products SET price=? WHERE id=?", next, p.id);
+          changed++;
+        }
       this.setSetting("cardFeeBps", bps);
       this.audit(
         "settings.cardFee",
         "cardFeeBps",
-        `${feeLabel(before)} → ${feeLabel(bps)}`,
+        `${feeLabel(before)} → ${feeLabel(bps)}${changed ? ` · ${changed} precios` : ""}`,
       );
     });
+    return changed;
   }
   // ---------- 2.7 · Comisión incluida en el precio ----------
   /** 2.7: el precio del catálogo ya incluye la comisión de la terminal (no se suma al cobrar). */
@@ -1636,6 +1652,46 @@ export class Business {
       this.audit("product.delete", productId, p.name);
     });
     return { mode: "deleted", name: p.name };
+  }
+  /**
+   * 2.8.2 · Unificar productos repetidos: las piezas de los repetidos pasan al que se queda
+   * (con su costo, caducidad y ubicación; no cuenta como merma) y los repetidos se eliminan
+   * (o se archivan si tienen ventas). Regresa cuántas piezas se movieron.
+   */
+  mergeProducts(keepId: string, dropIds: string[]): { moved: number; removed: number } {
+    const result = { moved: 0, removed: 0 };
+    this.transaction(() => {
+      const keep = this.one("SELECT id,name FROM products WHERE id=?", keepId);
+      const keepMeta = this.setting("product:" + keepId, {});
+      const now = new Date().toISOString();
+      for (const dropId of dropIds) {
+        if (dropId === keepId) continue;
+        const drop = this.one("SELECT id,name FROM products WHERE id=?", dropId);
+        const ref = "merge:" + id();
+        for (const lot of this.all("SELECT * FROM lots WHERE productId=? AND qty>0", dropId)) {
+          const free = lot.qty - this.reservedForLot(lot.id);
+          assert(free === lot.qty, `${drop.name} tiene piezas apartadas para entregas pendientes; entrégalas antes de unificar.`);
+          const key = id();
+          this.run("INSERT INTO lots VALUES(?,?,?,?,?,?)", key, keepId, lot.label, lot.expires, lot.cost, lot.qty);
+          const place = this.db.getFirstSync<Row>("SELECT locationId FROM lot_locations WHERE lotId=?", lot.id);
+          if (place) this.run("INSERT INTO lot_locations VALUES(?,?)", key, place.locationId);
+          this.run("UPDATE lots SET qty=0 WHERE id=?", lot.id);
+          this.run("INSERT INTO stock_moves VALUES(?,?,?,?,?,?,?)", id(), now, lot.id, -lot.qty, "merge", ref, `Unificado en ${keep.name}`);
+          this.run("INSERT INTO stock_moves VALUES(?,?,?,?,?,?,?)", id(), now, key, lot.qty, "merge", ref, `Unificado de ${drop.name}`);
+          result.moved += lot.qty;
+        }
+        // Si el que se queda no tiene foto o código, conserva los del repetido.
+        const dm = this.setting("product:" + dropId, {});
+        this.audit("product.merge", keepId, `${drop.name} → ${keep.name}`);
+        const gone = this.deleteProduct(dropId).mode === "deleted";
+        // El código de barras solo pasa si el repetido ya no existe (archivado lo conserva).
+        for (const f of ["imageUri", "cleanImageUri", "imageUris", "brand", "presentation", "description", ...(gone ? ["barcode"] : [])])
+          if (!keepMeta[f] && dm[f]) keepMeta[f] = dm[f];
+        result.removed++;
+      }
+      this.setSetting("product:" + keepId, { ...this.setting("product:" + keepId, {}), ...keepMeta, inventoryKnown: true });
+    });
+    return result;
   }
   setCustomerArchived(customerId: string, archived: boolean) {
     this.transaction(() => {

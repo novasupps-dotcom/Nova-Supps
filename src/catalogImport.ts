@@ -16,6 +16,7 @@ import { strFromU8, unzipSync } from "fflate";
 import { baseOf, cents, feeLabel, grossUp, money as fmtMoney, today, type Business, type Row } from "./business";
 import { findProductByCode, normalizeProductCode, validGtin } from "./barcodes";
 import { buildXlsx, type Sheet } from "./xlsx";
+import { describedMatch, known } from "./supplierOrder";
 
 export type Cell = string | number | null;
 
@@ -303,10 +304,26 @@ export type PlanRow = {
   dupOf?: number;
   /** Lo que se guardará (solo campos con valor). */
   values: Partial<Record<Field, any>>;
+  /** 2.8.2 · Cómo se encontró el producto de la app: por SKU/código o por descripción. */
+  match?: "code" | "desc";
+  /** Nombre del producto de la app con el que se ligó. */
+  matchName?: string;
+  /** Por descripción: con imagen se reemplazan las existencias; sin imagen solo se suman piezas. */
+  mode?: "replace" | "add";
+  /** Lo ligó el dueño a mano («¿Es tu…?»). */
+  linked?: boolean;
+  /** Producto nuevo que se parece a uno de la app: para preguntar «¿Es tu…?». */
+  candidates?: { id: string; name: string }[];
+  /** Producto que ya existe y el dueño desmarcó: no se toca. */
+  off?: boolean;
 };
+export type Missing = { id: string; name: string; sku: string; stock: number };
 export type ImportPlan = {
   rows: PlanRow[];
   counts: { new: number; update: number; same: number; error: number };
+  /** 2.8.2 · Productos de la app que no vienen en el archivo, y los que se eliminarán. */
+  missing: Missing[];
+  remove: Missing[];
   /** Columnas reconocidas, para mostrarlas al dueño. */
   columns: string[];
   /** Avisos generales (columnas desconocidas, renglones vacíos…). */
@@ -329,7 +346,16 @@ export type ImportPlan = {
 export type PlanOptions = {
   /** 2.7: sumar la comisión de la terminal a los precios del archivo (por omisión, sí). */
   addFee?: boolean;
+  /** 2.8.2 · Renglón → producto de la app elegido a mano (null = «No es», va como nuevo). */
+  links?: Record<number, string | null>;
+  /** Renglones de productos existentes que el dueño desmarcó. */
+  off?: number[];
+  /** Productos de la app (que no vienen en el archivo) a eliminar al aplicar. */
+  remove?: string[];
+  /** ¿El producto tiene imagen? (la pantalla también revisa las fotos del catálogo). */
+  hasImage?: (p: Row) => boolean;
 };
+const ownImage = (p: Row) => !!(p.imageUri || p.cleanImageUri || (Array.isArray(p.imageUris) && p.imageUris.length));
 
 const LABEL: Record<Field, string> = Object.fromEntries(COLUMNS.map((c) => [c.field, c.header.replace(/ \(.*\)$/, "")])) as any;
 const showMoney = (n: number) => fmtMoney(n);
@@ -356,6 +382,11 @@ export function planCatalogImport(b: Business, table: Cell[][], opts: PlanOption
   if (unknown.length) notes.push(`Columnas que no se usan: ${unknown.join(", ")}.`);
   if (!head.has("price")) notes.push("Sin columna Precio: los precios no cambian y no se pueden dar de alta productos nuevos.");
   const products = b.stock();
+  const catalog = known(b);
+  const links = opts.links ?? {};
+  const off = new Set(opts.off ?? []);
+  const hasImage = opts.hasImage ?? ownImage;
+  const touched = new Set<string>();
   // Existencias que traía el Excel descargado de la app (para no deshacer ventas posteriores).
   const exported = (b.setting(EXPORT_KEY, null) as { stock?: Record<string, number> } | null)?.stock ?? null;
   let keptSinceExport = 0;
@@ -424,9 +455,24 @@ export function planCatalogImport(b: Business, table: Cell[][], opts: PlanOption
       if (v.expires && v.expires < today() && (v.addQty || v.stock)) throw new Error("Caducidad: la fecha ya pasó; esas piezas no se podrían vender");
 
       // ¿Qué producto es? Por SKU; si no trae SKU, por código de barras.
-      const existing =
+      let existing =
         (v.sku ? products.find((p) => String(p.sku).toUpperCase() === v.sku) || findProductByCode(products, v.sku) : null) ||
         (!v.sku && v.barcode ? findProductByCode(products, v.barcode) : null);
+      // 2.8.2: si no, por descripción (marca, tipo de suplemento, presentación y sabor).
+      let described = false;
+      if (!existing && v.name) {
+        const chosen = links[line];
+        if (chosen) {
+          existing = products.find((p) => p.id === chosen) ?? null;
+          row.linked = !!existing;
+        } else if (chosen !== null) {
+          const m = describedMatch({ name: v.name, brand: v.brand, flavor: v.flavor, presentation: v.presentation }, catalog);
+          if (m.auto) existing = products.find((p) => p.id === m.auto!.id) ?? null;
+          else if (m.candidates.length) row.candidates = m.candidates.map((c) => ({ id: c.id, name: c.name }));
+        }
+        described = !!existing;
+      }
+      if (existing) touched.add(existing.id);
       const key = existing ? "id:" + existing.id : v.sku ? "sku:" + v.sku : "";
       if (key && seen.has(key)) {
         row.dupOf = seen.get(key);
@@ -444,7 +490,7 @@ export function planCatalogImport(b: Business, table: Cell[][], opts: PlanOption
         }
         seen.set("code:" + v.barcode, line);
       }
-      if (v.addQty) {
+      if (v.addQty && !described) {
         if (v.cost === undefined) {
           const c = existing ? lastCost.get(existing.id) : undefined;
           if (c === undefined) throw new Error("Agregar piezas: falta el Costo unitario");
@@ -472,6 +518,42 @@ export function planCatalogImport(b: Business, table: Cell[][], opts: PlanOption
       }
       row.productId = existing.id;
       row.sku = existing.sku;
+      if (described) {
+        // Ya existe (encontrado por descripción): sus datos no se tocan, solo el inventario.
+        // Con imagen, las existencias quedan como en el archivo (se pide confirmar);
+        // sin imagen, las piezas del archivo se suman a las que ya hay.
+        row.match = "desc";
+        row.matchName = existing.name;
+        row.mode = hasImage(existing) ? "replace" : "add";
+        const now = Number(existing.stock) || 0;
+        const keepOnly: Partial<Record<Field, any>> = {};
+        const qty = v.stock ?? v.addQty;
+        const costFor = () => {
+          if (v.cost !== undefined) return v.cost;
+          const c = lastCost.get(existing!.id) ?? existing!.referenceCost;
+          if (c === undefined) row.warning = "Sin Costo unitario: las piezas que se suman quedan con costo $0";
+          return Number(c) || 0;
+        };
+        if (row.mode === "replace" && v.stock !== undefined) {
+          if (v.stock !== now) {
+            const min = reserved.get(existing.id) ?? 0;
+            if (v.stock < min) throw new Error(`Existencias: no puedes dejar menos de ${min} (apartadas para entregas pendientes)`);
+            keepOnly.stock = v.stock;
+            if (v.stock > now) keepOnly.cost = costFor();
+            row.changes.push({ field: "stock", label: "Existencias", from: String(now), to: String(v.stock) });
+          }
+        } else if (qty) {
+          keepOnly.addQty = qty;
+          keepOnly.cost = costFor();
+          row.changes.push({ field: "addQty", label: "Piezas", from: String(now), to: `+${qty}` });
+        }
+        if (v.expires && (keepOnly.addQty || keepOnly.stock)) keepOnly.expires = v.expires;
+        row.values = keepOnly;
+        row.kind = row.changes.length ? "update" : "same";
+        if (row.kind === "update" && off.has(line)) row.off = true;
+        continue;
+      }
+      row.match = "code";
       row.name = v.name || existing.name;
       const cmp = (field: Field, before: unknown, after: unknown, show = (x: any) => String(x ?? "")) => {
         if (after === undefined) return;
@@ -510,6 +592,7 @@ export function planCatalogImport(b: Business, table: Cell[][], opts: PlanOption
         }
       }
       row.kind = row.changes.length ? "update" : "same";
+      if (row.kind === "update" && off.has(line)) row.off = true;
     } catch (e) {
       row.kind = "error";
       row.error = e instanceof Error ? e.message : String(e);
@@ -521,36 +604,44 @@ export function planCatalogImport(b: Business, table: Cell[][], opts: PlanOption
       `${keptSinceExport} ${keptSinceExport === 1 ? "producto conserva" : "productos conservan"} las existencias de la app: en el Excel tienen el mismo número que cuando lo descargaste y desde entonces hubo ventas o entradas.`,
     );
   const counts = { new: 0, update: 0, same: 0, error: 0 };
-  for (const r of rows) counts[r.kind]++;
+  for (const r of rows) if (!r.off) counts[r.kind]++;
+  // 2.8.2: productos de la app que no vienen en el archivo (se pueden eliminar).
+  const missing: Missing[] = products
+    .filter((p) => !p.archived && !touched.has(p.id))
+    .map((p) => ({ id: p.id, name: p.name, sku: p.sku, stock: Number(p.stock) || 0 }));
+  const toRemove = new Set(opts.remove ?? []);
+  const remove = missing.filter((m) => toRemove.has(m.id));
   const switching = addFee && !b.feeInPrice();
-  const repriced = new Set(rows.filter((r) => r.productId && r.kind !== "error" && r.priceInFile).map((r) => r.productId));
+  const repriced = new Set(rows.filter((r) => r.productId && r.kind !== "error" && !r.off && r.match !== "desc" && r.priceInFile).map((r) => r.productId));
   const others = switching ? products.filter((p) => !repriced.has(p.id) && p.price > 0).length : 0;
-  const priced = rows.filter((r) => r.kind !== "error" && r.priceInFile).length;
+  const priced = rows.filter((r) => r.kind !== "error" && !r.off && r.match !== "desc" && r.priceInFile).length;
   return {
     rows,
     counts,
+    missing,
+    remove,
     columns: [...head.keys()].map((f) => LABEL[f]),
     notes,
     fee: { bps, addFee, switching, priced, others, example },
   };
 }
 
-export type ImportResult = { created: number; updated: number; units: number; counted: number; skipped: number };
+export type ImportResult = { created: number; updated: number; units: number; counted: number; skipped: number; removed: number; archived: number };
 
 /** Aplica el plan (solo renglones nuevos o con cambios) en una sola transacción. Los renglones con error se omiten. */
 export function applyCatalogImport(b: Business, plan: ImportPlan): ImportResult {
-  const result: ImportResult = { created: 0, updated: 0, units: 0, counted: 0, skipped: plan.counts.error };
+  const result: ImportResult = { created: 0, updated: 0, units: 0, counted: 0, skipped: plan.counts.error, removed: 0, archived: 0 };
   const label = "Carga de catálogo " + today();
   b.transaction(() => {
     // 2.7: al aceptar la comisión en el precio, los productos que no traen precio en el archivo
     // también la incluyen (el cliente paga lo mismo) y al cobrar ya no se suma.
     if (plan.fee.switching) {
       const fromFile = new Set<string>();
-      for (const r of plan.rows) if (r.productId && r.kind !== "error" && r.priceInFile) fromFile.add(r.productId);
+      for (const r of plan.rows) if (r.productId && r.kind !== "error" && !r.off && r.match !== "desc" && r.priceInFile) fromFile.add(r.productId);
       b.setFeeInPrice(true, true, fromFile);
     }
     for (const row of plan.rows) {
-      if (row.kind !== "new" && row.kind !== "update") continue;
+      if ((row.kind !== "new" && row.kind !== "update") || row.off) continue;
       const v = row.values;
       let productId = row.productId;
       if (row.kind === "new") {
@@ -591,10 +682,16 @@ export function applyCatalogImport(b: Business, plan: ImportPlan): ImportResult 
         result.counted++;
       }
     }
+    // 2.8.2: los que no venían en el archivo y el dueño marcó para eliminar (con ventas se archivan).
+    for (const m of plan.remove) {
+      if (b.deleteProduct(m.id).mode === "deleted") result.removed++;
+      else result.archived++;
+    }
     b.audit(
       "catalog.import",
       today(),
       `${result.created} nuevos · ${result.updated} actualizados · ${result.units} piezas · ${result.counted} existencias` +
+        (result.removed + result.archived ? ` · ${result.removed + result.archived} eliminados` : "") +
         (plan.fee.addFee ? ` · precios + ${feeLabel(plan.fee.bps)}` : ""),
     );
   });

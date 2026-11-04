@@ -193,8 +193,8 @@ function baseTitle(name: string): string {
 
 // ---------------------------------------------------------------- catálogo
 
-type Known = { id: string; sku: string; name: string; brand: string; size: string; flavor: string; flavorList: string[]; base: string[]; stock: number; price: number; family: string; archived: boolean };
-function known(b: Business): Known[] {
+export type Known = { id: string; sku: string; name: string; brand: string; size: string; flavor: string; flavorList: string[]; base: string[]; stock: number; price: number; family: string; archived: boolean };
+export function known(b: Business): Known[] {
   return b.stock().map((p: Row) => {
     const parts = String(p.name).split(" · ");
     const brand = String(p.brand || parts[1] || "");
@@ -257,6 +257,61 @@ export function candidatesFor(line: OrderLine, catalog: Known[], remembered?: st
     out.push({ id: p.id, name: p.name, sku: p.sku, stock: p.stock, score, sure, why: why || "mismo producto" });
   }
   return out.sort((a, b) => b.score - a.score).slice(0, 3);
+}
+
+/**
+ * 2.8.2 · Un renglón del Excel sin SKU: ¿qué producto de la app es? Por descripción —
+ * marca (de su columna, del nombre «Producto · Marca · Tamaño» o encontrada dentro del
+ * nombre), tipo de suplemento, presentación y sabor. `auto` = tan claro que se liga solo.
+ */
+export function describedMatch(
+  row: { name: string; brand?: string; flavor?: string; presentation?: string },
+  catalog: Known[],
+): { auto: Candidate | null; candidates: Candidate[] } {
+  const parts = String(row.name || "").split(" · ").map((x) => x.trim());
+  let brand = String(row.brand || "").trim() || (parts.length > 1 ? parts[1] : "");
+  if (!brand) {
+    // Marca escrita dentro del nombre («Creatina GAT Sport 1 kg»): la más larga que aparezca.
+    const text = ` ${fold(row.name)} `;
+    brand =
+      [...new Set(catalog.map((p) => p.brand).filter(Boolean))]
+        .filter((x) => fold(x).length >= 3 && text.includes(` ${fold(x)} `))
+        .sort((x, y) => y.length - x.length)[0] ?? "";
+  }
+  const sizeText = [row.presentation, parts[2], row.name].map((x) => String(x || "")).find((x) => sizeOf(x)) || "";
+  const size = sizeOf(sizeText)?.key ?? "";
+  const base = tokens(baseTitle(parts[0] || row.name), [brand]);
+  const flavor = flavorKey(row.flavor);
+  if (!base.length) return { auto: null, candidates: [] };
+  const out: Candidate[] = [];
+  for (const p of catalog) {
+    const brandOk = !!brand && sameBrand(p.brand, brand);
+    if (brand && p.brand && !brandOk) continue;
+    let nameScore = jaccard(base, p.base);
+    // «Creatine» contra «Creatine Monohydrate»: todo lo de uno viene en el otro.
+    const A = new Set(base),
+      B = new Set(p.base);
+    if (nameScore < 0.8 && p.base.length && ([...B].every((t) => A.has(t)) || [...A].every((t) => B.has(t)))) nameScore = 0.8;
+    if (nameScore < 0.5) continue;
+    const sizeScore = !size || !p.size ? 0.5 : size === p.size ? 1 : size.replace(/[\d.]+/, "") === p.size.replace(/[\d.]+/, "") ? 0 : 0.5;
+    if (sizeScore === 0) continue;
+    const flavorScore =
+      flavor === p.flavor
+        ? 1
+        : p.flavorList.length > 1 && p.flavorList.includes(flavor)
+          ? 0.7
+          : !flavor || /diferentes sabores|varios/.test(p.flavor)
+            ? 0.4
+            : 0;
+    if (flavorScore === 0) continue;
+    const score = nameScore * 0.5 + sizeScore * 0.3 + flavorScore * 0.2 - (brandOk ? 0 : 0.15);
+    const sure = brandOk && nameScore === 1 && sizeScore === 1 && flavorScore === 1;
+    out.push({ id: p.id, name: p.name, sku: p.sku, stock: p.stock, score, sure, why: brandOk ? "misma marca" : "sin marca para comparar" });
+  }
+  out.sort((a, b) => b.score - a.score || (a.id < b.id ? -1 : 1));
+  const [top, second] = out;
+  const clear = !!top && (top.sure || (top.why === "misma marca" && top.score >= 0.85 && (!second || second.score <= top.score - 0.1)));
+  return { auto: clear ? top : null, candidates: out.slice(0, 3) };
 }
 
 // ---------------------------------------------------------------- SKU homologado
