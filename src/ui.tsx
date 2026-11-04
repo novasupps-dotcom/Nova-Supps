@@ -252,10 +252,13 @@ export function Button({
 export function Card({
   children,
   onPress,
+  onLongPress,
   tone,
 }: {
   children: React.ReactNode;
   onPress?: () => void;
+  /** 2.8.1: mantener presionado (por ejemplo, para eliminar). */
+  onLongPress?: () => void;
   tone?: "warn" | "ok" | "bad";
 }) {
   const toneStyle =
@@ -269,6 +272,8 @@ export function Card({
       <Pressable
         accessibilityRole="button"
         onPress={onPress}
+        onLongPress={onLongPress}
+        delayLongPress={400}
         style={({ pressed }) => [
           s.card,
           toneStyle,
@@ -279,6 +284,19 @@ export function Card({
       </Pressable>
     );
   return <View style={[s.card, toneStyle]}>{children}</View>;
+}
+/** 2.8.1 · Indicador de pasos (1 · 2 · 3) para los flujos guiados. */
+export function Steps({ step, names }: { step: number; names: string[] }) {
+  return (
+    <View style={{ flexDirection: "row", gap: 6, marginBottom: 12 }}>
+      {names.map((name, i) => (
+        <View key={name} style={{ flex: 1 }} accessibilityLabel={`Paso ${i + 1} de ${names.length}: ${name}`}>
+          <View style={{ height: 4, borderRadius: 2, backgroundColor: i <= step ? C.brand : C.line }} />
+          <Text style={{ fontSize: 12, marginTop: 4, color: i === step ? C.ink : C.muted }}>{`${i + 1}. ${name}`}</Text>
+        </View>
+      ))}
+    </View>
+  );
 }
 export function Note({
   children,

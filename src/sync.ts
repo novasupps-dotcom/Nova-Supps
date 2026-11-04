@@ -160,6 +160,14 @@ export async function publish(
     for (const p of part) pub.products[p.product_id] = hash(p);
     sent += part.length;
   }
+  // 2.8.1: los productos eliminados en el teléfono también se quitan del catálogo en línea.
+  const current = new Set(products.map((p) => p.product_id));
+  const gone = Object.keys(pub.products).filter((id) => !current.has(id));
+  for (const part of chunks(gone, 50)) {
+    await cloud.remove("catalog", `product_id=in.(${part.map((id) => '"' + id.replace(/"/g, "") + '"').join(",")})`);
+    for (const id of part) delete pub.products[id];
+    sent += part.length;
+  }
   if (legacy) pub.legacy = true;
   else delete pub.legacy;
   b.setSetting(NEEDS_SCHEMA_21, legacy || null);
