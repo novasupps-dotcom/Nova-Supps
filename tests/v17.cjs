@@ -288,6 +288,24 @@ print(json.dumps({'sheets':wb.sheetnames,'hdr':hdr,'n':len(rows),'last':[str(x) 
   }
   console.log("  ✓ 2.8.2: el % recalcula precios con la comisión incluida; repetidos en Stock se unifican");
 
+  // 2.8.4: «Cantidad» en el detalle del producto corrige lo duplicado sin merma.
+  {
+    const p = b.stock().find((x) => !x.archived && x.stock > 1);
+    const shrink = b.periodSummary(null).shrinkage;
+    await tab("Stock");
+    const card = ui.root.findAll((n) => n.type === "Pressable" && typeof n.props.onLongPress === "function" && text(n).includes(p.name))[0];
+    await act(async () => card.props.onPress());
+    await pressExact("Cantidad");
+    assert(all().includes("Corrige la cantidad sin mover dinero ni contar como merma."), all().slice(0, 800));
+    const counted = ui.root.findAll((n) => n.type === "TextInput" && n.props.accessibilityLabel === "Unidades que contaste *")[0];
+    await act(async () => counted.props.onChangeText(String(p.stock - 1)));
+    assert(all().includes("Se quitan 1 pieza (primero las cargadas más recientemente). No cuenta como merma."), all().slice(0, 800));
+    await pressExact("Guardar");
+    assert.equal(Number(b.stock().find((x) => x.id === p.id).stock), p.stock - 1);
+    assert.equal(b.periodSummary(null).shrinkage, shrink, "no es merma");
+  }
+  console.log("  ✓ 2.8.4: Cantidad en el detalle del producto corrige inventario duplicado sin merma");
+
   assert.equal(alerts.length, 0, JSON.stringify(alerts));
   await act(async () => ui.unmount());
   console.log("1.7 – 2.0: OK");

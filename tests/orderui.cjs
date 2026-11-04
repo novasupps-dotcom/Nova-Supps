@@ -74,21 +74,28 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   assert(!all().includes("te queda"));
   await act(async () => pressables((n) => n.props.accessibilityLabel === "Detalle de Psychotic Black · Insane Labz · 60 Servicios")[0].props.onPress());
   assert(all().includes(`Costo $409.96 · terminal ${money(black.fee)} · te queda ${money(black.net)}`), all());
-  assert(all().includes("2 × Grape · NS-PRE-006-GRA"), all());
+  assert(all().includes("Grape · NS-PRE-006-GRA"), all());
+  // 2.8.4: la cantidad se puede cambiar antes de cargar (Grape 2 → 1).
+  const grapeQty = ui.root.findAll((n) => n.type === "TextInput" && n.props.accessibilityLabel === "Piezas de Grape")[0];
+  assert.equal(grapeQty.props.value, "2");
+  await act(async () => grapeQty.props.onChangeText("1"));
+  assert(all().includes("Grape · NS-PRE-006-GRA · PDF 2"), all());
+  assert(all().includes("#0700001 · 6 piezas"), all());
   // Psychotic Gold: sí es el que ya tenía.
   await press("¿Es tu «Psychotic Gold · Insane Labz · Por confirmar»?");
   assert(all().includes("Tienes 0 · +1 pzas"), all());
   await press("Continuar");
   // Paso 3: con qué se pagó y cargar.
   issues.push(...screenIssues(ui, "paso 3"));
-  assert(all().includes("7 piezas") && all().includes("2 nuevos · 2 ya los tenías"), all());
+  assert(all().includes("6 piezas") && all().includes("2 nuevos · 2 ya los tenías"), all());
   assert(all().includes("¿Con qué pagaste $3,002.06?"), all());
   assert(pressables((n) => text(n).trim() === "Cargar inventario")[0].props.disabled, "pide la cuenta");
   await press("No registrar");
   await press("Cargar inventario");
   assert.equal(b.stock().find((p) => p.id === crea).stock, 4);
   assert.equal(changed, 1);
-  assert.equal(notes.at(-1), "Pedido cargado · 7 piezas");
+  assert.equal(notes.at(-1), "Pedido cargado · 6 piezas");
+  assert.equal(b.stock().find((p) => p.flavor === "Grape").stock, 1, "cargó la cantidad corregida");
   assert(all().includes("Elegir PDF"), "regresa al paso 1");
   assert.equal(b.balance(bank), 1000000, "sin registrar pago");
   assert(Object.keys(written).some((u) => /Nova-antes-de-pedido-\d+\.json$/.test(u)), "copia previa");
@@ -98,7 +105,7 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   await press("Elegir PDF");
   issues.push(...screenIssues(ui, "ya se cargó"));
   assert(all().includes("Este pedido ya se cargó"), all());
-  assert(all().includes("Actualmente tienes 8 piezas y vas a agregar 7 piezas más del Pedido #0700001 (Pedido 0700001.pdf)."), all());
+  assert(all().includes("Actualmente tienes 7 piezas y vas a agregar 7 piezas más del Pedido #0700001 (Pedido 0700001.pdf)."), all());
   assert(!all().includes("Ganancia"), "nada más hasta confirmar");
   await press("Confirmar");
   assert(all().includes("Tienes 4 · +3 pzas"), all());

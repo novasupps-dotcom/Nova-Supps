@@ -140,6 +140,16 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   await act(async () => pressables((n) => text(n).trim() === "✓ Confirmado")[0].props.onPress());
   assert(all().includes("Cambios 1") && all().includes("No se toca"), all());
   await press("Confirmar todos (1)");
+  // 2.8.4: cambiar la cantidad de un producto que ya existe (+3 → +1).
+  const qtyBtns = pressables((n) => text(n).trim() === "Cantidad");
+  assert.equal(qtyBtns.length, 2, "un botón Cantidad por producto existente");
+  await act(async () => qtyBtns[1].props.onPress());
+  const addInput = ui.root.findAll((n) => n.type === "TextInput" && n.props.accessibilityLabel === "Piezas a sumar del renglón 3")[0];
+  assert(addInput, "campo Piezas a sumar");
+  assert.equal(addInput.props.value, "3");
+  await act(async () => addInput.props.onChangeText("1"));
+  await press("Guardar renglón");
+  assert(all().includes("tienes 2 · +1 piezas"), all());
   assert(all().includes("Cambios 2"), all());
   // Lo que no viene en el archivo se puede eliminar.
   const missing = b.stock().filter((x) => !x.archived && x.id !== crea && x.id !== whey).length;
@@ -153,13 +163,13 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   await press("Aplicar");
   assert.equal(b.stock().find((x) => x.id === crea).stock, 9);
   assert.equal(b.stock().find((x) => x.id === crea).price, 64000, "sus datos no cambian");
-  assert.equal(b.stock().find((x) => x.id === whey).stock, 5);
+  assert.equal(b.stock().find((x) => x.id === whey).stock, 3, "2 + 1 corregido");
   assert(/eliminados/.test(notes.at(-1)), notes.at(-1));
   // 2.8.2 · Punto de control: el mismo archivo otra vez → primero se confirma.
   await press("Elegir archivo");
   issues.push(...screenIssues(ui, "ya se cargó"));
   assert(all().includes("Este archivo ya se cargó"), all());
-  assert(all().includes("Actualmente tienes 14 piezas y vas a agregar 3 piezas más de inventario.csv."), all());
+  assert(all().includes("Actualmente tienes 12 piezas y vas a agregar 3 piezas más de inventario.csv."), all());
   assert(!all().includes("Cambios"), "nada más hasta confirmar");
   await press("Confirmar");
   assert(all().includes("Cambios 1"), all());

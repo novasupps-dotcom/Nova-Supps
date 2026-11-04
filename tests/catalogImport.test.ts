@@ -266,7 +266,7 @@ test("2.7 · arreglar renglones: modificar, quitar y unificar repetidos por sabo
   assert.equal(plan.rows[1].dupOf, 2);
   assert.equal(plan.rows[2].dupOf, 2);
   // Modificar: escribir el precio que faltaba.
-  assert.deepEqual(rowFields(table, 5), { name: "Sin precio", sku: "", category: "", price: "", flavor: "", stock: "", barcode: "", cost: "" });
+  assert.deepEqual(rowFields(table, 5), { name: "Sin precio", sku: "", category: "", price: "", flavor: "", stock: "", addQty: "", barcode: "", cost: "" });
   table = editRow(table, 5, { price: "120", category: "Snacks" });
   // Quitar: el renglón con precio inválido.
   table = dropRow(table, 6);
