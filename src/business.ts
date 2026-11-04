@@ -1604,6 +1604,39 @@ export class Business {
       this.audit(archived ? "product.archive" : "product.restore", productId);
     });
   }
+  /**
+   * 2.8.1 · Eliminar un producto desde Stock. Sin ventas: se borra por completo (lotes,
+   * movimientos de inventario, foto/ficha y promociones solo de ese producto). Con ventas
+   * (o dentro de un paquete): se archiva para no perder el historial; se recupera en
+   * Stock → Archivados. El dinero ya registrado (compras pagadas) no cambia.
+   */
+  deleteProduct(productId: string): { mode: "deleted" | "archived"; name: string } {
+    const p = this.one("SELECT id,name FROM products WHERE id=?", productId);
+    const sold = this.one("SELECT COUNT(*) n FROM sale_lines WHERE productId=?", productId).n > 0;
+    const bundled = this.one("SELECT COUNT(*) n FROM bundle_items WHERE productId=?", productId).n > 0;
+    if (sold || bundled) {
+      this.setProductArchived(productId, true);
+      return { mode: "archived", name: p.name };
+    }
+    this.transaction(() => {
+      const lots = this.all("SELECT id FROM lots WHERE productId=?", productId).map((l) => l.id as string);
+      for (const lot of lots) {
+        this.run("DELETE FROM lot_locations WHERE lotId=?", lot);
+        this.run("DELETE FROM stock_moves WHERE lotId=?", lot);
+      }
+      this.run("DELETE FROM lots WHERE productId=?", productId);
+      this.run("DELETE FROM relations WHERE entityType='product' AND entityId=?", productId);
+      this.run("DELETE FROM products WHERE id=?", productId);
+      this.run("DELETE FROM settings WHERE key=?", "product:" + productId);
+      for (const r of this.all("SELECT key,value FROM settings WHERE key LIKE 'supplierMap:%'"))
+        if (JSON.parse(r.value) === productId) this.run("DELETE FROM settings WHERE key=?", r.key);
+      const promos = this.promos();
+      const kept = promos.filter((x) => !(x.target === "product" && x.ref === productId));
+      if (kept.length !== promos.length) this.setSetting("promotions", kept);
+      this.audit("product.delete", productId, p.name);
+    });
+    return { mode: "deleted", name: p.name };
+  }
   setCustomerArchived(customerId: string, archived: boolean) {
     this.transaction(() => {
       this.one("SELECT id FROM customers WHERE id=?", customerId);

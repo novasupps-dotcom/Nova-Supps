@@ -1,5 +1,5 @@
 import React from "react";
-import { Linking, View } from "react-native";
+import { Alert, Linking, View } from "react-native";
 import { Text } from "../text";
 import { grossUp, localDay, money, today } from "../business";
 import { catalogueImages } from "../catalogueImages";
@@ -62,8 +62,33 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
     query,
     productDetailId,
     act,
+    notify,
   } = ctx;
   const d = data!;
+  // 2.8.1: eliminar desde Stock (mantener presionado) o desde el detalle del producto.
+  const askDelete = (p: any, after?: () => void) => {
+    const sold = b!.one("SELECT COUNT(*) n FROM sale_lines WHERE productId=?", p.id).n > 0;
+    Alert.alert(
+      "Eliminar producto",
+      sold
+        ? `${p.name} tiene ventas. Se quita de Stock y de Vender; tus ventas no cambian. Lo recuperas en Archivados.`
+        : `${p.name}${p.stock ? ` y sus ${p.stock} piezas` : ""} se borra por completo.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: () => {
+            let mode = "";
+            if (act(() => (mode = b!.deleteProduct(p.id).mode), "")) {
+              notify(mode === "deleted" ? "Producto eliminado" : "Producto archivado");
+              after?.();
+            }
+          },
+        },
+      ],
+    );
+  };
   const {
     products,
     customers,
@@ -228,6 +253,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                 setProductDetailId(p.id);
                 go("Detalle producto");
               }}
+              onLongPress={() => (p.archived ? undefined : askDelete(p))}
             >
               <View style={s.productRow}>
                 <ProductPhoto product={p} style={{ width: 72, height: 88 }} />
@@ -361,19 +387,22 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
           />
           <MenuList
             items={[
-              {
-                key: "archive",
-                title: p.archived ? "Restaurar producto" : "Archivar producto",
-                desc: "Lo oculta del stock y de nuevas ventas; conserva su historial.",
-                icon: "layers",
-                tint: TILE.graphite,
-                danger: !p.archived,
-                onPress: () =>
-                  act(
-                    () => b!.setProductArchived(p.id, !p.archived),
-                    p.archived ? "Producto restaurado" : "Producto archivado",
-                  ),
-              },
+              p.archived
+                ? {
+                    key: "restore",
+                    title: "Restaurar producto",
+                    icon: "layers",
+                    tint: TILE.graphite,
+                    onPress: () => act(() => b!.setProductArchived(p.id, false), "Producto restaurado"),
+                  }
+                : {
+                    key: "delete",
+                    title: "Eliminar producto",
+                    icon: "trash-2",
+                    tint: TILE.red,
+                    danger: true,
+                    onPress: () => askDelete(p, () => go("Stock")),
+                  },
             ]}
           />
           {(!!p.barcode || (Array.isArray(p.barcodeAliases) && p.barcodeAliases.length > 0)) && (

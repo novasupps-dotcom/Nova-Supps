@@ -50,42 +50,46 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   const issues = screenIssues(ui, "inicio");
   files["file:///cache/pedido.pdf"] = Buffer.from(sampleOrder()).toString("base64");
   picked = { canceled: false, assets: [{ uri: "file:///cache/pedido.pdf", name: "Pedido 0700001.pdf" }] };
-  await press("Elegir PDF del pedido");
-  issues.push(...screenIssues(ui, "vista previa"));
+  // Paso 1: elegir el PDF.
+  assert(all().includes("1. PDF") && all().includes("2. Revisar") && all().includes("3. Cargar"));
+  await press("Elegir PDF");
+  issues.push(...screenIssues(ui, "paso 2"));
+  // Paso 2: un renglón por producto, con su precio.
   const t = all();
-  assert(t.includes("Pedido #0700001 · Suplementos GYM"), t);
-  assert(t.includes("7 piezas") && t.includes("3 nuevos") && t.includes("1 ya existen"), t);
-  assert(t.includes("pagado $3,002.06"), t);
-  assert(t.includes("Ya existe: Creatine · GAT Sport · 1 kg · existencias 1 → 4"), t);
-  assert(t.includes("Nuevo: NS-PRE-006-GRA · Preentreno"), t);
-  assert(t.includes("Sabores: Grape (2), Fruit Punch (1) · al vender se elige el sabor"), t);
-  assert(t.includes("¿Es «Psychotic Gold · Insane Labz · Por confirmar»?"), t);
-  assert(t.includes("Costo real $519.13 por pieza (PDF $523.34)"), t);
-  // Calculadora: 30% por omisión; con 40% cambia el sugerido.
+  assert(t.includes("#0700001 · 7 piezas") && t.includes("$3,002.06"), t);
+  assert(t.includes("Creatine · GAT Sport · 1 kg") && t.includes("3 pzas · ya lo tienes"), t);
+  assert(t.includes("Psychotic Black · Insane Labz · 60 Servicios") && t.includes("3 pzas · nuevo · 2 sabores"), t);
+  assert(t.includes("¿Es tu «Psychotic Gold · Insane Labz · Por confirmar»?"), t);
+  assert(t.length < 1400, "pantalla breve: " + t.length);
+  const { priceCalc } = require("../src/supplierOrder.ts");
   const pct = ui.root.findAll((n) => n.type === "TextInput" && n.props.accessibilityLabel === "Porcentaje de ganancia")[0];
   await act(async () => pct.props.onChangeText("40"));
-  const { priceCalc } = require("../src/supplierOrder.ts");
   const black = priceCalc(40996, 40, 406);
-  assert(all().includes(`Costo $409.96 + 40% = ${money(black.target)}`), all());
-  assert(all().includes(`→ ${money(black.client)} sugerido`), all());
-  // Creatina existente: por omisión conserva su precio.
-  assert(all().includes(`Mantener ${money(grossUp(64000))}`), all());
-  // Psychotic Gold: el dueño dice que sí es el existente.
-  await press("¿Es «Psychotic Gold · Insane Labz · Por confirmar»? (presentación por confirmar) · usar este");
-  assert(all().includes("2 ya existen"), all());
-  // Sin cuenta elegida no deja cargar.
-  const btn = pressables((n) => text(n).trim() === "Cargar 7 piezas al inventario")[0];
-  assert(btn.props.disabled, "pide la cuenta");
-  await press("No registrar pago");
-  await press("Cargar 7 piezas al inventario");
-  const [title, body, buttons] = alerts.at(-1);
-  assert.equal(title, "Cargar pedido");
-  assert(body.includes("7 piezas · 2 productos nuevos · 2 ya existían"), body);
-  await act(async () => buttons.find((x) => x.text === "Cargar").onPress());
-  await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+  const priceInput = ui.root.findAll((n) => n.type === "TextInput" && n.props.accessibilityLabel === "Precio de Psychotic Black · Insane Labz · 60 Servicios")[0];
+  assert.equal(priceInput.props.value, (black.client / 100).toFixed(2));
+  assert(all().includes(`Ganas ${money(black.profit)} c/u`), all());
+  // Existente: por omisión conserva su precio actual.
+  assert(all().includes(`Actual ${money(grossUp(64000))}`), all());
+  // Detalle (calculadora) detrás de un toque.
+  assert(!all().includes("te queda"));
+  await act(async () => pressables((n) => n.props.accessibilityLabel === "Detalle de Psychotic Black · Insane Labz · 60 Servicios")[0].props.onPress());
+  assert(all().includes(`Costo $409.96 · terminal ${money(black.fee)} · te queda ${money(black.net)}`), all());
+  assert(all().includes("2 × Grape · NS-PRE-006-GRA"), all());
+  // Psychotic Gold: sí es el que ya tenía.
+  await press("¿Es tu «Psychotic Gold · Insane Labz · Por confirmar»?");
+  assert(all().includes("1 pzas · ya lo tienes"), all());
+  await press("Continuar");
+  // Paso 3: con qué se pagó y cargar.
+  issues.push(...screenIssues(ui, "paso 3"));
+  assert(all().includes("7 piezas") && all().includes("2 nuevos · 2 ya los tenías"), all());
+  assert(all().includes("¿Con qué pagaste $3,002.06?"), all());
+  assert(pressables((n) => text(n).trim() === "Cargar inventario")[0].props.disabled, "pide la cuenta");
+  await press("No registrar");
+  await press("Cargar inventario");
   assert.equal(b.stock().find((p) => p.id === crea).stock, 4);
   assert.equal(changed, 1);
-  assert.equal(notes.at(-1), "Pedido cargado · 7 piezas · 2 nuevos · 2 con más piezas");
+  assert.equal(notes.at(-1), "Pedido cargado · 7 piezas");
+  assert(all().includes("Elegir PDF"), "regresa al paso 1");
   assert.equal(b.balance(bank), 1000000, "sin registrar pago");
   assert(Object.keys(written).some((u) => /Nova-antes-de-pedido-\d+\.json$/.test(u)), "copia previa");
   assert.equal(b.setting("orderMarkupPct", 0), 40);
@@ -94,7 +98,7 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
 
   // Margen y proyección (Resumen de ventas).
   await act(async () => { ui = renderer.create(React.createElement(MarginProjectionCard, { b })); });
-  assert(all().includes("Margen por producto y proyección") && all().includes("Ganancia proyectada"), all());
+  assert(all().includes("Margen y proyección") && all().includes("Solo tú lo ves") && all().includes("Ganancia"), all());
   issues.push(...screenIssues(ui, "margen"));
   await act(async () => ui.unmount());
 

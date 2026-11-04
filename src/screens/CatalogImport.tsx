@@ -7,7 +7,7 @@ import * as FS from "expo-file-system/legacy";
 import * as Picker from "expo-document-picker";
 import * as Sharing from "expo-sharing";
 import React, { useMemo, useState } from "react";
-import { Alert, Switch, View } from "react-native";
+import { View } from "react-native";
 import { Text, TextInput } from "../text";
 import { feeLabel, money, type Business } from "../business";
 import {
@@ -31,7 +31,7 @@ import {
 import { base64ToBytes } from "../photos";
 import { XLSX_MIME } from "../salesExcel";
 import { base64 } from "../xlsx";
-import { Button, C, Card, Chips, Note, Pill, TextButton, s } from "../ui";
+import { Button, C, Card, Chips, Note, Steps, TextButton, s } from "../ui";
 
 const FILE_TYPES = [
   XLSX_MIME,
@@ -66,6 +66,8 @@ export function CatalogImportPage({
   const [addFee, setAddFee] = useState(true);
   const [editing, setEditing] = useState<number | null>(null);
   const [draft, setDraft] = useState<Partial<Record<Field, string>>>({});
+  // 2.8.1: tres pasos (archivo → revisar → aplicar).
+  const [step, setStep] = useState(0);
 
   // El plan se recalcula con cada arreglo (quitar, modificar, unificar) o al cambiar la comisión.
   const { plan, planError } = useMemo(() => {
@@ -133,6 +135,7 @@ export function CatalogImportPage({
       setHistory([]);
       setEditing(null);
       setFileName(asset.name || "archivo");
+      setStep(1);
       setView(first.counts.error ? "Errores" : first.counts.new + first.counts.update ? "Cambios" : "Sin cambios");
     } catch (e) {
       reset();
@@ -152,46 +155,6 @@ export function CatalogImportPage({
     change(editRow(table, editing, draft), `Renglón ${editing} modificado`);
   }
 
-  function confirmApply() {
-    if (!plan || !table) return;
-    const { new: created, update, error: bad } = plan.counts;
-    const summary = [
-      created ? `${created} ${created === 1 ? "producto nuevo" : "productos nuevos"}` : "",
-      update ? `${update} ${update === 1 ? "producto con cambios" : "productos con cambios"}` : "",
-      bad ? `${bad} ${bad === 1 ? "renglón con error no se carga" : "renglones con error no se cargan"}` : "",
-    ].filter(Boolean);
-    const fee = plan.fee;
-    if (fee.addFee && fee.priced) {
-      const pct = feeLabel(fee.bps);
-      Alert.alert(
-        `¿Sumar la comisión de la terminal (${pct})?`,
-        [
-          `Los ${fee.priced} precios del archivo suben ${pct}` + (fee.example ? ` (ej. ${money(fee.example.from)} → ${money(fee.example.to)}).` : "."),
-          fee.switching
-            ? `Desde ahora el precio del catálogo ya incluye la comisión y al cobrar no se suma otra vez.` +
-              (fee.others ? ` Los ${fee.others} productos sin precio en el archivo también suben ${pct}, así el cliente paga lo mismo que hoy.` : "")
-            : "Tus precios ya incluyen la comisión: al cobrar no se suma otra vez.",
-          ...summary,
-          "Tus ventas y cobros anteriores no cambian. Antes se guarda una copia de tus datos.",
-        ].join("\n\n"),
-        [
-          { text: "Cancelar", style: "cancel" },
-          { text: "No sumar", onPress: () => void apply(planCatalogImport(b, table, { addFee: false })) },
-          { text: "Sí, sumar y cargar", onPress: () => void apply(plan) },
-        ],
-      );
-      return;
-    }
-    Alert.alert(
-      "Actualizar catálogo",
-      [...summary, "Tus ventas y cobros no cambian. Antes se guarda una copia de tus datos en la app."].join("\n"),
-      [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Aplicar", onPress: () => void apply(plan) },
-      ],
-    );
-  }
-
   async function apply(p: ImportPlan) {
     if (busy) return;
     setBusy("apply");
@@ -200,6 +163,7 @@ export function CatalogImportPage({
       await keepCopy(b);
       const r = applyCatalogImport(b, p);
       reset();
+      setStep(0);
       onChanged();
       notify(
         `Catálogo actualizado · ${r.created} nuevos · ${r.updated} con cambios` +
@@ -245,196 +209,148 @@ export function CatalogImportPage({
     </View>
   );
 
-  return (
-    <>
-      <Card>
-        <Text style={s.subtitle}>1. Descarga tu catálogo</Text>
-        <Note>
-          Excel con todos tus productos: SKU, nombre, categoría, precio, código de barras, marca y más. Ábrelo en la
-          computadora, Google Sheets o Excel del teléfono y cambia lo que necesites. Para un producto nuevo agrega un
-          renglón con Nombre y Precio.
-        </Note>
-        <View style={{ height: 8 }} />
-        <Button
-          title={busy === "download" ? "Preparando…" : "Descargar catálogo en Excel"}
-          icon="download"
-          secondary
-          disabled={!!busy}
-          onPress={download}
-        />
-      </Card>
+  // ---------------- 1. Archivo
+  if (step === 0 || !table)
+    return (
+      <>
+        <Steps step={0} names={["Archivo", "Revisar", "Aplicar"]} />
+        <Card>
+          <Text style={s.subtitle}>Tu catálogo en Excel</Text>
+          <Note>Cámbialo y vuelve a cargarlo (.xlsx o CSV).</Note>
+          <View style={{ height: 8 }} />
+          <Button title={busy === "read" ? "Leyendo…" : "Elegir archivo"} icon="upload" disabled={!!busy} onPress={pick} />
+          <TextButton title={busy === "download" ? "Preparando…" : "Descargar mi catálogo"} onPress={() => void download()} disabled={!!busy} />
+          {!!error && <Note color={C.red}>{error}</Note>}
+        </Card>
+      </>
+    );
 
-      <Card>
-        <Text style={s.subtitle}>2. Carga el archivo con tus cambios</Text>
-        <Note>
-          Excel (.xlsx) o CSV. Primero verás qué cambia y podrás quitar, modificar o unificar renglones; nada se guarda
-          hasta que toques «Aplicar».
-        </Note>
-        <View style={{ height: 8 }} />
-        <Button
-          title={busy === "read" ? "Leyendo archivo…" : table ? "Elegir otro archivo" : "Elegir archivo"}
-          icon="upload"
-          secondary={!!table}
-          disabled={!!busy}
-          onPress={pick}
-        />
-        {!!error && <Note color={C.red}>{error}</Note>}
-      </Card>
-
-      {table && !plan && (
+  if (!plan)
+    return (
+      <>
+        <Steps step={1} names={["Archivo", "Revisar", "Aplicar"]} />
         <Card>
           <Note color={C.red}>{planError}</Note>
-          {!!history.length && <Button title="Deshacer último cambio" secondary small onPress={undo} />}
-          <Button title="Descartar" secondary small onPress={reset} />
+          {!!history.length && <Button title="Deshacer" secondary small onPress={undo} />}
+          <Button title="Cancelar" secondary small onPress={() => (reset(), setStep(0))} />
         </Card>
-      )}
+      </>
+    );
 
-      {plan && (
-        <>
-          {plan.fee.bps > 0 && plan.fee.priced > 0 && (
-            <Card>
-              <View style={s.between}>
-                <Text style={[s.body, { fontWeight: "600", flex: 1 }]}>
-                  {`Sumar la comisión de la terminal (${feeLabel(plan.fee.bps)}) a los precios`}
-                </Text>
-                <Switch
-                  value={addFee}
-                  onValueChange={setAddFee}
-                  accessibilityLabel="Sumar la comisión de la terminal a los precios"
-                />
-              </View>
-              {addFee ? (
-                <>
-                  {!!plan.fee.example && (
-                    <Note>{`Ej. ${money(plan.fee.example.from)} del archivo → ${money(plan.fee.example.to)} en el catálogo.`}</Note>
-                  )}
-                  <Note>
-                    {plan.fee.switching
-                      ? `El precio del catálogo incluirá la comisión y al cobrar ya no se sumará otra vez.${plan.fee.others ? ` Los ${plan.fee.others} productos sin precio en el archivo también suben, así el cliente paga lo mismo que hoy.` : ""}`
-                      : "Tus precios ya incluyen la comisión: al cobrar no se suma otra vez."}
-                  </Note>
-                </>
-              ) : (
-                <Note color={inPrice ? C.amber : undefined}>
-                  {inPrice
-                    ? "Los precios se guardan tal como vienen y al cobrar no se suma comisión: usa esta opción solo si el archivo ya la incluye."
-                    : "Los precios se guardan tal como vienen; la comisión se sigue sumando al cobrar."}
-                </Note>
-              )}
-            </Card>
-          )}
-
-          <Card>
-            <Text style={s.subtitle} numberOfLines={1}>
+  // ---------------- 2. Revisar
+  if (step === 1)
+    return (
+      <>
+        <Steps step={1} names={["Archivo", "Revisar", "Aplicar"]} />
+        <Card>
+          <View style={s.between}>
+            <Text style={[s.body, { fontWeight: "600", flex: 1 }]} numberOfLines={1}>
               {fileName}
             </Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginVertical: 6 }}>
-              <Pill text={`${plan.counts.new} nuevos`} tone={plan.counts.new ? "ok" : "neutral"} />
-              <Pill text={`${plan.counts.update} con cambios`} tone={plan.counts.update ? "ok" : "neutral"} />
-              <Pill text={`${plan.counts.same} sin cambios`} />
-              {!!plan.counts.error && <Pill text={`${plan.counts.error} con error`} tone="bad" />}
+            {!!history.length && <TextButton title="Deshacer" onPress={undo} />}
+          </View>
+          <Chips
+            row
+            options={[
+              { id: "Cambios", name: `Cambios ${plan.counts.new + plan.counts.update}` },
+              { id: "Errores", name: `Errores ${plan.counts.error}` },
+              { id: "Sin cambios", name: `Iguales ${plan.counts.same}` },
+            ]}
+            value={view}
+            onChange={(v) => setView(v as View3)}
+          />
+          {view === "Errores" && !!plan.counts.error && (
+            <View style={[s.row, { gap: 8 }]}>
+              {!!dups && (
+                <Button
+                  title={`Unificar repetidos (${dups})`}
+                  small
+                  flex
+                  onPress={() => change(mergeAllDuplicates(table, plan), `${dups} unificados`)}
+                />
+              )}
+              <Button title="Quitar errores" small secondary flex onPress={() => change(dropAllErrors(table, plan), "Errores quitados")} />
             </View>
-            <Note>{`Columnas leídas: ${plan.columns.join(", ")}.`}</Note>
-            {plan.notes.map((n, i) => (
-              <Note key={i} color={C.amber}>
-                {n}
-              </Note>
-            ))}
-            {!!plan.counts.error && (
-              <View style={{ marginTop: 6 }}>
-                <Note>
-                  {`Los renglones con error no se cargan. Puedes quitarlos, modificarlos${dups ? " o unificar los repetidos (mismo producto en varios renglones, por ejemplo por sabor)" : ""}.`}
-                </Note>
-                <View style={[s.row, { gap: 8, marginTop: 6 }]}>
-                  {!!dups && (
-                    <Button
-                      title={`Unificar repetidos (${dups})`}
-                      small
-                      flex
-                      onPress={() => change(mergeAllDuplicates(table!, plan), `${dups} ${dups === 1 ? "renglón unificado" : "renglones unificados"}`)}
+          )}
+          {!rows.length && <Note>Nada aquí.</Note>}
+          {rows.slice(0, SHOW).map((r) => (
+            <View key={r.line} style={{ paddingVertical: 8, borderTopWidth: 1, borderColor: C.line }}>
+              <Text style={[s.body, { fontWeight: "600" }]} numberOfLines={1}>
+                {r.name || r.sku || "Sin nombre"}
+              </Text>
+              <Text style={[s.muted, { fontSize: 12.5, color: r.kind === "error" ? C.red : C.muted }]} numberOfLines={2}>
+                {r.kind === "error"
+                  ? r.error
+                  : r.kind === "same"
+                    ? "Igual que en la app"
+                    : r.changes
+                        .map((c, i) => (r.kind === "new" ? (i ? `${c.label} ${c.to}` : `Nuevo · ${c.to}`) : `${c.label}: ${c.from || "—"} → ${c.to || "—"}`))
+                        .join(" · ")}
+              </Text>
+              {editing === r.line ? (
+                editor(r)
+              ) : (
+                <View style={[s.row, { gap: 14, marginVertical: 0 }]}>
+                  {!!r.dupOf && (
+                    <TextButton
+                      title={`Unificar con ${r.dupOf}`}
+                      bold
+                      onPress={() => change(mergeRows(table, r.dupOf!, r.line), `Renglón ${r.line} unificado`)}
                     />
                   )}
-                  <Button
-                    title={`Quitar errores (${plan.counts.error})`}
-                    small
-                    secondary
-                    flex
-                    onPress={() => change(dropAllErrors(table!, plan), "Renglones con error quitados")}
-                  />
+                  <TextButton title="Modificar" onPress={() => startEdit(r)} />
+                  <TextButton title="Quitar" color={C.red} onPress={() => change(dropRow(table, r.line), `Renglón ${r.line} quitado`)} />
                 </View>
-              </View>
-            )}
-            {!!history.length && (
-              <TextButton title={`Deshacer último cambio (${history.length})`} onPress={undo} />
-            )}
-            <Chips
-              row
-              options={(["Cambios", "Errores", "Sin cambios"] as View3[]).map((x) => ({ id: x, name: x }))}
-              value={view}
-              onChange={(v) => setView(v as View3)}
-            />
-            {!rows.length && <Note>Nada en esta lista.</Note>}
-            {rows.slice(0, SHOW).map((r) => (
-              <View key={r.line} style={{ paddingVertical: 8, borderTopWidth: 1, borderColor: C.line }}>
-                <Text style={s.body} numberOfLines={1}>
-                  <Text style={{ fontWeight: "600" }}>{r.name || r.sku || "Sin nombre"}</Text>
-                  {r.sku ? <Text style={{ color: C.muted }}>{"  " + r.sku}</Text> : null}
-                </Text>
-                {r.kind === "error" ? (
-                  <Note color={C.red}>{`Renglón ${r.line}: ${r.error}`}</Note>
-                ) : r.kind === "same" ? (
-                  <Note>{`Renglón ${r.line}: igual que en la app`}</Note>
-                ) : (
-                  r.changes.map((c, i) => (
-                    <Note key={i}>
-                      {r.kind === "new" ? (i ? `${c.label}: ${c.to}` : `Nuevo: ${c.to}`) : `${c.label}: ${c.from || "—"} → ${c.to || "(vacío)"}`}
-                    </Note>
-                  ))
-                )}
-                {!!r.warning && r.kind !== "error" && <Note color={C.amber}>{r.warning}</Note>}
-                {editing === r.line ? (
-                  editor(r)
-                ) : (
-                  <View style={[s.row, { gap: 14 }]}>
-                    {!!r.dupOf && (
-                      <TextButton
-                        title={`Unificar con renglón ${r.dupOf}`}
-                        bold
-                        onPress={() => change(mergeRows(table!, r.dupOf!, r.line), `Renglón ${r.line} unificado con el ${r.dupOf}`)}
-                      />
-                    )}
-                    <TextButton title="Modificar" onPress={() => startEdit(r)} />
-                    <TextButton
-                      title="Quitar"
-                      color={C.red}
-                      onPress={() => change(dropRow(table!, r.line), `Renglón ${r.line} quitado de la carga`)}
-                    />
-                  </View>
-                )}
-              </View>
-            ))}
-            {rows.length > SHOW && <Note>{`…y ${rows.length - SHOW} más.`}</Note>}
-            <View style={{ height: 8 }} />
-            <Button
-              title={busy === "apply" ? "Aplicando…" : pending ? `Aplicar ${pending} ${pending === 1 ? "cambio" : "cambios"}` : "No hay cambios que aplicar"}
-              disabled={!pending || !!busy}
-              onPress={confirmApply}
-            />
-            <Button title="Descartar" secondary disabled={!!busy} onPress={reset} />
-          </Card>
-        </>
-      )}
+              )}
+            </View>
+          ))}
+          {rows.length > SHOW && <Note>{`…y ${rows.length - SHOW} más.`}</Note>}
+        </Card>
+        <Button title="Continuar" disabled={!pending} onPress={() => setStep(2)} />
+        <Button title="Cancelar" secondary onPress={() => (reset(), setStep(0))} />
+      </>
+    );
 
+  // ---------------- 3. Aplicar
+  const fee = plan.fee;
+  return (
+    <>
+      <Steps step={2} names={["Archivo", "Revisar", "Aplicar"]} />
       <Card>
-        <Text style={s.subtitle}>Qué hace cada columna</Text>
-        <Note>• SKU: identifica el producto. Si lo dejas vacío en un producto nuevo, la app lo crea. Nunca se cambia.</Note>
-        <Note>• Celda vacía: no cambia nada. Para borrar un texto escribe un guion (-).</Note>
-        <Note>• Precio: tu precio. Al cargar eliges si se le suma la comisión de la terminal.</Note>
-        <Note>• Activo = No: deja de venderse y se oculta a tus vendedores (no se borra).</Note>
-        <Note>• Existencias: cuántas piezas tienes; la app deja ese número. Si no lo cambias, se respeta lo vendido después de descargar el Excel.</Note>
-        <Note>• Agregar piezas: suma piezas como un lote nuevo. Costo unitario y Caducidad aplican a las piezas que se suman. Nada mueve dinero.</Note>
-        <Note>• Quitar: ese renglón no se carga (tu archivo no cambia). Unificar: junta renglones del mismo producto, suma existencias y junta los sabores.</Note>
+        <Text style={s.subtitle}>{`${pending} ${pending === 1 ? "cambio" : "cambios"}`}</Text>
+        <Text style={[s.muted, { fontSize: 13 }]}>
+          {[
+            `${plan.counts.new} nuevos`,
+            `${plan.counts.update} actualizados`,
+            plan.counts.error ? `${plan.counts.error} con error no se cargan` : "",
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </Text>
       </Card>
+      {fee.bps > 0 && fee.priced > 0 && (
+        <Card>
+          <Text style={s.subtitle}>{`Terminal ${feeLabel(fee.bps)}`}</Text>
+          <Chips
+            options={[
+              { id: "add", name: "Sumarla a los precios" },
+              { id: "as-is", name: "Precios tal cual" },
+            ]}
+            value={addFee ? "add" : "as-is"}
+            onChange={(v) => setAddFee(v === "add")}
+          />
+          <Text style={[s.muted, { fontSize: 12.5 }]}>
+            {addFee
+              ? `${fee.example ? `${money(fee.example.from)} → ${money(fee.example.to)}. ` : ""}Al cobrar ya no se suma.`
+              : inPrice
+                ? "Usa esto solo si el archivo ya la incluye."
+                : "La comisión se suma al cobrar."}
+          </Text>
+        </Card>
+      )}
+      {!!error && <Note color={C.red}>{error}</Note>}
+      <Button title={busy === "apply" ? "Aplicando…" : "Aplicar"} disabled={!pending || !!busy} onPress={() => void apply(plan)} />
+      <Button title="Atrás" secondary disabled={!!busy} onPress={() => setStep(1)} />
     </>
   );
 }

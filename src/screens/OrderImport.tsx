@@ -1,11 +1,12 @@
-// 2.8 · Stock → «Cargar pedido (PDF)»: el PDF del pedido del proveedor se vuelve inventario.
-// Muestra qué productos ya existen (solo suman piezas) y cuáles son nuevos (SKU homologado),
-// la calculadora de precio (costo real + % de ganancia + comisión de la terminal) y pide
-// la cuenta con la que se pagó. Nada se guarda hasta confirmar.
+// 2.8 · Stock → «Cargar pedido»: el PDF del pedido del proveedor se vuelve inventario.
+// 2.8.1 · Tres pasos, sin texto de más (estilo iPhone):
+//   1. Elegir el PDF.
+//   2. Revisar: un renglón por producto con su precio (la calculadora queda detrás de un toque).
+//   3. Cargar: con qué se pagó y listo.
 import * as FS from "expo-file-system/legacy";
 import * as Picker from "expo-document-picker";
 import React, { useMemo, useState } from "react";
-import { Alert, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { Text, TextInput } from "../text";
 import { feeLabel, money, type Business, type Row } from "../business";
 import { base64ToBytes } from "../photos";
@@ -19,11 +20,10 @@ import {
   type PriceGroup,
   type SupplierOrder,
 } from "../supplierOrder";
-import { Button, C, Card, Chips, Note, Pill, TextButton, s, tryCents } from "../ui";
+import { Button, C, Card, Chips, Note, Steps, TextButton, s, tryCents } from "../ui";
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const NO_PAY = "__none__";
-
 export function OrderImportPage({
   b,
   notify,
@@ -34,86 +34,62 @@ export function OrderImportPage({
   /** Después de cargar: refresca pantallas y publica el catálogo a los vendedores. */
   onChanged: () => void;
 }) {
+  const [step, setStep] = useState(0);
   const [order, setOrder] = useState<SupplierOrder | null>(null);
-  const [fileName, setFileName] = useState("");
-  const [busy, setBusy] = useState<"" | "read" | "apply">("");
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [choices, setChoices] = useState<Record<string, string | null>>({});
   const [markupText, setMarkupText] = useState(String(b.setting("orderMarkupPct", 30)));
   const [prices, setPrices] = useState<Record<string, string>>({});
   const [keep, setKeep] = useState<Record<string, boolean>>({});
+  const [open, setOpen] = useState<string | null>(null);
   const [account, setAccount] = useState("");
   const [again, setAgain] = useState(false);
 
   const plan: OrderPlan | null = useMemo(() => (order ? planSupplierOrder(b, order, choices) : null), [b, order, choices]);
   const markup = Math.max(0, Math.min(1000, Number(markupText.replace(",", ".")) || 0));
   const bps = b.feeBps();
-  const inPrice = b.feeInPrice();
   const accounts: Row[] = useMemo(() => b.accounts(), [b, order]);
 
+  const reset = () => {
+    setStep(0);
+    setOrder(null);
+    setChoices({});
+    setPrices({});
+    setKeep({});
+    setOpen(null);
+    setAccount("");
+    setAgain(false);
+  };
   async function pick() {
     setError("");
     try {
       const r = await Picker.getDocumentAsync({ type: ["application/pdf"], copyToCacheDirectory: true, multiple: false });
       if (r.canceled || !r.assets?.length) return;
-      setBusy("read");
+      setBusy(true);
       await new Promise((ok) => setTimeout(ok, 30));
       const raw = await FS.readAsStringAsync(r.assets[0].uri, { encoding: FS.EncodingType.Base64 });
       const next = readSupplierOrderPdf(base64ToBytes(raw));
+      reset();
       setOrder(next);
-      setFileName(r.assets[0].name || "pedido.pdf");
-      setChoices({});
-      setPrices({});
-      setKeep({});
-      setAccount("");
-      setAgain(false);
+      setStep(1);
     } catch (e) {
-      setOrder(null);
       setError(errText(e));
     } finally {
-      setBusy("");
+      setBusy(false);
     }
   }
-  const reset = () => {
-    setOrder(null);
-    setFileName("");
-    setChoices({});
-  };
 
   const calcOf = (g: PriceGroup) => {
     const typed = tryCents(prices[g.family] ?? "");
     return priceCalc(g.cost, markup, bps, typed !== null && typed > 0 ? typed : undefined);
   };
   const keepOf = (g: PriceGroup) => g.currentClient !== null && (keep[g.family] ?? true);
+  const clientOf = (g: PriceGroup) => (keepOf(g) ? g.currentClient! : calcOf(g).client);
 
-  function confirm() {
-    if (!plan) return;
-    if (!account) {
-      setError("Elige con qué cuenta pagaste el pedido (o «No registrar pago»).");
-      return;
-    }
-    const created = plan.items.filter((i) => !i.productId).length;
-    const restock = new Set(plan.items.filter((i) => i.productId).map((i) => i.productId)).size;
-    const units = plan.order.lines.reduce((n, l) => n + l.qty, 0);
-    const acc = accounts.find((a) => a.id === account);
-    Alert.alert(
-      "Cargar pedido",
-      [
-        `${units} piezas · ${created} ${created === 1 ? "producto nuevo" : "productos nuevos"} · ${restock} ya ${restock === 1 ? "existía" : "existían"}.`,
-        `Precios: ${plan.groups.filter((g) => !keepOf(g)).length} con precio nuevo, ${plan.groups.filter(keepOf).length} conservan el actual.`,
-        acc ? `Pago: ${money(plan.order.total)} sale de ${acc.name}.` : "Sin registrar pago.",
-        "Antes se guarda una copia de tus datos.",
-      ].join("\n"),
-      [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Cargar", onPress: () => void apply() },
-      ],
-    );
-  }
-
-  async function apply() {
+  async function load() {
     if (!plan || busy) return;
-    setBusy("apply");
+    setBusy(true);
     setError("");
     try {
       await keepCopy(b);
@@ -123,75 +99,53 @@ export function OrderImportPage({
       const r = applySupplierOrder(b, plan, decisions, account === NO_PAY ? null : account);
       reset();
       onChanged();
-      notify(`Pedido cargado · ${r.units} piezas · ${r.created} nuevos · ${r.restocked} con más piezas${r.paid ? " · pago " + money(r.paid) : ""}`);
+      notify(`Pedido cargado · ${r.units} piezas`);
     } catch (e) {
-      setError("No se cargó nada: " + errText(e));
+      setError(errText(e));
     } finally {
-      setBusy("");
+      setBusy(false);
     }
   }
 
-  const o = plan?.order;
-  const units = o ? o.lines.reduce((n, l) => n + l.qty, 0) : 0;
-  return (
-    <>
-      <Card>
-        <Text style={s.subtitle}>Pedido del proveedor (PDF)</Text>
-        <Note>
-          Elige el PDF del pedido (Imprimir pedido → Guardar como PDF). La app lee productos, sabores, cantidades y
-          precios; lo que ya tienes solo suma piezas y lo nuevo se da de alta. Nada se guarda hasta confirmar.
-        </Note>
-        <View style={{ height: 8 }} />
-        <Button
-          title={busy === "read" ? "Leyendo PDF…" : order ? "Elegir otro PDF" : "Elegir PDF del pedido"}
-          icon="file-text"
-          secondary={!!order}
-          disabled={!!busy}
-          onPress={pick}
-        />
-        {!!error && <Note color={C.red}>{error}</Note>}
-      </Card>
+  // ---------------- 1. PDF
+  if (step === 0 || !plan)
+    return (
+      <>
+        <Steps step={0} names={["PDF", "Revisar", "Cargar"]} />
+        <Card>
+          <Text style={s.subtitle}>Pedido del proveedor</Text>
+          <Note>El PDF de «Imprimir pedido».</Note>
+          <View style={{ height: 8 }} />
+          <Button title={busy ? "Leyendo…" : "Elegir PDF"} icon="file-text" disabled={busy} onPress={pick} />
+          {!!error && <Note color={C.red}>{error}</Note>}
+        </Card>
+      </>
+    );
 
-      {plan && o && (
-        <>
-          <Card>
-            <Text style={s.subtitle}>{`Pedido ${o.number ? "#" + o.number : ""} · ${o.supplier}`}</Text>
-            <Note>{[o.date, o.status, fileName].filter(Boolean).join(" · ")}</Note>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginVertical: 6 }}>
-              <Pill text={`${units} piezas`} tone="ok" />
-              <Pill text={`${plan.items.filter((i) => !i.productId).length} nuevos`} />
-              <Pill text={`${plan.items.filter((i) => i.productId).length} ya existen`} />
-            </View>
-            <Note>{`Sub-total ${money(o.subtotal)} · descuento −${money(o.discount)} · envío ${money(o.shipping)} · pagado ${money(o.total)}`}</Note>
-            <Note>El costo de cada pieza es el real: su precio con su parte del descuento y del envío.</Note>
-            {/pendiente/i.test(o.status) && (
-              <Note color={C.amber}>El pedido dice «{o.status}»: carga el inventario cuando la mercancía ya esté contigo, para no vender piezas que aún no llegan.</Note>
-            )}
-            {o.warnings.map((w, i) => (
-              <Note key={i} color={C.amber}>
-                {w}
-              </Note>
-            ))}
-            {!!plan.duplicate && (
-              <>
-                <Note color={C.red}>
-                  {`Este pedido ya se cargó el ${new Date(String(plan.duplicate.at)).toLocaleDateString("es-MX")} (${plan.duplicate.units} piezas). Cargarlo otra vez duplicaría las existencias.`}
-                </Note>
-                <TextButton
-                  title={again ? "✓ Cargar de nuevo de todos modos" : "Cargar de nuevo de todos modos"}
-                  color={C.red}
-                  onPress={() => setAgain((x) => !x)}
-                />
-              </>
-            )}
-          </Card>
+  const o = plan.order;
+  const units = o.lines.reduce((n, l) => n + l.qty, 0);
+  const created = plan.items.filter((i) => !i.productId).length;
+  const existing = new Set(plan.items.filter((i) => i.productId).map((i) => i.productId)).size;
+  const projected = plan.groups.reduce((n, g) => {
+    const c = priceCalc(g.cost, markup, bps, clientOf(g));
+    return n + g.items.reduce((u, i) => u + plan.items[i].line.qty, 0) * c.profit;
+  }, 0);
 
-          <Card>
-            <Text style={s.subtitle}>Calculadora de precio</Text>
-            <View style={[s.row, { alignItems: "center" }]}>
-              <Text style={[s.body, { flex: 1 }]}>% de ganancia sobre el costo</Text>
+  // ---------------- 2. Revisar
+  if (step === 1)
+    return (
+      <>
+        <Steps step={1} names={["PDF", "Revisar", "Cargar"]} />
+        <Card>
+          <View style={s.between}>
+            <Text style={[s.body, { fontWeight: "600" }]}>{`#${o.number || "—"} · ${units} piezas`}</Text>
+            <Text style={[s.body, { fontWeight: "600" }]}>{money(o.total)}</Text>
+          </View>
+          <View style={[s.between, { marginTop: 10 }]}>
+            <Text style={s.body}>Ganancia</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
               <TextInput
-                style={[s.input, { width: 90, textAlign: "right", marginBottom: 0 }]}
+                style={[s.input, { width: 70, textAlign: "right", marginBottom: 0 }]}
                 value={markupText}
                 onChangeText={(t) => {
                   setMarkupText(t);
@@ -200,112 +154,136 @@ export function OrderImportPage({
                 keyboardType="decimal-pad"
                 accessibilityLabel="Porcentaje de ganancia"
               />
+              <Text style={s.body}>%</Text>
             </View>
-            <Note>{`Comisión de la terminal: ${feeLabel(bps)} (la absorbe el cliente). Precio sugerido = costo + ${markup}% + comisión, redondeado hacia arriba al peso. Puedes cambiar cada precio.`}</Note>
-            <Note>
-              {inPrice
-                ? "Tus precios incluyen la comisión: el precio que ves es el del catálogo."
-                : "La comisión se suma al cobrar: aquí ves lo que paga el cliente; en el catálogo se guarda sin la comisión."}
-            </Note>
-          </Card>
+          </View>
+          <Text style={[s.muted, { fontSize: 12.5, marginTop: 4 }]}>{`+ terminal ${feeLabel(bps)} · redondeado al peso`}</Text>
+          {(!!o.warnings.length || !!plan.duplicate) && (
+            <Text style={[s.muted, { fontSize: 12.5, marginTop: 6, color: plan.duplicate ? C.red : C.amber }]}>
+              {plan.duplicate ? "Este pedido ya se cargó antes." : o.warnings[0]}
+            </Text>
+          )}
+        </Card>
 
-          {plan.groups.map((g) => {
-            const c = calcOf(g);
+        <Card>
+          {plan.groups.map((g, gi) => {
             const items = g.items.map((i) => plan.items[i]);
-            const current = g.currentClient !== null ? priceCalc(g.cost, markup, bps, g.currentClient) : null;
-            const keeping = keepOf(g);
+            const qty = items.reduce((n, it) => n + it.line.qty, 0);
+            const allNew = items.every((it) => !it.productId);
+            const c = priceCalc(g.cost, markup, bps, clientOf(g));
+            const doubt = items.find((it) => !it.productId && it.candidates.length);
+            const expanded = open === g.family;
+            const flavors = items.map((it) => it.line.flavor).filter(Boolean);
             return (
-              <Card key={g.family}>
-                <Text style={[s.body, { fontWeight: "600" }]}>{g.name}</Text>
-                {items.length > 1 && (
-                  <Note>{`Sabores: ${items.map((it) => `${it.line.flavor} (${it.line.qty})`).join(", ")} · al vender se elige el sabor`}</Note>
-                )}
-                {items.map((it) => (
-                  <View key={it.key} style={{ paddingVertical: 6, borderTopWidth: 1, borderColor: C.line }}>
-                    <Text style={s.body} numberOfLines={2}>
-                      {`${it.line.qty} × ${it.line.flavor || it.line.name}`}
+              <View key={g.family} style={{ paddingVertical: 10, borderTopWidth: gi ? 1 : 0, borderColor: C.line }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                  <Pressable
+                    style={{ flex: 1 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Detalle de ${g.name}`}
+                    onPress={() => setOpen(expanded ? null : g.family)}
+                  >
+                    <Text style={[s.body, { fontWeight: "600" }]} numberOfLines={1}>
+                      {g.name}
                     </Text>
-                    {it.productId ? (
-                      <>
-                        <Note color={C.green}>
-                          {`Ya existe: ${it.candidates.find((x) => x.id === it.productId)?.name ?? ""} · existencias ${
-                            it.candidates.find((x) => x.id === it.productId)?.stock ?? 0
-                          } → ${(it.candidates.find((x) => x.id === it.productId)?.stock ?? 0) + it.line.qty}`}
-                        </Note>
-                        <TextButton title="No es este, darlo de alta" onPress={() => setChoices((ch) => ({ ...ch, [it.key]: null }))} />
-                      </>
-                    ) : (
-                      <>
-                        <Note>{`Nuevo: ${it.newSku} · ${it.category}`}</Note>
-                        {it.candidates.map((cand) => (
-                          <TextButton
-                            key={cand.id}
-                            title={`¿Es «${cand.name}»? (${cand.why}) · usar este`}
-                            onPress={() => setChoices((ch) => ({ ...ch, [it.key]: cand.id }))}
-                          />
-                        ))}
-                      </>
-                    )}
-                    <Note>{`Costo real ${money(it.unitCost)} por pieza (PDF ${money(it.line.price)})`}</Note>
-                  </View>
-                ))}
-                <View style={{ borderTopWidth: 1, borderColor: C.line, paddingTop: 6 }}>
-                  <Note>{`Costo ${money(g.cost)} + ${markup}% = ${money(c.target)} + comisión ${feeLabel(bps)} → ${money(priceCalc(g.cost, markup, bps).client)} sugerido`}</Note>
-                  {current && (
-                    <Chips
-                      row
-                      options={[
-                        { id: "keep", name: `Mantener ${money(current.client)}` },
-                        { id: "new", name: `Precio nuevo ${money(c.client)}` },
-                      ]}
-                      value={keeping ? "keep" : "new"}
-                      onChange={(v) => setKeep((k) => ({ ...k, [g.family]: v === "keep" }))}
+                    <Text style={[s.muted, { fontSize: 12.5 }]} numberOfLines={1}>
+                      {`${qty} pzas · ${allNew ? "nuevo" : "ya lo tienes"}${flavors.length > 1 ? ` · ${flavors.length} sabores` : flavors.length ? ` · ${flavors[0]}` : ""}`}
+                    </Text>
+                  </Pressable>
+                  {keepOf(g) ? (
+                    <Text style={[s.body, { fontWeight: "700" }]}>{money(c.client)}</Text>
+                  ) : (
+                    <TextInput
+                      style={[s.input, { width: 96, textAlign: "right", marginBottom: 0, fontWeight: "700" }]}
+                      value={prices[g.family] ?? (c.client / 100).toFixed(2)}
+                      onChangeText={(t) => setPrices((p) => ({ ...p, [g.family]: t }))}
+                      keyboardType="decimal-pad"
+                      accessibilityLabel={`Precio de ${g.name}`}
                     />
                   )}
-                  {current && keeping ? (
-                    <Note>{`Con el precio actual: comisión ${money(current.fee)} · te queda ${money(current.net)} · ganancia ${money(current.profit)} (${current.realPct.toFixed(1)}%)`}</Note>
-                  ) : (
-                    <>
-                      <View style={[s.row, { alignItems: "center" }]}>
-                        <Text style={[s.body, { flex: 1 }]}>Precio al cliente</Text>
-                        <TextInput
-                          style={[s.input, { width: 120, textAlign: "right", marginBottom: 0 }]}
-                          value={prices[g.family] ?? (c.client / 100).toFixed(2)}
-                          onChangeText={(t) => setPrices((p) => ({ ...p, [g.family]: t }))}
-                          keyboardType="decimal-pad"
-                          accessibilityLabel={`Precio al cliente de ${g.name}`}
-                        />
-                      </View>
-                      <Note color={c.profit < 0 ? C.red : undefined}>
-                        {`Comisión ${feeLabel(bps)} ${money(c.fee)} · te queda ${money(c.net)} · ganancia ${money(c.profit)} por pieza (${c.realPct.toFixed(1)}%)`}
-                      </Note>
-                    </>
-                  )}
                 </View>
-              </Card>
+                <Text style={[s.muted, { fontSize: 12.5, color: c.profit < 0 ? C.red : C.muted }]}>
+                  {`Ganas ${money(c.profit)} c/u (${c.realPct.toFixed(0)}%)`}
+                </Text>
+                {g.currentClient !== null && (
+                  <Chips
+                    row
+                    options={[
+                      { id: "keep", name: `Actual ${money(g.currentClient)}` },
+                      { id: "new", name: `Nuevo ${money(priceCalc(g.cost, markup, bps).client)}` },
+                    ]}
+                    value={keepOf(g) ? "keep" : "new"}
+                    onChange={(v) => setKeep((k) => ({ ...k, [g.family]: v === "keep" }))}
+                  />
+                )}
+                {doubt && (
+                  <TextButton
+                    title={`¿Es tu «${doubt.candidates[0].name}»?`}
+                    onPress={() => setChoices((ch) => ({ ...ch, [doubt.key]: doubt.candidates[0].id }))}
+                  />
+                )}
+                {expanded && (
+                  <View style={{ marginTop: 4 }}>
+                    <Text style={[s.muted, { fontSize: 12.5 }]}>
+                      {`Costo ${money(g.cost)} · terminal ${money(c.fee)} · te queda ${money(c.net)}`}
+                    </Text>
+                    {items.map((it) => (
+                      <View key={it.key} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                        <Text style={[s.muted, { fontSize: 12.5, flex: 1 }]} numberOfLines={1}>
+                          {`${it.line.qty} × ${it.line.flavor || it.line.name} · ${it.productId ? "ya existe" : it.newSku}`}
+                        </Text>
+                        {it.productId && (
+                          <TextButton title="No es" onPress={() => setChoices((ch) => ({ ...ch, [it.key]: null }))} />
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
             );
           })}
+        </Card>
+        <Button title="Continuar" onPress={() => setStep(2)} />
+        <Button title="Cancelar" secondary onPress={reset} />
+      </>
+    );
 
-          <Card>
-            <Text style={s.subtitle}>¿Con qué pagaste el pedido?</Text>
-            <Note>{`Se registra una salida de ${money(o.total)} de esa cuenta. Si ya lo registraste o no quieres moverlo, elige «No registrar pago».`}</Note>
-            <Chips
-              options={[
-                ...accounts.map((a) => ({ id: a.id, name: `${a.name} (${money(a.balance)})` })),
-                { id: NO_PAY, name: "No registrar pago" },
-              ]}
-              value={account}
-              onChange={setAccount}
-            />
-            <View style={{ height: 8 }} />
-            <Button
-              title={busy === "apply" ? "Cargando…" : `Cargar ${units} piezas al inventario`}
-              disabled={!!busy || (!!plan.duplicate && !again) || !account}
-              onPress={confirm}
-            />
-            <Button title="Descartar" secondary disabled={!!busy} onPress={reset} />
-          </Card>
-        </>
+  // ---------------- 3. Cargar
+  return (
+    <>
+      <Steps step={2} names={["PDF", "Revisar", "Cargar"]} />
+      <Card>
+        <Text style={s.subtitle}>{`${units} piezas`}</Text>
+        <Text style={[s.muted, { fontSize: 13 }]}>{`${created} nuevos · ${existing} ya los tenías`}</Text>
+        <View style={[s.between, { marginTop: 10 }]}>
+          <Text style={s.body}>Ganancia si vendes todo</Text>
+          <Text style={[s.body, { fontWeight: "700", color: projected >= 0 ? C.green : C.red }]}>{money(projected)}</Text>
+        </View>
+        {/pendiente/i.test(o.status) && (
+          <Text style={[s.muted, { fontSize: 12.5, marginTop: 6, color: C.amber }]}>Pedido pendiente de pago: cárgalo cuando llegue la mercancía.</Text>
+        )}
+      </Card>
+      <Card>
+        <Text style={s.subtitle}>{`¿Con qué pagaste ${money(o.total)}?`}</Text>
+        <Chips
+          options={[...accounts.map((a) => ({ id: a.id, name: a.name })), { id: NO_PAY, name: "No registrar" }]}
+          value={account}
+          onChange={setAccount}
+        />
+        {!!error && <Note color={C.red}>{error}</Note>}
+      </Card>
+      <Button
+        title={busy ? "Cargando…" : "Cargar inventario"}
+        disabled={busy || !account || (!!plan.duplicate && !again)}
+        onPress={() => void load()}
+      />
+      <Button title="Atrás" secondary disabled={busy} onPress={() => setStep(1)} />
+      {!!plan.duplicate && (
+        <TextButton
+          title={again ? "✓ Cargar otra vez aunque ya se cargó" : "Este pedido ya se cargó · cargarlo otra vez"}
+          color={C.red}
+          onPress={() => setAgain((x) => !x)}
+        />
       )}
     </>
   );
@@ -334,14 +312,14 @@ export function MarginProjectionCard({ b }: { b: Business }) {
   const shownRows = all ? list : list.slice(0, 12);
   return (
     <Card>
-      <Text style={s.subtitle}>Margen por producto y proyección</Text>
-      <Note>{`Solo tú lo ves. Con tus precios actuales y lo que hay en existencia (${totals.units} piezas). La comisión se cuenta como si todo se cobrara con tarjeta.`}</Note>
+      <Text style={s.subtitle}>Margen y proyección</Text>
+      <Text style={[s.muted, { fontSize: 12.5 }]}>{`Solo tú lo ves · ${totals.units} piezas en existencia`}</Text>
       <View style={{ marginVertical: 6 }}>
         {[
           ["Si vendes todo", money(totals.revenue)],
-          ["Comisión de la terminal", "−" + money(totals.fees)],
-          ["Costo de la mercancía", "−" + money(totals.cost)],
-          ["Ganancia proyectada", money(totals.profit)],
+          ["Terminal", "−" + money(totals.fees)],
+          ["Costo", "−" + money(totals.cost)],
+          ["Ganancia", money(totals.profit)],
         ].map(([k, v], i) => (
           <View key={k} style={s.between}>
             <Text style={[s.body, i === 3 && { fontWeight: "700" }]}>{k}</Text>
@@ -354,13 +332,12 @@ export function MarginProjectionCard({ b }: { b: Business }) {
           <Text style={[s.body, { fontWeight: "600" }]} numberOfLines={1}>
             {r.name}
           </Text>
-          <Note color={r.profit < 0 ? C.red : undefined}>
-            {`Costo ${money(r.cost)} · cliente paga ${money(r.client)} · comisión ${money(r.fee)} · ganas ${money(r.profit)} (${r.pct.toFixed(1)}%)`}
-          </Note>
-          <Note>{`${r.units} en existencia → ganancia proyectada ${money(r.units * r.profit)}`}</Note>
+          <Text style={[s.muted, { fontSize: 12.5, color: r.profit < 0 ? C.red : C.muted }]}>
+            {`${money(r.client)} · ganas ${money(r.profit)} c/u (${r.pct.toFixed(0)}%) · ${r.units} pzas → ${money(r.units * r.profit)}`}
+          </Text>
         </View>
       ))}
-      {list.length > 12 && <TextButton title={all ? "Ver menos" : `Ver los ${list.length} productos`} onPress={() => setAll((x) => !x)} />}
+      {list.length > 12 && <TextButton title={all ? "Ver menos" : `Ver todos (${list.length})`} onPress={() => setAll((x) => !x)} />}
     </Card>
   );
 }

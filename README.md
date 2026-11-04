@@ -1,6 +1,12 @@
-# Nova Negocio · 2.8.0
+# Nova Negocio · 2.8.1
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
+
+**2.8.1 · Eliminar productos y flujos en 3 pasos (versionCode 57):**
+
+- **Eliminar producto** en Stock: mantener presionada la tarjeta, o desde su detalle. Sin ventas se borra por completo (lotes, movimientos, ficha y promociones de ese producto); con ventas se archiva (Stock → Archivados) para no perder el historial. Las compras ya pagadas no cambian. También se quita del catálogo en línea de los vendedores (`publish` borra los que ya no existen).
+- **Cargar pedido (PDF)** y **Actualizar catálogo** en 3 pasos con indicador (1 · 2 · 3), mínimo texto: 1) elegir archivo, 2) revisar (un renglón por producto; el detalle de la calculadora queda detrás de un toque), 3) cargar/aplicar (cuenta del pago o si se suma la terminal), sin ventanas de confirmación extra.
+- Tarjeta «Margen y proyección» más breve.
 
 **2.8.0 · Cargar pedido del proveedor en PDF (versionCode 56, solo JavaScript sobre el runtime 2.2.4):**
 
