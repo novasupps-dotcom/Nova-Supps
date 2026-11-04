@@ -248,6 +248,46 @@ print(json.dumps({'sheets':wb.sheetnames,'hdr':hdr,'n':len(rows),'last':[str(x) 
   }
   console.log("  ✓ 2.8.1: eliminar producto desde Stock (sin ventas se borra; con ventas se archiva)");
 
+  // 2.8.2: con la comisión dentro del precio, cambiar el % recalcula los precios solos.
+  {
+    const base = b.stock().find((x) => !x.archived && x.brand && x.stock > 0);
+    const twin = b.quickProduct({ sku: "DUP-PRUEBA", name: base.name, category: base.category, brand: base.brand, flavor: base.flavor, presentation: base.presentation, price: base.price, qty: 2, cost: 1000 });
+    await tab("Ajustes");
+    await pressExact("Incluir la comisión en el precio");
+    const sw = alerts.pop();
+    await act(async () => sw[2].find((x) => x.text === "Cambiar").onPress());
+    assert.equal(b.feeInPrice(), true);
+    const before = b.one("SELECT price FROM products WHERE id=?", base.id).price;
+    await pressExact("Cambiar porcentaje");
+    assert(all().includes("Tus precios se ajustan solos al nuevo %."), all().slice(0, 600));
+    const rate2 = ui.root.findAll((n) => n.type === "TextInput" && n.props.accessibilityLabel === "Comisión (%) *")[0];
+    await act(async () => rate2.props.onChangeText("4.5"));
+    await pressExact("Guardar");
+    assert.notEqual(b.one("SELECT price FROM products WHERE id=?", base.id).price, before, "el precio se recalculó");
+    assert(all().includes("precios ajustados"), "avisa cuántos precios cambió");
+    // Repetidos en Stock: unificar.
+    await tab("Stock");
+    const link = pressables((n) => /repetidos? · Revisar$/.test(text(n).trim()));
+    assert(link.length, "aviso de repetidos en Stock");
+    await act(async () => link[0].props.onPress());
+    assert(all().includes("DUP-PRUEBA"), all().slice(0, 600));
+    const here = pressables((n) => text(n).trim() === "Unificar aquí");
+    const keepIdx = b.stock().filter((x) => !x.archived).length; // solo para asegurar que hay botones
+    assert(here.length >= 2 && keepIdx > 0);
+    const stockBefore = Number(b.stock().find((x) => x.id === base.id).stock);
+    // El de más piezas va primero; unificamos en el original.
+    const card = ui.root.findAll((n) => n.type === "View" && text(n).startsWith(base.name) && text(n).includes(base.sku) && n.findAll((m) => m.type === "Pressable" && text(m).trim() === "Unificar aquí").length === 1)[0];
+    await act(async () => card.findAll((m) => m.type === "Pressable" && text(m).trim() === "Unificar aquí")[0].props.onPress());
+    const a = alerts.pop();
+    assert.equal(a[0], "Unificar");
+    await act(async () => a[2].find((x) => x.text === "Unificar").onPress());
+    assert.equal(Number(b.stock().find((x) => x.id === base.id).stock), stockBefore + 2);
+    assert.equal(b.all("SELECT id FROM products WHERE id=?", twin).length, 0);
+    b.setFeeBps(406);
+    b.setFeeInPrice(false, false);
+  }
+  console.log("  ✓ 2.8.2: el % recalcula precios con la comisión incluida; repetidos en Stock se unifican");
+
   assert.equal(alerts.length, 0, JSON.stringify(alerts));
   await act(async () => ui.unmount());
   console.log("1.7 – 2.0: OK");

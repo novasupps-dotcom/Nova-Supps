@@ -71,7 +71,7 @@ test("cambios de precio, nombre, código, activo, alta nueva y piezas; ventas in
   const pro = plan.rows.find((r) => r.productId === a)!;
   assert.deepEqual(pro.changes.map((x) => x.label), ["Nombre", "Precio", "Marca", "Piezas"]);
   const r = applyCatalogImport(b, plan);
-  assert.deepEqual(r, { created: 1, updated: 2, units: 14, counted: 0, skipped: 2 });
+  assert.deepEqual(r, { created: 1, updated: 2, units: 14, counted: 0, skipped: 2, removed: 0, archived: 0 });
   const stock = b.stock();
   const p = stock.find((x) => x.id === a)!;
   assert.equal(p.price, 105050);

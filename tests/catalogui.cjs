@@ -127,7 +127,36 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   picked = { canceled: true, assets: null };
   await press("Elegir archivo");
 
+  // 5. 2.8.2 · Archivo sin SKU: reconoce lo que ya existe por descripción.
+  const crea = b.quickProduct({ sku: "NS-CRE-009", name: "Creatine · GAT Sport · 1 kg", category: "Creatina", brand: "GAT Sport", presentation: "1 kg", price: 64000, qty: 4, cost: 40000, imageUri: "file:///doc/fotos/p-1.jpg" });
+  const whey = b.quickProduct({ sku: "NS-PRO-009", name: "Iso 100 · Dymatize · 5 lb", category: "Proteínas", brand: "Dymatize", presentation: "5 lb", price: 199900, qty: 2, cost: 150000 });
+  files["file:///cache/inventario.csv"] = Buffer.from("Nombre,Marca,Presentación,Existencias\nCreatina,GAT Sport,1 kg,9\nIso 100,Dymatize,5 lb,3\n", "utf8").toString("base64");
+  picked = { canceled: false, assets: [{ uri: "file:///cache/inventario.csv", name: "inventario.csv" }] };
+  await press("Elegir archivo");
+  issues.push(...screenIssues(ui, "ya existe"));
+  assert(all().includes("Ya existe: «Creatine · GAT Sport · 1 kg» · Existencias 4 → 9 · se reemplazará"), all());
+  assert(all().includes("Ya existe: «Iso 100 · Dymatize · 5 lb» · sin imagen · +3 piezas"), all());
+  assert(all().includes("Cambios 2"), all());
+  await act(async () => pressables((n) => text(n).trim() === "✓ Confirmado")[0].props.onPress());
+  assert(all().includes("Cambios 1") && all().includes("No se toca"), all());
+  await press("Confirmar todos (1)");
+  assert(all().includes("Cambios 2"), all());
+  // Lo que no viene en el archivo se puede eliminar.
+  const missing = b.stock().filter((x) => !x.archived && x.id !== crea && x.id !== whey).length;
+  await press(`No vienen ${missing}`);
+  issues.push(...screenIssues(ui, "no vienen"));
+  assert(all().includes("Barra"), all());
+  await act(async () => pressables((n) => text(n).trim() === "Eliminar")[0].props.onPress());
+  assert(all().includes("✓ Se elimina"), all());
+  await press("Continuar");
+  assert(all().includes("1 se eliminan"), all());
+  await press("Aplicar");
+  assert.equal(b.stock().find((x) => x.id === crea).stock, 9);
+  assert.equal(b.stock().find((x) => x.id === crea).price, 64000, "sus datos no cambian");
+  assert.equal(b.stock().find((x) => x.id === whey).stock, 5);
+  assert(/eliminados/.test(notes.at(-1)), notes.at(-1));
+
   await act(async () => ui.unmount());
   if (issues.length) throw new Error(issues.join("\n"));
-  console.log("ACTUALIZAR CATÁLOGO: OK (descargar Excel, unificar repetidos, modificar, deshacer, quitar, comisión con confirmación, copia previa, aplicar y publicar)");
+  console.log("ACTUALIZAR CATÁLOGO: OK (descargar Excel, unificar repetidos, modificar, deshacer, quitar, comisión con confirmación, copia previa, aplicar, ya existe por descripción y eliminar los que no vienen)");
 })().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });
