@@ -3,7 +3,7 @@ import { type Outcome, type TerminalPayment } from "../mercadopago";
 import type { IconName } from "../icons";
 import { TILE } from "../theme";
 
-export const VERSION = "2.5.3";
+export const VERSION = "2.6.0";
 export const HOME = "Vender";
 
 export const PAGES = [
@@ -29,6 +29,7 @@ export const PAGES = [
   "Promociones",
   "Reportes",
   "Catálogo para clientes",
+  "Actualizar catálogo",
 ];
 
 /** 2.3: cuatro pestañas; Ajustes (página "Parámetros") se abre con el engrane de arriba. */
@@ -103,6 +104,13 @@ export const SETTINGS_MENU: { section: string; items: MenuItem[] }[] = [
         tint: TILE.gold,
         title: "Reportes",
         desc: "Por producto y por vendedor",
+      },
+      {
+        page: "Actualizar catálogo",
+        icon: "file-spreadsheet",
+        tint: TILE.green,
+        title: "Actualizar catálogo",
+        desc: "Precios y productos desde Excel o CSV",
       },
       {
         page: "Catálogo para clientes",
