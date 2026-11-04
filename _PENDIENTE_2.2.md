@@ -1,4 +1,8 @@
-# Nova Negocio 2.8.2 · 4-nov-2026
+# Nova Negocio 2.8.3 · 4-nov-2026
+
+Hecho en 2.8.3: punto de control al volver a cargar el mismo Excel o PDF: primero pide confirmar con
+«Actualmente tienes X piezas y vas a agregar N piezas más del Pedido #… (archivo.pdf)».
+
 
 Hecho en 2.8.2: el % de la terminal recalcula precios (comisión incluida); el Excel reconoce productos existentes por
 descripción (con imagen reemplaza existencias, sin imagen suma piezas) y deja eliminar los que no vienen; repetidos en Stock.

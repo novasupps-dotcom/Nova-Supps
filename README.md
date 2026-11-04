@@ -1,6 +1,10 @@
-# Nova Negocio · 2.8.2
+# Nova Negocio · 2.8.3
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
+
+**2.8.3 · Punto de control al volver a cargar (versionCode 59):**
+
+- **Punto de control**: si el Excel o el PDF ya se cargó antes (misma huella del archivo o mismo número de pedido), antes de cualquier otra cosa pide confirmar: «Actualmente tienes X piezas y vas a agregar N piezas más del Pedido #… (archivo.pdf)». En la revisión, cada producto existente dice «Tienes X · +N».
 
 **2.8.2 · Comisión que recalcula precios, Excel que reconoce lo que ya tienes y repetidos (versionCode 58):**
 
