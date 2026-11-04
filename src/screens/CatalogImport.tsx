@@ -3,6 +3,9 @@
 // copia de tus datos dentro de la app antes de tocar nada.
 // 2.7 · Cada renglón se puede quitar, modificar o (si se repite, por ejemplo por sabor)
 // unificar desde la app, y al cargar se pregunta si se suma la comisión de la terminal.
+// 2.8.2 · Lo que ya existe se reconoce por descripción (marca, tipo, presentación, sabor) y
+// viene confirmado: con imagen se reemplazan sus existencias, sin imagen solo se suman piezas.
+// Lo que no viene en el archivo se puede eliminar.
 import * as FS from "expo-file-system/legacy";
 import * as Picker from "expo-document-picker";
 import * as Sharing from "expo-sharing";
@@ -31,7 +34,7 @@ import {
 import { base64ToBytes } from "../photos";
 import { XLSX_MIME } from "../salesExcel";
 import { base64 } from "../xlsx";
-import { Button, C, Card, Chips, Note, Steps, TextButton, s } from "../ui";
+import { Button, C, Card, Chips, Note, Steps, TextButton, productHasImage, s } from "../ui";
 
 const FILE_TYPES = [
   XLSX_MIME,
@@ -44,7 +47,7 @@ const FILE_TYPES = [
 ];
 const SHOW = 60;
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
-type View3 = "Cambios" | "Errores" | "Sin cambios";
+type View3 = "Cambios" | "Errores" | "Sin cambios" | "No vienen";
 const NUMERIC: Field[] = ["price", "stock", "cost"];
 
 export function CatalogImportPage({
@@ -68,16 +71,20 @@ export function CatalogImportPage({
   const [draft, setDraft] = useState<Partial<Record<Field, string>>>({});
   // 2.8.1: tres pasos (archivo → revisar → aplicar).
   const [step, setStep] = useState(0);
+  // 2.8.2: «¿Es tu…?» / «No es», existentes desmarcados y productos a eliminar.
+  const [links, setLinks] = useState<Record<number, string | null>>({});
+  const [off, setOff] = useState<number[]>([]);
+  const [remove, setRemove] = useState<string[]>([]);
 
   // El plan se recalcula con cada arreglo (quitar, modificar, unificar) o al cambiar la comisión.
   const { plan, planError } = useMemo(() => {
     if (!table) return { plan: null as ImportPlan | null, planError: "" };
     try {
-      return { plan: planCatalogImport(b, table, { addFee }), planError: "" };
+      return { plan: planCatalogImport(b, table, { addFee, links, off, remove, hasImage: productHasImage }), planError: "" };
     } catch (e) {
       return { plan: null, planError: errText(e) };
     }
-  }, [b, table, addFee]);
+  }, [b, table, addFee, links, off, remove]);
 
   function change(next: Cell[][], message?: string) {
     if (table) setHistory((h) => [...h.slice(-19), table]);
@@ -96,6 +103,9 @@ export function CatalogImportPage({
     setHistory([]);
     setFileName("");
     setEditing(null);
+    setLinks({});
+    setOff([]);
+    setRemove([]);
   }
 
   async function download() {
@@ -130,10 +140,9 @@ export function CatalogImportPage({
       await new Promise((ok) => setTimeout(ok, 30));
       const raw = await FS.readAsStringAsync(asset.uri, { encoding: FS.EncodingType.Base64 });
       const next = readCatalogFile(base64ToBytes(raw));
-      const first = planCatalogImport(b, next, { addFee }); // valida encabezados antes de mostrar
+      const first = planCatalogImport(b, next, { addFee, hasImage: productHasImage }); // valida encabezados antes de mostrar
+      reset();
       setTable(next);
-      setHistory([]);
-      setEditing(null);
       setFileName(asset.name || "archivo");
       setStep(1);
       setView(first.counts.error ? "Errores" : first.counts.new + first.counts.update ? "Cambios" : "Sin cambios");
@@ -169,6 +178,7 @@ export function CatalogImportPage({
         `Catálogo actualizado · ${r.created} nuevos · ${r.updated} con cambios` +
           (r.counted ? ` · existencias de ${r.counted}` : "") +
           (r.units ? ` · +${r.units} piezas` : "") +
+          (r.removed + r.archived ? ` · ${r.removed + r.archived} eliminados` : "") +
           (p.fee.addFee && p.fee.priced ? ` · precios + ${feeLabel(p.fee.bps)}` : ""),
       );
     } catch (e) {
@@ -178,12 +188,31 @@ export function CatalogImportPage({
     }
   }
 
-  const rows: PlanRow[] = plan
-    ? plan.rows.filter((r) =>
-        view === "Errores" ? r.kind === "error" : view === "Sin cambios" ? r.kind === "same" : r.kind === "new" || r.kind === "update",
-      )
-    : [];
-  const pending = plan ? plan.counts.new + plan.counts.update : 0;
+  const rows: PlanRow[] =
+    plan && view !== "No vienen"
+      ? plan.rows.filter((r) =>
+          view === "Errores" ? r.kind === "error" : view === "Sin cambios" ? r.kind === "same" : r.kind === "new" || r.kind === "update",
+        )
+      : [];
+  const existingOn = plan ? plan.rows.filter((r) => r.kind === "update" && r.off).length : 0;
+  const describe = (r: PlanRow) => {
+    if (r.kind === "error") return r.error;
+    if (r.match === "desc") {
+      const c = r.changes[0];
+      const what = !c
+        ? "sin cambios"
+        : r.mode === "replace"
+          ? `Existencias ${c.from} → ${c.to} · se reemplazará`
+          : `sin imagen · ${c.to} piezas`;
+      return `Ya existe: «${r.matchName}» · ${what}`;
+    }
+    if (r.kind === "same") return "Igual que en la app";
+    return r.changes
+      .map((c, i) => (r.kind === "new" ? (i ? `${c.label} ${c.to}` : `Nuevo · ${c.to}`) : `${c.label}: ${c.from || "—"} → ${c.to || "—"}`))
+      .join(" · ");
+  };
+  const pending = plan ? plan.counts.new + plan.counts.update + plan.remove.length : 0;
+  const toggle = <T,>(list: T[], x: T) => (list.includes(x) ? list.filter((y) => y !== x) : [...list, x]);
   const dups = plan ? plan.rows.filter((r) => r.kind === "error" && r.dupOf).length : 0;
   const inPrice = b.feeInPrice();
 
@@ -255,6 +284,7 @@ export function CatalogImportPage({
               { id: "Cambios", name: `Cambios ${plan.counts.new + plan.counts.update}` },
               { id: "Errores", name: `Errores ${plan.counts.error}` },
               { id: "Sin cambios", name: `Iguales ${plan.counts.same}` },
+              ...(plan.missing.length ? [{ id: "No vienen", name: `No vienen ${plan.missing.length}` }] : []),
             ]}
             value={view}
             onChange={(v) => setView(v as View3)}
@@ -272,25 +302,66 @@ export function CatalogImportPage({
               <Button title="Quitar errores" small secondary flex onPress={() => change(dropAllErrors(table, plan), "Errores quitados")} />
             </View>
           )}
-          {!rows.length && <Note>Nada aquí.</Note>}
+          {view === "Cambios" && !!existingOn && (
+            <Button title={`Confirmar todos (${existingOn})`} small onPress={() => setOff([])} />
+          )}
+          {view === "No vienen" && (
+            <>
+              <Text style={[s.muted, { fontSize: 12.5 }]}>Están en la app y no en el archivo.</Text>
+              <Button
+                title={plan.remove.length === plan.missing.length ? "No eliminar ninguno" : `Eliminar todos (${plan.missing.length})`}
+                small
+                secondary={plan.remove.length === plan.missing.length}
+                onPress={() => setRemove(plan.remove.length === plan.missing.length ? [] : plan.missing.map((m) => m.id))}
+              />
+              {plan.missing.slice(0, SHOW).map((m) => {
+                const on = remove.includes(m.id);
+                return (
+                  <View key={m.id} style={[s.between, { paddingVertical: 8, borderTopWidth: 1, borderColor: C.line }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.body, { fontWeight: "600" }]} numberOfLines={1}>
+                        {m.name}
+                      </Text>
+                      <Text style={[s.muted, { fontSize: 12.5 }]}>{`${m.stock} pzas`}</Text>
+                    </View>
+                    <TextButton title={on ? "✓ Se elimina" : "Eliminar"} bold={on} color={C.red} onPress={() => setRemove((x) => toggle(x, m.id))} />
+                  </View>
+                );
+              })}
+              {plan.missing.length > SHOW && <Note>{`…y ${plan.missing.length - SHOW} más.`}</Note>}
+            </>
+          )}
+          {view !== "No vienen" && !rows.length && <Note>Nada aquí.</Note>}
           {rows.slice(0, SHOW).map((r) => (
             <View key={r.line} style={{ paddingVertical: 8, borderTopWidth: 1, borderColor: C.line }}>
               <Text style={[s.body, { fontWeight: "600" }]} numberOfLines={1}>
                 {r.name || r.sku || "Sin nombre"}
               </Text>
-              <Text style={[s.muted, { fontSize: 12.5, color: r.kind === "error" ? C.red : C.muted }]} numberOfLines={2}>
-                {r.kind === "error"
-                  ? r.error
-                  : r.kind === "same"
-                    ? "Igual que en la app"
-                    : r.changes
-                        .map((c, i) => (r.kind === "new" ? (i ? `${c.label} ${c.to}` : `Nuevo · ${c.to}`) : `${c.label}: ${c.from || "—"} → ${c.to || "—"}`))
-                        .join(" · ")}
+              <Text
+                style={[s.muted, { fontSize: 12.5, color: r.kind === "error" ? C.red : r.off ? C.muted : r.mode === "replace" && r.kind === "update" ? C.amber : C.muted }]}
+                numberOfLines={2}
+              >
+                {r.off ? `No se toca · ${describe(r)}` : describe(r)}
               </Text>
               {editing === r.line ? (
                 editor(r)
               ) : (
-                <View style={[s.row, { gap: 14, marginVertical: 0 }]}>
+                <View style={[s.row, { gap: 14, marginVertical: 0, flexWrap: "wrap" }]}>
+                  {r.kind === "update" && (
+                    <TextButton
+                      title={r.off ? "Confirmar" : "✓ Confirmado"}
+                      bold={!r.off}
+                      onPress={() => setOff((x) => toggle(x, r.line))}
+                    />
+                  )}
+                  {!r.productId && !!r.candidates?.length && (
+                    <TextButton
+                      title={`¿Es tu «${r.candidates[0].name}»?`}
+                      bold
+                      onPress={() => setLinks((l) => ({ ...l, [r.line]: r.candidates![0].id }))}
+                    />
+                  )}
+                  {r.match === "desc" && <TextButton title="No es" onPress={() => setLinks((l) => ({ ...l, [r.line]: null }))} />}
                   {!!r.dupOf && (
                     <TextButton
                       title={`Unificar con ${r.dupOf}`}
@@ -298,7 +369,7 @@ export function CatalogImportPage({
                       onPress={() => change(mergeRows(table, r.dupOf!, r.line), `Renglón ${r.line} unificado`)}
                     />
                   )}
-                  <TextButton title="Modificar" onPress={() => startEdit(r)} />
+                  {r.match !== "desc" && <TextButton title="Modificar" onPress={() => startEdit(r)} />}
                   <TextButton title="Quitar" color={C.red} onPress={() => change(dropRow(table, r.line), `Renglón ${r.line} quitado`)} />
                 </View>
               )}
@@ -322,6 +393,7 @@ export function CatalogImportPage({
           {[
             `${plan.counts.new} nuevos`,
             `${plan.counts.update} actualizados`,
+            plan.remove.length ? `${plan.remove.length} se eliminan` : "",
             plan.counts.error ? `${plan.counts.error} con error no se cargan` : "",
           ]
             .filter(Boolean)
