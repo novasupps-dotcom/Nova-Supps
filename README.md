@@ -1,6 +1,17 @@
-# Nova Negocio · 2.7.1
+# Nova Negocio · 2.8.0
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
+
+**2.8.0 · Cargar pedido del proveedor en PDF (versionCode 56, solo JavaScript sobre el runtime 2.2.4):**
+
+- Stock → **Cargar pedido del proveedor (PDF)** (también en Ajustes → Cargar pedido): se elige el PDF del pedido de Suplementos GYM («Imprimir pedido» → Guardar como PDF). La app lo lee en el teléfono (`src/pdfText.ts`: lector de PDF propio, sin módulos nativos) y obtiene productos, sabores, precio, cantidad, descuento, envío y total; comprueba que la suma cuadre con el Sub-total y las piezas con «Productos Pedidos (N)».
+- **Coincidencias:** cada renglón se busca por marca + nombre + presentación (gramos, kilos, libras y servicios normalizados) + sabor. Si existe, solo suma piezas; si hay un parecido dudoso, lo propone y decide el dueño («¿Es este?» / «No es este»). La app recuerda lo que el dueño ligó para el próximo pedido. El mismo número de pedido no se carga dos veces sin confirmarlo.
+- **Nuevos con SKU homologado:** `NS-<CAT>-<NNN>-<SABOR>` (por ejemplo `NS-PRE-011-GRA`), categoría deducida (Preentreno, Creatina, Proteína, Carbohidratos…), nombre «Producto · Marca · Presentación · Sabor».
+- **Costo real por pieza:** precio del PDF × (Total pagado ÷ Sub-total), o sea con su parte del descuento y del envío. Es interno: los vendedores nunca lo ven.
+- **Calculadora de precio:** % de ganancia sobre el costo (se recuerda) + comisión de la terminal (4.06%), redondeado hacia arriba al peso; muestra comisión, lo que te queda y la ganancia real por pieza, y cada precio se puede cambiar. En productos existentes se elige «Mantener precio actual» o «Precio nuevo».
+- **Pago:** se pide de qué cuenta salió el pago del pedido (o «No registrar pago»); una sola salida por el total.
+- **Sabores:** los sabores del mismo producto quedan agrupados (familia, también publicada a vendedores en `scan_data.family`); en Vender se ve una sola tarjeta y al tocarla se elige el sabor y las piezas.
+- **Resumen de ventas → Margen por producto y proyección** (solo dueño): costo, precio al cliente, comisión, ganancia por pieza y ganancia proyectada si se vende todo lo que hay.
 
 **2.7.1 · Aviso de versión nueva (versionCode 55):** cuando una versión se descarga aparece una **ventana emergente** «Nueva versión lista» (Instalar ahora / Después) y una **notificación del teléfono** (canal «Actualizaciones de la app», si las notificaciones están permitidas), una sola vez por versión. La app busca al abrirla, al volver a ella (mínimo cada 5 min) y cada 10 min mientras está abierta. Ajustes (dueño) y Cuenta (vendedor) tienen **Actualizaciones**: versión, «Buscar actualización ahora», última revisión y datos de diagnóstico (canal, runtime, versión del APK o descargada). `app.config.js` omite `google-services.json` cuando no existe (publicación desde GitHub), así la actualización lleva su número de versión.
 
