@@ -1,6 +1,6 @@
 // Componentes compartidos. El lector se carga solo si existe su módulo nativo.
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Image, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text, TextInput } from "./text";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { catalogueImages } from "./catalogueImages";
@@ -609,6 +609,9 @@ export type GridProduct = {
   lookupSourceUrl?: string;
   presentationUnconfirmed?: boolean;
   tag?: string;
+  /** 2.8: productos del mismo artículo en distintos sabores comparten familia; al vender se elige el sabor. */
+  family?: string;
+  familyName?: string;
 };
 /** Código escrito o leído con un lector (USB/Bluetooth): coincide exacto con el código de barras o el SKU. */
 export function matchCode<
@@ -666,6 +669,8 @@ export function ProductGrid({
 }) {
   const [ownQuery, setOwnQuery] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
+  // 2.8: familia abierta para elegir sabor.
+  const [openFamily, setOpenFamily] = useState<string | null>(null);
   // Resultado de un código escrito o leído con lector USB/Bluetooth (la cámara lo muestra en su pantalla).
   const [scanMessage, setScanMessage] = useState<{
     id: string;
@@ -853,6 +858,23 @@ export function ProductGrid({
       ? (index.hay.get(p.id) || "").includes(q)
       : current === "Todos" || index.seg.get(p.id) === current,
   );
+  // 2.8: los sabores de un mismo producto se muestran como una sola tarjeta.
+  type Entry = { kind: "one"; p: GridProduct } | { kind: "family"; key: string; name: string; members: GridProduct[] };
+  const entries: Entry[] = [];
+  {
+    const byFamily = new Map<string, GridProduct[]>();
+    for (const p of shown) if (p.family) byFamily.set(p.family, [...(byFamily.get(p.family) ?? []), p]);
+    const done = new Set<string>();
+    for (const p of shown) {
+      const members = p.family ? byFamily.get(p.family)! : [];
+      if (members.length > 1) {
+        if (done.has(p.family!)) continue;
+        done.add(p.family!);
+        entries.push({ kind: "family", key: p.family!, name: p.familyName || p.name, members });
+      } else entries.push({ kind: "one", p });
+    }
+  }
+  const familyMembers = openFamily ? products.filter((p) => p.family === openFamily) : [];
   const cols = width >= 840 ? 4 : width >= 560 ? 3 : 2;
   const GAP = 10;
   const tileWidth: any = width
@@ -957,7 +979,43 @@ export function ProductGrid({
         <Note>{`${shown.length} ${shown.length === 1 ? "resultado" : "resultados"} en todas las categorías`}</Note>
       )}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: GAP }}>
-        {shown.map((p) => {
+        {entries.map((entry) => {
+          if (entry.kind === "family") {
+            const qty = entry.members.reduce((n, m) => n + qtyOf(m.id), 0);
+            const left = entry.members.reduce((n, m) => n + Math.max(0, limitOf(m.id) - qtyOf(m.id)), 0);
+            const avail = entry.members.reduce((n, m) => n + (Number.isFinite(limitOf(m.id)) ? limitOf(m.id) : 0), 0);
+            const prices = entry.members.map((m) => m.price);
+            const low = Math.min(...prices);
+            const out = avail < 1 && qty < 1;
+            const photo = entry.members.find((m) => m.imageUri || m.imageKey) || entry.members[0];
+            return (
+              <View key={"fam:" + entry.key} style={[s.tile, { width: tileWidth }, qty > 0 && s.tileOn, out && { opacity: 0.45 }]}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Elegir sabor de ${entry.name}`}
+                  disabled={out}
+                  onPress={() => setOpenFamily(entry.key)}
+                >
+                  <View style={s.tilePhoto}>
+                    <ProductPhoto product={photo} style={{ width: "100%", height: "100%" }} />
+                    {qty > 0 && (
+                      <View style={s.tileBadge}>
+                        <Text style={s.tileBadgeText}>{qty}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={s.tileName} numberOfLines={2}>
+                    {entry.name}
+                  </Text>
+                  <Text style={s.tilePrice}>{(prices.some((x) => x !== low) ? "desde " : "") + money(low)}</Text>
+                  <Text style={[s.tileStock, { color: avail < 1 ? C.red : C.muted }]}>
+                    {`${entry.members.length} sabores · ${avail < 1 ? "sin existencias" : `${left} por agregar`}`}
+                  </Text>
+                </Pressable>
+              </View>
+            );
+          }
+          const p = entry.p;
           const qty = qtyOf(p.id);
           const max = limitOf(p.id);
           const out = max < 1 && qty < 1;
@@ -1048,6 +1106,64 @@ export function ProductGrid({
         <Note>
           {q ? "No hay coincidencias." : "No hay productos en esta categoría."}
         </Note>
+      )}
+      {!!openFamily && (
+      <Modal visible transparent animationType="slide" onRequestClose={() => setOpenFamily(null)}>
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)" }}>
+          <View style={{ backgroundColor: C.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, maxHeight: "80%" }}>
+            <Text style={s.subtitle}>{familyMembers[0]?.familyName || "Elige el sabor"}</Text>
+            <Note>Elige el sabor y cuántas piezas.</Note>
+            <ScrollView>
+              {familyMembers.map((m) => {
+                const qty = qtyOf(m.id);
+                const max = limitOf(m.id);
+                const none = max < 1 && qty < 1;
+                return (
+                  <View key={m.id} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 10, borderTopWidth: 1, borderColor: C.line, opacity: none ? 0.45 : 1 }}>
+                    <Pressable
+                      style={{ flex: 1 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Agregar sabor ${m.flavor || m.name}`}
+                      disabled={none || qty >= max}
+                      onPress={() => onAdd(m.id)}
+                    >
+                      <Text style={[s.body, { fontWeight: "600" }]} numberOfLines={1}>
+                        {m.flavor || m.name}
+                      </Text>
+                      <Text style={s.muted}>
+                        {`${money(m.price)} · ${!Number.isFinite(max) ? "" : max < 1 ? "sin existencias" : `${max} ${max === 1 ? "disponible" : "disponibles"}`}`}
+                      </Text>
+                    </Pressable>
+                    {qty > 0 && (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Quitar una de ${m.flavor || m.name}`}
+                        style={s.tileBtn}
+                        onPress={() => onRemove(m.id)}
+                      >
+                        <Icon name={qty > 1 ? "minus" : "trash-2"} size={18} color={C.ink} />
+                      </Pressable>
+                    )}
+                    {qty > 0 && <Text style={[s.subtitle, { marginBottom: 0, marginHorizontal: 10 }]}>{qty}</Text>}
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Agregar otra de ${m.flavor || m.name}`}
+                      accessibilityState={{ disabled: none || qty >= max }}
+                      disabled={none || qty >= max}
+                      style={[s.tileBtn, (none || qty >= max) && { opacity: 0.35 }]}
+                      onPress={() => onAdd(m.id)}
+                    >
+                      <Icon name="plus" size={18} color={C.ink} />
+                    </Pressable>
+                  </View>
+                );
+              })}
+            </ScrollView>
+            <View style={{ height: 8 }} />
+            <Button title="Listo" onPress={() => setOpenFamily(null)} />
+          </View>
+        </View>
+      </Modal>
       )}
     </View>
   );

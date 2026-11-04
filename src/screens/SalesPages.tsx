@@ -29,6 +29,7 @@ import {
   units,
 } from "./ownerShared";
 import { ReportsPage } from "./Reports";
+import { MarginProjectionCard } from "./OrderImport";
 
 export function renderSalesPages(ctx: OwnerPageContext): Body | null {
   if (
@@ -140,6 +141,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
             })}
             <Note>Las mermas se valúan a su costo: no mueven dinero, pero sí bajan tu utilidad.</Note>
           </Card>
+          <MarginProjectionCard b={b!} />
           {!!top.length && (
             <Card>
               <Text style={s.subtitle}>Productos más vendidos</Text>

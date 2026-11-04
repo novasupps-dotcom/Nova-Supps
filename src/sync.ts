@@ -93,6 +93,9 @@ export async function publish(
       barcodeAliases: Array.isArray(p.barcodeAliases) ? p.barcodeAliases : [],
       presentation: p.presentation || "",
       flavor: p.flavor || "",
+      // 2.8: sabores del mismo producto (el vendedor elige el sabor en una sola tarjeta).
+      family: p.family || "",
+      familyName: p.familyName || "",
       presentationUnconfirmed:
         /confirmar.*(presentaci[oó]n|contenido)|por confirmar/i.test(
           String(p.notes || "") + " " + String(p.presentation || ""),

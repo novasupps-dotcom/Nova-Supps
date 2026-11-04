@@ -1,6 +1,6 @@
 {
   "name": "nova-negocio",
-  "version": "2.7.1",
+  "version": "2.8.0",
   "private": true,
   "main": "index.ts",
   "scripts": {
@@ -27,6 +27,7 @@
     "test:v22": "node tests/v22.cjs",
     "test:sql22": "node tests/sql22.cjs",
     "test:catalog": "node --experimental-strip-types --import ./tests/ts-resolve.mjs --test tests/catalogImport.test.ts && node tests/catalogui.cjs",
+    "test:order": "node --experimental-strip-types --import ./tests/ts-resolve.mjs --test tests/supplierOrder.test.ts && node tests/orderui.cjs",
     "android:config": "node scripts/check_android_config.cjs"
   },
   "dependencies": {

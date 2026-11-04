@@ -7,6 +7,7 @@ import { Button, C, Card, MenuList, Note, Pill, fmtDay, s } from "../ui";
 import { TILE } from "../theme";
 import { CloudBackupCard } from "./CloudBackup";
 import { CatalogImportPage } from "./CatalogImport";
+import { OrderImportPage } from "./OrderImport";
 import { CustomerCatalogPage } from "./CustomerCatalog";
 import type { Body, OwnerPageContext } from "./ownerContext";
 import {
@@ -52,6 +53,20 @@ export function renderParameters(ctx: OwnerPageContext): Body | null {
           getCloud={getCloud}
           initialCustomerId={filters["Catálogo para clientes"] || ""}
           onSent={refresh}
+        />
+      ),
+    };
+
+  if (page === "Cargar pedido")
+    return {
+      scroll: (
+        <OrderImportPage
+          b={b!}
+          notify={notify}
+          onChanged={() => {
+            refresh();
+            void syncRef.current();
+          }}
         />
       ),
     };

@@ -1,3 +1,10 @@
+# Nova Negocio 2.8.0 · 4-nov-2026
+
+Hecho en 2.8.0: Stock → Cargar pedido del proveedor (PDF): inventario, costo real, calculadora de precio con % de ganancia +
+comisión de la terminal, sabores agrupados (se eligen al vender) y Resumen de ventas → Margen por producto y proyección.
+Probar: cargar el PDF del pedido #0639469 → revisar coincidencias (Creatine GAT 1 kg debe sumar piezas), poner el %, elegir la
+cuenta del pago → Cargar. En Vender, tocar «Psychotic Black · 60 Servicios» y elegir el sabor.
+
 # Nova Negocio 2.7.1 · 4-nov-2026
 
 Hecho en 2.7.1: ventana emergente y notificación cuando hay versión nueva; Ajustes → Actualizaciones → Buscar actualización ahora.
