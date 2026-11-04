@@ -732,6 +732,8 @@ export function SellerApp({
       barcodeAliases: p.scan_data?.barcodeAliases || [],
       presentation: p.scan_data?.presentation || "",
       flavor: p.scan_data?.flavor || "",
+      family: p.scan_data?.family || "",
+      familyName: p.scan_data?.familyName || "",
       presentationUnconfirmed: p.scan_data?.presentationUnconfirmed === true,
       imageUri: p.scan_data?.imageUri || "",
       lookupSource: p.scan_data?.lookupSource || "",

@@ -1017,6 +1017,84 @@ export class Business {
     });
     return key;
   }
+  /**
+   * 2.8 · Entrada de un pedido de proveedor: lote con su costo real, sin mover dinero (el pago
+   * del pedido completo se registra aparte con payPurchase).
+   */
+  receivePurchase(productId: string, label: string, qty: number, cost: number, ref: string, note: string) {
+    required(label);
+    integer(qty, 1);
+    integer(cost);
+    integer(qty * cost);
+    const key = id();
+    this.transaction(() => {
+      this.one("SELECT id FROM products WHERE id=?", productId);
+      this.run("INSERT INTO lots VALUES(?,?,?,?,?,?)", key, productId, label, "", cost, qty);
+      this.run(
+        "INSERT INTO stock_moves VALUES(?,?,?,?,?,?,?)",
+        id(),
+        new Date().toISOString(),
+        key,
+        qty,
+        "purchase",
+        ref,
+        note.slice(0, 300) || label,
+      );
+      this.audit("stock.receive", key, label);
+    });
+    return key;
+  }
+  /** 2.8 · Pago de un pedido de proveedor (una sola salida de dinero por el total pagado). */
+  payPurchase(accountId: string, amount: number, ref: string, note: string) {
+    integer(amount, 1);
+    this.transaction(() => {
+      assert(this.balance(accountId) >= amount, "Saldo insuficiente para pagar la compra.");
+      this.ledger(accountId, -amount, "purchase", ref, note || "Compra de inventario");
+    });
+  }
+  /**
+   * 2.8 · Solo dueño: margen por producto con su precio actual y proyección si se vende todo
+   * lo que hay. Costo = promedio de los lotes con existencias (o el último costo conocido).
+   * La comisión se descuenta como si todo se cobrara con tarjeta (el caso con menos ganancia).
+   */
+  marginProjection(): {
+    rows: { id: string; name: string; sku: string; units: number; cost: number; client: number; fee: number; profit: number; pct: number }[];
+    totals: { units: number; revenue: number; fees: number; cost: number; profit: number };
+  } {
+    const bps = this.feeBps();
+    const inPrice = this.feeInPrice();
+    const lots = new Map<string, { qty: number; value: number; last: number }>();
+    for (const l of this.all("SELECT productId,qty,cost FROM lots ORDER BY rowid")) {
+      const x = lots.get(l.productId) ?? { qty: 0, value: 0, last: 0 };
+      x.qty += l.qty;
+      x.value += l.qty * l.cost;
+      x.last = l.cost;
+      lots.set(l.productId, x);
+    }
+    const rows = this.stock()
+      .filter((p: Row) => !p.archived)
+      .map((p: Row) => {
+        const l = lots.get(p.id);
+        const units = Math.max(0, Number(p.available) || 0);
+        const cost = l && l.qty > 0 ? Math.round(l.value / l.qty) : Number(p.referenceCost ?? l?.last ?? 0) || 0;
+        const client = inPrice ? p.price : grossUp(p.price, bps);
+        const fee = cardFee(client, bps);
+        const profit = client - fee - cost;
+        return { id: p.id, name: p.name, sku: p.sku, units, cost, client, fee, profit, pct: cost ? (profit / cost) * 100 : 0 };
+      })
+      .filter((r) => r.units > 0 || r.cost > 0);
+    const totals = rows.reduce(
+      (t, r) => ({
+        units: t.units + r.units,
+        revenue: t.revenue + r.units * r.client,
+        fees: t.fees + r.units * r.fee,
+        cost: t.cost + r.units * r.cost,
+        profit: t.profit + r.units * r.profit,
+      }),
+      { units: 0, revenue: 0, fees: 0, cost: 0, profit: 0 },
+    );
+    return { rows, totals };
+  }
   movement(
     kind: string,
     accountId: string,
