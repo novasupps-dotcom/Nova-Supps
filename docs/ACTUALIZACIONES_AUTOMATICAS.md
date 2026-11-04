@@ -39,7 +39,7 @@ Con eso, la PC revisa cada 10 minutos (si está encendida y con tu sesión abier
 
 - **En tu PC:** `deliverables\subida_github.log` anota cada subida o el motivo si no pudo.
 - **En GitHub:** pestaña **Actions → Actualizar teléfonos**. Palomita verde: se publicó. Tache rojo: falló una prueba o falta el token, y no se mandó nada.
-- **En el teléfono:** Ajustes muestra la versión, por ejemplo «Nova Negocio 2.5.3». La primera vez puede tardar hasta un día en llegar, porque la app que hoy tienes instalada revisa cada 6 horas. Desde la 2.5.3 revisa cada 30 minutos.
+- **En el teléfono:** Ajustes muestra la versión, por ejemplo «Nova Negocio 2.7.1». Desde la 2.7.1, cuando una versión se descarga aparece una ventana «Nueva versión lista» (Instalar ahora / Después) y una notificación del teléfono. La app busca al abrirla, al volver a ella y cada 10 minutos; en Ajustes → Actualizaciones puedes tocar «Buscar actualización ahora».
 
 ## Si algo sale mal
 
