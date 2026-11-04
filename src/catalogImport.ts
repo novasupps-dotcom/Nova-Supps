@@ -629,7 +629,29 @@ export function planCatalogImport(b: Business, table: Cell[][], opts: PlanOption
 export type ImportResult = { created: number; updated: number; units: number; counted: number; skipped: number; removed: number; archived: number };
 
 /** Aplica el plan (solo renglones nuevos o con cambios) en una sola transacción. Los renglones con error se omiten. */
-export function applyCatalogImport(b: Business, plan: ImportPlan): ImportResult {
+/** 2.8.2 · Archivo ya cargado (por su huella SHA-256). */
+export const CATALOG_FILE_KEY = (hash: string) => "catalogFile:" + hash;
+
+/**
+ * 2.8.2 · Punto de control: piezas que ya tienes de los productos del archivo y las que
+ * se sumarían («Actualmente tienes X piezas y vas a agregar N piezas más de archivo.xlsx»).
+ */
+export function catalogCheckpoint(b: Business, plan: ImportPlan): { have: number; add: number } {
+  const stock = new Map(b.stock().map((p: Row) => [p.id, Number(p.stock) || 0]));
+  const ids = new Set<string>();
+  let add = 0;
+  for (const r of plan.rows) {
+    if (r.kind === "error" || r.off) continue;
+    const now = r.productId ? (stock.get(r.productId) ?? 0) : 0;
+    if (r.productId) ids.add(r.productId);
+    if (r.kind === "same") continue;
+    add += Number(r.values.addQty) || 0;
+    if (r.values.stock !== undefined) add += Math.max(0, Number(r.values.stock) - now);
+  }
+  return { have: [...ids].reduce((n, id) => n + (stock.get(id) ?? 0), 0), add };
+}
+
+export function applyCatalogImport(b: Business, plan: ImportPlan, source?: { hash: string; name: string }): ImportResult {
   const result: ImportResult = { created: 0, updated: 0, units: 0, counted: 0, skipped: plan.counts.error, removed: 0, archived: 0 };
   const label = "Carga de catálogo " + today();
   b.transaction(() => {
@@ -687,6 +709,8 @@ export function applyCatalogImport(b: Business, plan: ImportPlan): ImportResult 
       if (b.deleteProduct(m.id).mode === "deleted") result.removed++;
       else result.archived++;
     }
+    if (source?.hash)
+      b.setSetting(CATALOG_FILE_KEY(source.hash), { at: new Date().toISOString(), name: source.name, units: result.units, created: result.created });
     b.audit(
       "catalog.import",
       today(),
