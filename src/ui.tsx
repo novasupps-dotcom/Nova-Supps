@@ -179,6 +179,19 @@ export function followUpLabel(daysLeft: number, nextDate: string) {
   return `En ${daysLeft} días · ${fmtDay(nextDate)}`;
 }
 /** Importe escrito → centavos, o null si aún no es válido. */
+/** 2.8.2 · ¿El producto tiene imagen? (foto propia, imagen verificada o del catálogo de la app). */
+export function productHasImage(p: any): boolean {
+  return !!(
+    p.cleanImageUri ||
+    p.imageUri ||
+    (Array.isArray(p.imageUris) && p.imageUris.length) ||
+    verifiedProductImage(p) ||
+    catalogueImages[p.imageKey]?.length ||
+    catalogueImages[p.sku]?.length ||
+    catalogueImages[p.id]?.length
+  );
+}
+
 export function tryCents(raw: string): number | null {
   try {
     return raw?.trim() ? cents(raw) : null;

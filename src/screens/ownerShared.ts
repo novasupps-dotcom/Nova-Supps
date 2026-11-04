@@ -3,7 +3,7 @@ import { type Outcome, type TerminalPayment } from "../mercadopago";
 import type { IconName } from "../icons";
 import { TILE } from "../theme";
 
-export const VERSION = "2.8.1";
+export const VERSION = "2.8.2";
 export const HOME = "Vender";
 
 export const PAGES = [
@@ -31,6 +31,7 @@ export const PAGES = [
   "Catálogo para clientes",
   "Actualizar catálogo",
   "Cargar pedido",
+  "Repetidos",
 ];
 
 /** 2.3: cuatro pestañas; Ajustes (página "Parámetros") se abre con el engrane de arriba. */

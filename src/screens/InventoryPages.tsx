@@ -21,6 +21,7 @@ import {
   Icon,
 } from "../ui";
 import { TILE } from "../theme";
+import { duplicateGroups, type DuplicateGroup } from "../duplicates";
 import type { Body, OwnerPageContext } from "./ownerContext";
 import { normalize, units } from "./ownerShared";
 
@@ -32,6 +33,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
       "Catálogo",
       "Detalle producto",
       "Lotes",
+      "Repetidos",
     ].includes(ctx.page)
   )
     return null;
@@ -94,6 +96,29 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
     customers,
     lots,
   } = d;
+  // 2.8.2: productos repetidos (se calcula una vez por cada versión de los datos).
+  const dups = (() => {
+    let v = DUP_CACHE.get(d);
+    if (!v) DUP_CACHE.set(d, (v = duplicateGroups(b!)));
+    return v;
+  })();
+  const askMerge = (g: DuplicateGroup, keep: any) => {
+    const others = g.products.filter((p) => p.id !== keep.id);
+    const pieces = others.reduce((n, p) => n + (Number(p.stock) || 0), 0);
+    Alert.alert(
+      "Unificar",
+      `${pieces ? `${pieces} piezas pasan a` : "Se queda solo"} «${keep.name}» y ${others.length === 1 ? "el otro se elimina" : `los otros ${others.length} se eliminan`} (con ventas se archivan).`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Unificar",
+          onPress: () => {
+            if (act(() => b!.mergeProducts(keep.id, others.map((p) => p.id)), "")) notify(`Unificado · ${keep.name}`);
+          },
+        },
+      ],
+    );
+  };
   const soon = followUpsDue(customers);
   if (page === "Vender") {
     const lastDays = d.lastBackup
@@ -236,6 +261,14 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               ]}
             />
             <Button title="Cargar pedido del proveedor (PDF)" icon="file-text" secondary small onPress={() => go("Cargar pedido")} />
+            {!!dups.length && (
+              <TextButton
+                title={`${dups.length} ${dups.length === 1 ? "producto repetido" : "productos repetidos"} · Revisar`}
+                color={C.amber}
+                bold
+                onPress={() => go("Repetidos")}
+              />
+            )}
             {searchBox("Buscar nombre, SKU o marca")}
             {filterChips(page, [
               "Todos",
@@ -297,6 +330,31 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
       },
     };
   }
+
+  if (page === "Repetidos")
+    return {
+      scroll: (
+        <>
+          {!dups.length && <Note>No hay productos repetidos.</Note>}
+          {dups.map((g) => (
+            <Card key={g.key}>
+              {g.products.map((p, i) => (
+                <View key={p.id} style={{ paddingVertical: 8, borderTopWidth: i ? 1 : 0, borderColor: C.line }}>
+                  <Text style={[s.body, { fontWeight: "600" }]} numberOfLines={2}>
+                    {p.name}
+                  </Text>
+                  <Text style={[s.muted, { fontSize: 12.5 }]}>{`${p.sku} · ${p.stock} pzas · ${money(p.price)}`}</Text>
+                  <View style={[s.row, { gap: 14, marginVertical: 0 }]}>
+                    <TextButton title="Unificar aquí" bold onPress={() => askMerge(g, p)} />
+                    <TextButton title="Eliminar" color={C.red} onPress={() => askDelete(p)} />
+                  </View>
+                </View>
+              ))}
+            </Card>
+          ))}
+        </>
+      ),
+    };
 
   if (page === "Detalle producto") {
     const p = products.find((x) => x.id === productDetailId);
@@ -492,3 +550,5 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
 
   return null;
 }
+
+const DUP_CACHE = new WeakMap<object, DuplicateGroup[]>();
