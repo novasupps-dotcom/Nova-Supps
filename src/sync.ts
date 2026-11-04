@@ -179,7 +179,8 @@ export async function publish(
     sent += part.length;
   }
   const config: Row = {
-    fee: { bps: b.feeBps() },
+    // 2.7: si la comisión ya va en el precio, el servidor no suma nada al cobrar.
+    fee: { bps: b.upliftBps() },
     promos: { list: b.promos() },
     terminal: terminal || { terminalId: "", enabled: false },
     store: { name: STORE_NAME },

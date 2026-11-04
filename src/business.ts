@@ -657,6 +657,42 @@ export class Business {
       );
     });
   }
+  // ---------- 2.7 · Comisión incluida en el precio ----------
+  /** 2.7: el precio del catálogo ya incluye la comisión de la terminal (no se suma al cobrar). */
+  feeInPrice(): boolean {
+    return this.setting("feeInPrice", false) === true;
+  }
+  /** Lo que se suma al cobrar: la comisión, salvo que ya venga dentro del precio. */
+  upliftBps(): number {
+    return this.feeInPrice() ? 0 : this.feeBps();
+  }
+  /**
+   * Cambia el modo. Con `convert`, ajusta los precios del catálogo para que el cliente
+   * siga pagando lo mismo: al incluirla, precio → precio + comisión; al quitarla, el inverso.
+   * Las ventas anteriores no cambian. Regresa cuántos precios cambiaron.
+   */
+  setFeeInPrice(on: boolean, convert = true, skip: Set<string> = new Set()): number {
+    if (this.feeInPrice() === on) return 0;
+    const bps = this.feeBps();
+    let changed = 0;
+    this.transaction(() => {
+      if (convert)
+        for (const p of this.all("SELECT id,price FROM products")) {
+          if (skip.has(p.id)) continue;
+          const next = on ? grossUp(p.price, bps) : baseOf(p.price, bps);
+          if (next === p.price) continue;
+          this.run("UPDATE products SET price=? WHERE id=?", next, p.id);
+          changed++;
+        }
+      this.setSetting("feeInPrice", on);
+      this.audit(
+        "settings.feeInPrice",
+        "feeInPrice",
+        `${on ? "Comisión incluida en el precio" : "Comisión al cobrar"} ${feeLabel(bps)} · ${changed} precios`,
+      );
+    });
+    return changed;
+  }
   // ---------- 2.1 · Promociones ----------
   promos(): Promo[] {
     const v = this.setting("promotions", []);

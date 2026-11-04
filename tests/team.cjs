@@ -219,6 +219,18 @@ const flush=async(n=6,ms=15)=>{for(let i=0;i<n;i++)await act(async()=>{await new
   assert(x.all().includes(`Cobrar ${money(grossUp(cat.price,350))}`),'el vendedor cobra con la comisión nueva');await x.press('Vaciar');
   assert.equal((await xc.rpc('check_sale',{p_items:[{productId:cat.product_id,qty:1}]})).total,grossUp(cat.price,350),'el servidor también');
   await o.press('Cambiar porcentaje');await o.type('Comisión (%) *','4.06');await o.press('Guardar');await flush(12);assert.equal(fake.T.config.find(c=>c.key==='fee').value.bps,406);await o.press('Invitar, formas de pago y sincronizar');await flush(6);}
+ // 2.7: comisión incluida en el precio: los precios suben, el servidor y el vendedor ya no suman nada y el cliente paga lo mismo.
+ {const before=new Business(O.db).one('SELECT price FROM products WHERE id=?',cat.product_id).price;
+  await o.press('Ajustes');await o.press('Incluir la comisión en el precio');const a=alerts.pop();assert.equal(a[0],'Incluir la comisión en tus precios');await act(async()=>a[2][1].onPress());await flush(12);
+  await o.press('Invitar, formas de pago y sincronizar');await flush(8);
+  assert.equal(fake.T.config.find(c=>c.key==='fee').value.bps,0,'el servidor ya no suma comisión');
+  const row=fake.T.catalog.find(c=>c.product_id===cat.product_id);assert.equal(row.price,client(before),'el precio del catálogo ya la incluye');
+  await x.press('Cuenta');await x.press('Actualizar ahora');await flush(6);await x.press('Vender');await x.add(cat.name);
+  assert(x.all().includes(`Cobrar ${money(client(before))}`),'el cliente paga lo mismo (sin doble comisión)');await x.press('Vaciar');
+  const r=await xc.rpc('check_sale',{p_items:[{productId:cat.product_id,qty:1}]});assert.equal(r.total,client(before),'el servidor tampoco suma');
+  await o.press('Ajustes');await o.press('Sumar la comisión al cobrar');const z=alerts.pop();await act(async()=>z[2][1].onPress());await flush(12);
+  await o.press('Invitar, formas de pago y sincronizar');await flush(8);
+  assert.equal(fake.T.config.find(c=>c.key==='fee').value.bps,406);assert.equal(fake.T.catalog.find(c=>c.product_id===cat.product_id).price,before,'regresa a tu precio');}
  await assert.rejects(xc.rpc('submit_sale',{p_id:'v-forzada-01',p_items:[{productId:cat.product_id,qty:1}],p_method:'Efectivo'}),/no te habilitó/,'el servidor también lo impide');
  // Cuenta huérfana (sin acceso) y baja de Luis
  await fake.fetch(fake.BASE+'/auth/v1/admin/users',{method:'POST',headers:{apikey:'service'},body:JSON.stringify({email:'prueba@gns.mx',password:'secreto99'})});

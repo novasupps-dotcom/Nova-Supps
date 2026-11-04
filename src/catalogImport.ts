@@ -13,7 +13,7 @@
 //   traía el Excel al descargarlo, no se toca: así no se "regresan" piezas vendidas después.
 // - "Agregar piezas" suma existencias como un lote nuevo. Ninguna de las dos mueve dinero.
 import { strFromU8, unzipSync } from "fflate";
-import { cents, money as fmtMoney, today, type Business, type Row } from "./business";
+import { baseOf, cents, feeLabel, grossUp, money as fmtMoney, today, type Business, type Row } from "./business";
 import { findProductByCode, normalizeProductCode, validGtin } from "./barcodes";
 import { buildXlsx, type Sheet } from "./xlsx";
 
@@ -187,7 +187,7 @@ export const COLUMNS: { field: Field; header: string; aliases: string[] }[] = [
   { field: "sku", header: "SKU", aliases: ["clave", "codigo interno", "id producto", "folio"] },
   { field: "name", header: "Nombre", aliases: ["producto", "nombre del producto", "articulo", "nombre producto"] },
   { field: "category", header: "Categoría", aliases: ["categoria", "linea", "familia", "tipo"] },
-  { field: "price", header: "Precio", aliases: ["precio de venta", "precio venta", "precio publico", "precio al publico", "pvp", "price"] },
+  { field: "price", header: "Precio", aliases: ["precio sin comision", "precio de venta", "precio venta", "precio publico", "precio al publico", "pvp", "price"] },
   { field: "minimum", header: "Stock mínimo", aliases: ["minimo", "stock minimo", "existencia minima", "inventario minimo"] },
   { field: "barcode", header: "Código de barras", aliases: ["codigo de barras", "codigo barras", "barcode", "ean", "upc", "gtin", "codigo"] },
   { field: "brand", header: "Marca", aliases: ["marca", "brand"] },
@@ -297,6 +297,10 @@ export type PlanRow = {
   error?: string;
   /** Aviso que no impide aplicar (por ejemplo, piezas sin costo). */
   warning?: string;
+  /** El archivo trae precio para este renglón. */
+  priceInFile?: boolean;
+  /** Renglón repetido: el renglón (anterior) con el mismo producto o código. Se puede unificar con él. */
+  dupOf?: number;
   /** Lo que se guardará (solo campos con valor). */
   values: Partial<Record<Field, any>>;
 };
@@ -307,21 +311,46 @@ export type ImportPlan = {
   columns: string[];
   /** Avisos generales (columnas desconocidas, renglones vacíos…). */
   notes: string[];
+  /** 2.7 · Comisión de la terminal sumada a los precios del archivo. */
+  fee: {
+    bps: number;
+    /** Se suma la comisión a los precios del archivo. */
+    addFee: boolean;
+    /** La app aún suma la comisión al cobrar: al aceptar, pasa a ir dentro del precio. */
+    switching: boolean;
+    /** Renglones con precio en el archivo. */
+    priced: number;
+    /** Productos que NO traen precio en el archivo y también suben (solo al cambiar de modo). */
+    others: number;
+    /** Ejemplo para la confirmación. */
+    example: { from: number; to: number } | null;
+  };
+};
+export type PlanOptions = {
+  /** 2.7: sumar la comisión de la terminal a los precios del archivo (por omisión, sí). */
+  addFee?: boolean;
 };
 
 const LABEL: Record<Field, string> = Object.fromEntries(COLUMNS.map((c) => [c.field, c.header.replace(/ \(.*\)$/, "")])) as any;
 const showMoney = (n: number) => fmtMoney(n);
 const META_TEXT: Field[] = ["brand", "flavor", "presentation", "description"];
 
-/** Lee los renglones del archivo y calcula qué pasará con cada producto, sin guardar nada. */
-export function planCatalogImport(b: Business, table: Cell[][]): ImportPlan {
-  const headerAt = table.findIndex((r) => {
+function findHeader(table: Cell[][]): { at: number; head: Map<Field, number> } {
+  const at = table.findIndex((r) => {
     const h = headerMap(r || []);
     return h.has("name") || h.has("sku");
   });
-  if (headerAt < 0)
+  if (at < 0)
     throw new Error('No encontré los encabezados. La primera fila debe decir al menos "SKU" o "Nombre" (descarga la plantilla para ver el formato).');
-  const head = headerMap(table[headerAt]);
+  return { at, head: headerMap(table[at]) };
+}
+
+/** Lee los renglones del archivo y calcula qué pasará con cada producto, sin guardar nada. */
+export function planCatalogImport(b: Business, table: Cell[][], opts: PlanOptions = {}): ImportPlan {
+  const { at: headerAt, head } = findHeader(table);
+  const bps = b.feeBps();
+  const addFee = opts.addFee !== false && bps > 0;
+  let example: { from: number; to: number } | null = null;
   const notes: string[] = [];
   const unknown = (table[headerAt] || []).map(str).filter((h) => h && !headerMap([h]).size);
   if (unknown.length) notes.push(`Columnas que no se usan: ${unknown.join(", ")}.`);
@@ -365,6 +394,13 @@ export function planCatalogImport(b: Business, table: Cell[][]): ImportPlan {
         } catch {
           throw new Error(`Precio: "${str(get(r, "price"))}" no es un importe (ejemplo: 499 o 1,250.50)`);
         }
+        // 2.7: el precio del archivo + la comisión de la terminal (se confirma antes de aplicar).
+        if (addFee) {
+          const up = grossUp(v.price, bps);
+          if (!example && up !== v.price) example = { from: v.price, to: up };
+          v.price = up;
+        }
+        row.priceInFile = true;
       }
       if (str(get(r, "minimum"))) v.minimum = whole(get(r, "minimum"), "Stock mínimo");
       if (str(get(r, "barcode"))) {
@@ -392,14 +428,20 @@ export function planCatalogImport(b: Business, table: Cell[][]): ImportPlan {
         (v.sku ? products.find((p) => String(p.sku).toUpperCase() === v.sku) || findProductByCode(products, v.sku) : null) ||
         (!v.sku && v.barcode ? findProductByCode(products, v.barcode) : null);
       const key = existing ? "id:" + existing.id : v.sku ? "sku:" + v.sku : "";
-      if (key && seen.has(key)) throw new Error(`Repetido: el mismo producto ya viene en el renglón ${seen.get(key)}`);
+      if (key && seen.has(key)) {
+        row.dupOf = seen.get(key);
+        throw new Error(`Repetido: el mismo producto ya viene en el renglón ${seen.get(key)}`);
+      }
       if (key) seen.set(key, line);
       if (v.barcode) {
         const owner = findProductByCode(products.filter((p) => p.id !== existing?.id), v.barcode);
         if (owner)
           throw new Error(`Código de barras: ya es de ${owner.name} (${owner.sku})`);
         const dup = [...seen.entries()].find(([k]) => k === "code:" + v.barcode);
-        if (dup) throw new Error(`Código de barras repetido en el renglón ${dup[1]}`);
+        if (dup) {
+          row.dupOf = dup[1];
+          throw new Error(`Código de barras repetido en el renglón ${dup[1]}`);
+        }
         seen.set("code:" + v.barcode, line);
       }
       if (v.addQty) {
@@ -480,7 +522,17 @@ export function planCatalogImport(b: Business, table: Cell[][]): ImportPlan {
     );
   const counts = { new: 0, update: 0, same: 0, error: 0 };
   for (const r of rows) counts[r.kind]++;
-  return { rows, counts, columns: [...head.keys()].map((f) => LABEL[f]), notes };
+  const switching = addFee && !b.feeInPrice();
+  const repriced = new Set(rows.filter((r) => r.productId && r.kind !== "error" && r.priceInFile).map((r) => r.productId));
+  const others = switching ? products.filter((p) => !repriced.has(p.id) && p.price > 0).length : 0;
+  const priced = rows.filter((r) => r.kind !== "error" && r.priceInFile).length;
+  return {
+    rows,
+    counts,
+    columns: [...head.keys()].map((f) => LABEL[f]),
+    notes,
+    fee: { bps, addFee, switching, priced, others, example },
+  };
 }
 
 export type ImportResult = { created: number; updated: number; units: number; counted: number; skipped: number };
@@ -490,6 +542,13 @@ export function applyCatalogImport(b: Business, plan: ImportPlan): ImportResult 
   const result: ImportResult = { created: 0, updated: 0, units: 0, counted: 0, skipped: plan.counts.error };
   const label = "Carga de catálogo " + today();
   b.transaction(() => {
+    // 2.7: al aceptar la comisión en el precio, los productos que no traen precio en el archivo
+    // también la incluyen (el cliente paga lo mismo) y al cobrar ya no se suma.
+    if (plan.fee.switching) {
+      const fromFile = new Set<string>();
+      for (const r of plan.rows) if (r.productId && r.kind !== "error" && r.priceInFile) fromFile.add(r.productId);
+      b.setFeeInPrice(true, true, fromFile);
+    }
     for (const row of plan.rows) {
       if (row.kind !== "new" && row.kind !== "update") continue;
       const v = row.values;
@@ -532,7 +591,12 @@ export function applyCatalogImport(b: Business, plan: ImportPlan): ImportResult 
         result.counted++;
       }
     }
-    b.audit("catalog.import", today(), `${result.created} nuevos · ${result.updated} actualizados · ${result.units} piezas · ${result.counted} existencias`);
+    b.audit(
+      "catalog.import",
+      today(),
+      `${result.created} nuevos · ${result.updated} actualizados · ${result.units} piezas · ${result.counted} existencias` +
+        (plan.fee.addFee ? ` · precios + ${feeLabel(plan.fee.bps)}` : ""),
+    );
   });
   return result;
 }
@@ -543,13 +607,16 @@ export const EXPORT_KEY = "catalogExportStock";
 /** Excel con el catálogo actual, listo para editar y volver a cargar. Recuerda las existencias que trae. */
 export function catalogWorkbook(b: Business, when = new Date()): { bytes: Uint8Array; fileName: string; count: number } {
   const products = b.stock().sort((x, y) => String(x.category).localeCompare(String(y.category)) || String(x.name).localeCompare(String(y.name)));
+  // 2.7: con la comisión dentro del precio, el Excel trae tu precio sin comisión; al cargarlo se vuelve a sumar.
+  const inPrice = b.feeInPrice();
+  const bps = b.feeBps();
   const catalog: Sheet = {
     name: "Catálogo",
     columns: [
       { header: "SKU", width: 16 },
       { header: "Nombre", width: 34 },
       { header: "Categoría", width: 16 },
-      { header: "Precio", type: "money" },
+      { header: inPrice ? "Precio sin comisión" : "Precio", type: "money", width: inPrice ? 18 : undefined },
       { header: "Stock mínimo", type: "int", width: 12 },
       { header: "Código de barras", width: 18 },
       { header: "Marca", width: 14 },
@@ -566,7 +633,7 @@ export function catalogWorkbook(b: Business, when = new Date()): { bytes: Uint8A
       p.sku,
       p.name,
       p.category,
-      p.price / 100,
+      (inPrice ? baseOf(p.price, bps) : p.price) / 100,
       p.minimum,
       p.barcode || "",
       p.brand || "",
@@ -590,11 +657,103 @@ export function catalogWorkbook(b: Business, when = new Date()): { bytes: Uint8A
       ["4. Activo = No quita el producto de la venta y del catálogo de tus vendedores (no se borra; puedes volver a ponerlo en Sí)."],
       ["5. Existencias: escribe cuántas piezas tienes y la app deja ese número (como un conteo). Si no lo cambias, no se toca, aunque hayas vendido después de descargar el Excel."],
       ["6. Agregar piezas suma existencias como un lote nuevo. Costo unitario y Caducidad (opcionales) se usan para las piezas que se suman. Nada de esto mueve dinero de tus cuentas."],
-      ["7. Guarda el archivo (.xlsx o CSV) y en la app ve a Ajustes → Actualizar catálogo → Elegir archivo. Verás los cambios antes de aplicarlos."],
+      [`7. Precio: escribe tu precio. Al cargarlo, la app te pregunta si le suma la comisión de la terminal (${feeLabel(bps)}); si aceptas, el precio del catálogo ya la incluye y al cobrar no se suma otra vez.`],
+      ["8. Guarda el archivo (.xlsx o CSV) y en la app ve a Ajustes → Actualizar catálogo → Elegir archivo. Verás los cambios antes de aplicarlos; ahí puedes quitar, modificar o unificar renglones."],
       ["Las ventas, cobros y costos anteriores nunca cambian."],
     ],
   };
   b.setSetting(EXPORT_KEY, { at: when.toISOString(), stock: Object.fromEntries(products.map((p: Row) => [p.id, Number(p.stock) || 0])) });
   const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, "0")}-${String(when.getDate()).padStart(2, "0")}`;
   return { bytes: buildXlsx([catalog, help], when), fileName: `Catalogo_Nova_${stamp}.xlsx`, count: products.length };
+}
+
+// ---------------------------------------------------------------- 2.7 · arreglar renglones desde la app
+
+/** Campos que se pueden modificar desde la app (en este orden). */
+export const EDITABLE: Field[] = ["name", "sku", "category", "price", "flavor", "stock", "barcode", "cost"];
+export const fieldLabel = (f: Field) => LABEL[f];
+
+/** Valores de un renglón como texto (para precargar el formulario de «Modificar»). */
+export function rowFields(table: Cell[][], line: number): Partial<Record<Field, string>> {
+  const { head } = findHeader(table);
+  const r = table[line - 1] || [];
+  const out: Partial<Record<Field, string>> = {};
+  for (const f of EDITABLE) {
+    const i = head.get(f);
+    out[f] = i === undefined ? "" : str(r[i] ?? null);
+  }
+  return out;
+}
+
+function withColumn(table: Cell[][], field: Field): { table: Cell[][]; col: number } {
+  const { at, head } = findHeader(table);
+  const col = head.get(field);
+  if (col !== undefined) return { table, col };
+  const next = table.map((r) => [...(r || [])]);
+  const width = Math.max(...next.map((r) => r.length));
+  next[at][width] = COLUMNS.find((c) => c.field === field)!.header;
+  return { table: next, col: width };
+}
+
+/** «Modificar»: cambia valores de un renglón (agrega la columna si el archivo no la traía). */
+export function editRow(table: Cell[][], line: number, values: Partial<Record<Field, string>>): Cell[][] {
+  let next = table.map((r) => [...(r || [])]);
+  for (const [f, value] of Object.entries(values) as [Field, string][]) {
+    if (value === undefined) continue;
+    const { head } = findHeader(next);
+    if (!head.has(f) && !String(value).trim()) continue;
+    const added = withColumn(next, f);
+    next = added.table;
+    next[line - 1][added.col] = String(value).trim() || null;
+  }
+  return next;
+}
+
+/** «Quitar»: el renglón no se carga (se vacía para conservar los números de renglón). */
+export function dropRow(table: Cell[][], line: number): Cell[][] {
+  return table.map((r, i) => (i === line - 1 ? [] : r));
+}
+
+/**
+ * «Unificar»: junta un renglón repetido con el primero. Suma Existencias y Agregar piezas,
+ * junta los sabores distintos («Chocolate, Vainilla») y completa las celdas vacías del primero.
+ */
+export function mergeRows(table: Cell[][], keepLine: number, dropLine: number): Cell[][] {
+  const { head } = findHeader(table);
+  const next = table.map((r) => [...(r || [])]);
+  const keep = next[keepLine - 1];
+  const drop = next[dropLine - 1] || [];
+  const width = Math.max(keep.length, drop.length);
+  const sumCols = new Set([head.get("stock"), head.get("addQty")].filter((x) => x !== undefined) as number[]);
+  const flavorCol = head.get("flavor");
+  for (let i = 0; i < width; i++) {
+    const a = str(keep[i] ?? null),
+      d = str(drop[i] ?? null);
+    if (!d) continue;
+    if (sumCols.has(i)) {
+      const x = Number(a.replace(/,/g, "") || 0),
+        y = Number(d.replace(/,/g, ""));
+      keep[i] = Number.isFinite(x) && Number.isFinite(y) ? x + y : a || d;
+    } else if (i === flavorCol) {
+      const parts = [...a.split(/\s*,\s*/), ...d.split(/\s*,\s*/)].filter(Boolean);
+      const unique = parts.filter((x, k) => parts.findIndex((y) => fold(y) === fold(x)) === k);
+      keep[i] = unique.join(", ");
+    } else if (!a) keep[i] = drop[i] ?? null;
+  }
+  next[dropLine - 1] = [];
+  return next;
+}
+
+/** Unifica todos los repetidos del plan, cada uno con su primer renglón. */
+export function mergeAllDuplicates(table: Cell[][], plan: ImportPlan): Cell[][] {
+  let next = table;
+  for (const r of plan.rows) if (r.kind === "error" && r.dupOf) next = mergeRows(next, r.dupOf, r.line);
+  return next;
+}
+
+/** Quita todos los renglones con error. */
+export function dropAllErrors(table: Cell[][], plan: ImportPlan): Cell[][] {
+  let next = table;
+  for (const r of plan.rows) if (r.kind === "error") next = dropRow(next, r.line);
+  return next;
 }

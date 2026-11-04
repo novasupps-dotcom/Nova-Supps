@@ -32,6 +32,9 @@ export type OwnerPageContext = {
     period: string;
     biometric: boolean;
     feeBps: number;
+    /** 2.7: tasa de Mercado Pago (para el gasto estimado), aunque no se sume al cobrar. */
+    cardFeeBps: number;
+    feeInPrice: boolean;
     todaySales: { revenue: number; orders: number };
   } | null;
   page: string;

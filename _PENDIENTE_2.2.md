@@ -1,3 +1,10 @@
+# Nova Negocio 2.7.0 · 4-nov-2026
+
+Hecho en 2.7.0: en Actualizar catálogo, Quitar / Modificar / Unificar cada renglón (repetidos por sabor) y Deshacer;
+al aplicar pregunta si suma la comisión de la terminal (4.06%) a los precios. Al aceptar, la comisión va dentro del precio y
+ya no se suma al cobrar (también en vendedores). Ajustes → comisión permite regresar.
+Probar: cargar el archivo, unificar los repetidos, Aplicar → «Sí, sumar y cargar»; revisar un precio en Vender y en un vendedor.
+
 # Nova Negocio 2.6.1 · 4-nov-2026
 
 Hecho en 2.6.1: Actualizar catálogo ya carga la columna Existencias (antes se ignoraba).

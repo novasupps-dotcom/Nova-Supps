@@ -191,7 +191,10 @@ function load(b: Business) {
     mpPending: b.setting("mpPending", null) as Row | null,
     period: b.setting("homePeriod", "Todo") as string,
     biometric: b.setting("biometricEnabled", true) !== false,
-    feeBps: b.feeBps(),
+    // 2.7: lo que se suma al cobrar (0 si la comisión ya va en el precio).
+    feeBps: b.upliftBps(),
+    cardFeeBps: b.feeBps(),
+    feeInPrice: b.feeInPrice(),
     // Lo vendido hoy (encabezado de Ventas): se calcula al cargar, no en cada tecla de la búsqueda.
     todaySales: b.one(
       "SELECT COALESCE(SUM(total),0) revenue,COUNT(*) orders FROM sales WHERE status='confirmed' AND created>=?",
@@ -2186,7 +2189,7 @@ function AppContent({ business }: { business?: Business }) {
   const divider = () => (
     <View style={{ height: 1, backgroundColor: C.line, marginVertical: 8 }} />
   );
-  const feePct = feeLabel(data?.feeBps);
+  const feePct = feeLabel(data?.cardFeeBps);
   /** Ventas netas = suma de las formas de pago; solo tarjeta descuenta su comisión. */
   const excelCard = (label = "Excel") =>
     excel ? (
@@ -3906,7 +3909,7 @@ function AppContent({ business }: { business?: Business }) {
                     {(() => {
                       const base = tryCents(val("price"));
                       return (
-                        <Note>{`Tu precio: lo que recibes completo.${base ? ` El cliente paga ${money(grossUp(base, data.feeBps))} (absorbe la comisión ${feeLabel(data.feeBps)}).` : ""}`}</Note>
+                        <Note>{data.feeInPrice ? `Precio con la comisión ${feeLabel(data.cardFeeBps)} incluida: el cliente paga este precio.` : `Tu precio: lo que recibes completo.${base ? ` El cliente paga ${money(grossUp(base, data.feeBps))} (absorbe la comisión ${feeLabel(data.feeBps)}).` : ""}`}</Note>
                       );
                     })()}
                     {!val("id") && (
