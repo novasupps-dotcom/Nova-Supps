@@ -210,6 +210,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                 { label: "Conteo", icon: "list-checks", onPress: () => open("Ajuste de inventario") },
               ]}
             />
+            <Button title="Cargar pedido del proveedor (PDF)" icon="file-text" secondary small onPress={() => go("Cargar pedido")} />
             {searchBox("Buscar nombre, SKU o marca")}
             {filterChips(page, [
               "Todos",
