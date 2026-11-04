@@ -1,5 +1,5 @@
 import React from "react";
-import { Switch, View } from "react-native";
+import { Alert, Switch, View } from "react-native";
 import { Text } from "../text";
 import { cardFee, feeLabel, grossUp, localDay, money } from "../business";
 import { deviceId } from "../device";
@@ -149,7 +149,34 @@ export function renderParameters(ctx: OwnerPageContext): Body | null {
     />
   );
   const ex = 100000;
-  const pays = grossUp(ex, d.feeBps);
+  const rate = d.cardFeeBps;
+  // 2.7: con la comisión en el precio, el cliente paga el precio del catálogo tal cual.
+  const pays = d.feeInPrice ? ex : grossUp(ex, rate);
+  const switchMode = () => {
+    const on = !d.feeInPrice;
+    Alert.alert(
+      on ? "Incluir la comisión en tus precios" : "Sumar la comisión al cobrar",
+      on
+        ? `Todos los precios del catálogo suben ${feeLabel(rate)} (ej. ${money(ex)} → ${money(grossUp(ex, rate))}) y al cobrar ya no se suma nada. El cliente paga lo mismo que hoy. Tus vendedores lo ven al sincronizar.`
+        : `Todos los precios del catálogo bajan para quitar el ${feeLabel(rate)} (ej. ${money(grossUp(ex, rate))} → ${money(ex)}) y la comisión se vuelve a sumar al cobrar. El cliente paga lo mismo que hoy.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Cambiar",
+          onPress: () => {
+            try {
+              const n = b!.setFeeInPrice(on, true);
+              refresh();
+              void syncRef.current();
+              notify(`${on ? "Comisión incluida en el precio" : "Comisión al cobrar"} · ${n} precios ajustados`);
+            } catch (e) {
+              Alert.alert("Comisión", e instanceof Error ? e.message : String(e));
+            }
+          },
+        },
+      ],
+    );
+  };
   const stat = (label: string, value: string, color?: string) => (
     <View style={{ flex: 1 }}>
       <Text style={{ color: C.muted, fontSize: 13 }}>{label}</Text>
@@ -165,22 +192,39 @@ export function renderParameters(ctx: OwnerPageContext): Body | null {
         <Card>
           <View style={s.between}>
             <Text style={[s.body, { fontWeight: "600", flex: 1 }]}>
-              Comisión que absorbe el cliente
+              {d.feeInPrice
+                ? "Comisión incluida en tus precios"
+                : "Comisión que absorbe el cliente"}
             </Text>
-            <Text style={s.price}>{feeLabel(d.feeBps)}</Text>
+            <Text style={s.price}>{feeLabel(rate)}</Text>
           </View>
           <View style={[s.row, { marginVertical: 8 }]}>
-            {stat("Tu precio", money(ex))}
+            {stat(d.feeInPrice ? "Precio del catálogo" : "Tu precio", money(ex))}
             {stat("El cliente paga", money(pays))}
-            {stat("Recibes", money(pays - cardFee(pays, d.feeBps)), C.green)}
+            {stat("Recibes", money(pays - cardFee(pays, rate)), C.green)}
           </View>
+          <Note>
+            {d.feeInPrice
+              ? "El precio del catálogo ya trae la comisión: al cobrar no se suma nada."
+              : "La comisión se suma al cobrar, con cualquier forma de pago."}
+          </Note>
           <Button
             title="Cambiar porcentaje"
             secondary
             small
             onPress={() =>
-              open("Configuración", { rate: (d.feeBps / 100).toFixed(2) })
+              open("Configuración", { rate: (rate / 100).toFixed(2) })
             }
+          />
+          <Button
+            title={
+              d.feeInPrice
+                ? "Sumar la comisión al cobrar"
+                : "Incluir la comisión en el precio"
+            }
+            secondary
+            small
+            onPress={switchMode}
           />
         </Card>
         {menuRows(SETTINGS_MENU[0].items)}
