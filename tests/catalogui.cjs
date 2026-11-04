@@ -30,7 +30,7 @@ Module._load = function (name, ...args) {
   if (name.startsWith("expo-")) return {};
   return original.call(this, name, ...args);
 };
-const { Business } = require("../src/business.ts");
+const { Business, grossUp, money } = require("../src/business.ts");
 const { CatalogImportPage } = require("../src/screens/CatalogImport.tsx");
 let ui;
 const all = () => text(ui.root);
@@ -55,32 +55,70 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   assert.equal(shared.at(-1).o.mimeType, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   assert.equal(notes.at(-1), "Catálogo en Excel · 1 productos");
 
-  // 2. Archivo con un error, un cambio y un alta: el Excel descargado, editado.
-  files["file:///cache/precios.csv"] = Buffer.from("SKU,Nombre,Precio,Existencias,Agregar piezas,Costo unitario\nNS-PRO-001,,950,5,,\n,Barra,45,,6,20\nNS-X,Sin precio,,,,\n", "utf8").toString("base64");
+  // 2. Archivo editado: un cambio, un alta, un producto repetido por sabor y un renglón sin precio.
+  files["file:///cache/precios.csv"] = Buffer.from(
+    "SKU,Nombre,Precio,Sabor,Existencias,Agregar piezas,Costo unitario\n" +
+      "NS-PRO-001,,950,,5,,\n" +
+      ",Barra,45,,,6,20\n" +
+      "NS-ISO-1,Iso 2 lb,899,Chocolate,4,,300\n" +
+      "NS-ISO-1,Iso 2 lb,899,Vainilla,3,,300\n" +
+      "NS-X,Sin precio,,,,,\n",
+    "utf8",
+  ).toString("base64");
   picked = { canceled: false, assets: [{ uri: "file:///cache/precios.csv", name: "precios.csv" }] };
   await press("Elegir archivo");
   issues.push(...screenIssues(ui, "vista previa"));
   assert(all().includes("precios.csv"));
-  assert(all().includes("1 nuevos") && all().includes("1 con cambios") && all().includes("1 con error"), all());
-  assert(/Precio: \$899\.00 → \$950\.00/.test(all()), all());
-  assert(all().includes("Nuevo: Barra"));
+  assert(all().includes("2 con error"), all());
+  // Abre en Errores: cada renglón se puede unificar, modificar o quitar.
+  assert(all().includes("Renglón 5: Repetido: el mismo producto ya viene en el renglón 4"), all());
+  assert(all().includes("Renglón 6: Producto nuevo: falta el Precio"), all());
+  await press("Unificar con renglón 4");
+  assert(all().includes("1 con error") && !all().includes("Renglón 5:"), all());
+  // Modificar: escribir el precio que faltaba.
+  const editBtns = pressables((n) => text(n).trim() === "Modificar");
+  await act(async () => editBtns[editBtns.length - 1].props.onPress());
+  const priceInput = ui.root.findAll((n) => n.type === "TextInput" && n.props.accessibilityLabel === "Precio del renglón 6")[0];
+  assert(priceInput, "campo Precio del renglón 6");
+  await act(async () => priceInput.props.onChangeText("30"));
+  await press("Guardar renglón");
+  assert(all().includes("0 con error") || !all().includes("con error"), all());
+  // Deshacer y mejor quitarlo.
+  await press("Deshacer último cambio (2)");
+  assert(all().includes("Renglón 6: Producto nuevo: falta el Precio"), all());
+  await press("Quitar");
+  assert(!all().includes("con error"), all());
+  await press("Cambios");
+  issues.push(...screenIssues(ui, "arreglado"));
+  // Comisión: activada por omisión, con ejemplo; se puede apagar para ver los precios tal cual.
+  assert(all().includes("Sumar la comisión de la terminal (4.06%) a los precios"), all());
+  assert(all().includes(`Precio: $899.00 → ${money(grossUp(95000))}`), all());
+  const sw = ui.root.findAll((n) => n.type === "Switch" && n.props.accessibilityLabel === "Sumar la comisión de la terminal a los precios")[0];
+  await act(async () => sw.props.onValueChange(false));
+  assert(all().includes("Precio: $899.00 → $950.00"), all());
+  await act(async () => sw.props.onValueChange(true));
   assert(all().includes("Existencias: 1 → 5"), all());
-  await press("Errores");
-  assert(all().includes("Renglón 4: Producto nuevo: falta el Precio"), all());
+  assert(all().includes("Nuevo: Barra"));
   assert.equal(b.stock().find((x) => x.id === p).price, 89900, "nada se guarda antes de aplicar");
 
-  // 3. Aplicar (con confirmación) → guarda copia, aplica, avisa y publica.
-  await press("Aplicar 2 cambios");
+  // 3. Aplicar: pregunta si suma la comisión → guarda copia, aplica, avisa y publica.
+  await press("Aplicar 3 cambios");
   const [title, body, buttons] = alerts.at(-1);
-  assert.equal(title, "Actualizar catálogo");
-  assert(body.includes("1 renglón con error se omite"), body);
-  await act(async () => buttons.find((x) => x.text === "Aplicar").onPress());
+  assert.equal(title, "¿Sumar la comisión de la terminal (4.06%)?");
+  assert(body.includes("al cobrar no se suma otra vez"), body);
+  assert.deepEqual(buttons.map((x) => x.text), ["Cancelar", "No sumar", "Sí, sumar y cargar"]);
+  await act(async () => buttons.find((x) => x.text === "Sí, sumar y cargar").onPress());
   await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
-  assert.equal(b.stock().find((x) => x.id === p).price, 95000);
+  assert.equal(b.stock().find((x) => x.id === p).price, grossUp(95000));
+  assert.equal(b.feeInPrice(), true);
   assert.equal(b.stock().find((x) => x.name === "Barra").stock, 6);
   assert.equal(b.stock().find((x) => x.id === p).stock, 5);
+  const iso = b.stock().find((x) => x.sku === "NS-ISO-1");
+  assert.equal(iso.stock, 7);
+  assert.equal(iso.flavor, "Chocolate, Vainilla");
+  assert(!b.stock().some((x) => x.name === "Sin precio"));
   assert.equal(changed, 1);
-  assert.equal(notes.at(-1), "Catálogo actualizado · 1 nuevos · 1 con cambios · existencias de 1 · +6 piezas");
+  assert.equal(notes.at(-1), "Catálogo actualizado · 2 nuevos · 1 con cambios · existencias de 2 · +6 piezas · precios + 4.06%");
   assert(Object.keys(written).some((u) => /Nova-antes-de-catalogo-\d+\.json$/.test(u)), "copia previa");
   assert(!all().includes("precios.csv"), "la vista previa se cierra");
   issues.push(...screenIssues(ui, "aplicado"));
@@ -95,5 +133,5 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
 
   await act(async () => ui.unmount());
   if (issues.length) throw new Error(issues.join("\n"));
-  console.log("ACTUALIZAR CATÁLOGO: OK (descargar Excel, vista previa con errores, confirmar, copia previa, aplicar y publicar)");
+  console.log("ACTUALIZAR CATÁLOGO: OK (descargar Excel, unificar repetidos, modificar, deshacer, quitar, comisión con confirmación, copia previa, aplicar y publicar)");
 })().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });
