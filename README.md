@@ -1,6 +1,11 @@
-# Nova Negocio · 2.6.1
+# Nova Negocio · 2.7.0
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
+
+**2.7.0 · Arreglar renglones y comisión en el precio (versionCode 54, solo JavaScript sobre el runtime 2.2.4):**
+
+- Actualizar catálogo: cada renglón de la vista previa se puede **Quitar** (no se carga), **Modificar** (nombre, SKU, categoría, precio, sabor, existencias, código y costo, desde la app) o, si se repite (por ejemplo, el mismo producto en varios renglones por sabor), **Unificar** con el primero: suma existencias y junta los sabores («Chocolate, Vainilla»). También «Unificar repetidos» y «Quitar errores» para todos, y «Deshacer».
+- Comisión de la terminal: al cargar, la app propone sumar el 4.06% a los precios del archivo (interruptor con ejemplo) y lo confirma al aplicar («Sí, sumar y cargar» / «No sumar»). Al aceptar, el precio del catálogo **incluye** la comisión y al cobrar ya no se suma (dueño, vendedores y servidor: se publica `fee.bps = 0`); los productos sin precio en el archivo también suben, para que el cliente pague lo mismo. El gasto de comisión de tarjeta se sigue registrando con la tasa de Mercado Pago. Ajustes → comisión muestra el modo y permite regresar («Sumar la comisión al cobrar»), ajustando los precios. Con la comisión en el precio, el Excel descargado trae «Precio sin comisión». Código: `Business.feeInPrice/upliftBps/setFeeInPrice`.
 
 **2.6.1 (versionCode 53):** en Actualizar catálogo, la columna **Existencias** ahora carga las piezas (antes era solo informativa y se ignoraba): deja ese número como un conteo (sube con el Costo unitario o el último costo, baja por caducidad más próxima, sin mover dinero). Si el número es el mismo que traía el Excel al descargarlo, no se toca, para no deshacer ventas hechas después. También acepta encabezados como «Existencia», «Stock», «Inventario», «Cantidad» o «Piezas».
 
