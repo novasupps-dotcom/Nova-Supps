@@ -2,7 +2,7 @@
   "expo": {
     "name": "Nova Negocio",
     "slug": "nova-negocio",
-    "version": "2.5.3",
+    "version": "2.6.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "ios": {
@@ -20,18 +20,13 @@
     "android": {
       "package": "com.novasupps.negocio",
       "allowBackup": false,
-      "versionCode": 51,
+      "versionCode": 52,
       "blockedPermissions": [
-        "android.permission.SYSTEM_ALERT_WINDOW",
-        "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.RECORD_AUDIO"
       ],
       "googleServicesFile": "./google-services.json",
       "permissions": [
-        "android.permission.USE_BIOMETRIC",
-        "android.permission.USE_FINGERPRINT",
-        "android.permission.CAMERA",
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT",
         "android.permission.CAMERA"

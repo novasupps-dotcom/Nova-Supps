@@ -7,19 +7,25 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "channel": "development"
+      "channel": "development",
+      "environment": "development"
     },
     "preview": {
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "credentialsSource": "remote"
       },
       "channel": "preview",
-      "credentialsSource": "remote"
+      "environment": "preview"
     },
     "production": {
       "autoIncrement": true,
-      "channel": "production"
+      "android": {
+        "credentialsSource": "remote"
+      },
+      "channel": "production",
+      "environment": "production"
     }
   },
   "submit": {
