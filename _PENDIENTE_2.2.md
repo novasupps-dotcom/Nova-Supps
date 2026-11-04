@@ -1,3 +1,9 @@
+# Nova Negocio 2.8.1 · 4-nov-2026
+
+Hecho en 2.8.1: eliminar productos en Stock (mantener presionado o desde el detalle); Cargar pedido y Actualizar catálogo
+en 3 pasos con poco texto.
+Probar: Stock → mantener presionado un producto → Eliminar. Stock → Cargar pedido: 1. Elegir PDF · 2. Revisar · 3. Cargar.
+
 # Nova Negocio 2.8.0 · 4-nov-2026
 
 Hecho en 2.8.0: Stock → Cargar pedido del proveedor (PDF): inventario, costo real, calculadora de precio con % de ganancia +
