@@ -1,6 +1,8 @@
-# Nova Negocio · 2.7.0
+# Nova Negocio · 2.7.1
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
+
+**2.7.1 · Aviso de versión nueva (versionCode 55):** cuando una versión se descarga aparece una **ventana emergente** «Nueva versión lista» (Instalar ahora / Después) y una **notificación del teléfono** (canal «Actualizaciones de la app», si las notificaciones están permitidas), una sola vez por versión. La app busca al abrirla, al volver a ella (mínimo cada 5 min) y cada 10 min mientras está abierta. Ajustes (dueño) y Cuenta (vendedor) tienen **Actualizaciones**: versión, «Buscar actualización ahora», última revisión y datos de diagnóstico (canal, runtime, versión del APK o descargada). `app.config.js` omite `google-services.json` cuando no existe (publicación desde GitHub), así la actualización lleva su número de versión.
 
 **2.7.0 · Arreglar renglones y comisión en el precio (versionCode 54, solo JavaScript sobre el runtime 2.2.4):**
 

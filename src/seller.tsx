@@ -112,7 +112,8 @@ import { TILE } from "./theme";
 import type { IconName } from "./icons";
 import { autoRegisterPush, setupNotifications, detachPush } from "./push";
 import { PushCard } from "./screens/PushCard";
-import { UpdateNotice } from "./screens/UpdateNotice";
+import { UpdateNotice, UpdatesCard } from "./screens/UpdateNotice";
+import { VERSION } from "./screens/ownerShared";
 
 /** 2.3: cuatro pestañas; Cuenta se abre con el ícono de persona de arriba. */
 const TABS: { name: string; icon: IconName }[] = [
@@ -1834,6 +1835,7 @@ export function SellerApp({
           revision={version}
           onChanged={() => setVersion((v) => v + 1)}
         />
+        <UpdatesCard b={b} version={VERSION} notify={notify} />
         <Note>Vende, revisa existencias y tus ventas del día. Sin internet, tus ventas se guardan y se envían solas.</Note>
         <View style={{ height: 10 }} />
         <Button title="Cerrar sesión" secondary small onPress={signOut} />

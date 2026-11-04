@@ -406,7 +406,7 @@ async function dispose(ui) {
   assert.equal(await updates.restartForUpdate(() => true), true);
   assert.equal(reloaded, 1);
   console.log(
-    "  ✓ Updates: una consulta cada 30 min, descarga única y reinicio impedido durante cobro",
+    "  ✓ Updates: una consulta cada 5 min (al abrir o volver), descarga única y reinicio impedido durante cobro",
   );
   // 2.5.3: la versión nueva se aplica sola al volver a la app tras 15 min (nunca a media venta).
   {
@@ -458,6 +458,43 @@ async function dispose(ui) {
   console.log(
     "  ✓ Updates 2.5.3: se aplica sola al volver tras 15 min, nunca con venta o cobro abiertos",
   );
+  // 2.7.1: ventana emergente + notificación del teléfono una sola vez por versión, y búsqueda manual en Ajustes.
+  {
+    const { UpdateNotice, UpdatesCard } = require("../src/screens/UpdateNotice.tsx");
+    permission = { granted: true };
+    const popups = () => alerts.filter((a) => a[0] === "Nueva versión lista");
+    // Ya hubo ventana (con la venta abierta, sin botones) en la prueba anterior: una sola vez por versión.
+    assert.equal(popups().length, 1);
+    assert.equal(popups()[0][2], undefined, "con venta abierta solo avisa, no ofrece reiniciar");
+    b.setSetting("updatePopupFor", "");
+    b.setSetting("updateNotified", "");
+    const before = popups().length;
+    const reloads = reloaded;
+    const n1 = await mount(React.createElement(UpdateNotice, { b, canRestart: () => true }));
+    await act(async () => { await flush(); });
+    assert.equal(popups().length, before + 1, "ventana emergente al tener la versión descargada");
+    const pop = popups().at(-1);
+    assert.deepEqual(pop[2].map((x) => x.text), ["Después", "Instalar ahora"]);
+    assert(scheduled.some((x) => x.identifier === "update-nueva" && x.content.title === "Nueva versión de Nova Negocio lista"), "notificación del teléfono");
+    assert(channels.includes("actualizaciones"));
+    await act(async () => n1.unmount());
+    // Volver a montar (otra pantalla) no repite la ventana ni la notificación.
+    const count = scheduled.filter((x) => x.identifier === "update-nueva").length;
+    const n2 = await mount(React.createElement(UpdateNotice, { b, canRestart: () => true }));
+    await act(async () => { await flush(); });
+    assert.equal(popups().length, before + 1, "no se repite");
+    assert.equal(scheduled.filter((x) => x.identifier === "update-nueva").length, count);
+    await act(async () => pop[2][1].onPress());
+    await act(async () => { await flush(); });
+    assert.equal(reloaded, reloads + 1, "«Instalar ahora» reinicia con la versión nueva");
+    await act(async () => n2.unmount());
+    // Ajustes → Actualizaciones: buscar ahora sin esperar los 5 minutos.
+    const notes = [];
+    const card = await mount(React.createElement(UpdatesCard, { b, version: "2.7.1", notify: (t) => notes.push(t) }));
+    assert(text(card.root).includes("Actualizaciones") && text(card.root).includes("Buscar actualización ahora"));
+    await act(async () => card.unmount());
+  }
+  console.log("  ✓ Updates 2.7.1: ventana emergente y notificación una vez por versión; Instalar ahora; Ajustes → Buscar actualización");
   const {
     CameraScanner,
     createScanGate,

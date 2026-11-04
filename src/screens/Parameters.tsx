@@ -17,6 +17,7 @@ import {
 } from "./ownerShared";
 import { PromotionsPage } from "./Promotions";
 import { PushCard } from "./PushCard";
+import { UpdatesCard } from "./UpdateNotice";
 
 export function renderParameters(ctx: OwnerPageContext): Body | null {
   const {
@@ -301,6 +302,7 @@ export function renderParameters(ctx: OwnerPageContext): Body | null {
             {menuRows(ADVANCED_MENU)}
           </>
         )}
+        <UpdatesCard b={b!} version={VERSION} notify={notify} />
         <Text
           style={{
             color: C.muted,

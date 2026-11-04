@@ -1,3 +1,8 @@
+# Nova Negocio 2.7.1 · 4-nov-2026
+
+Hecho en 2.7.1: ventana emergente y notificación cuando hay versión nueva; Ajustes → Actualizaciones → Buscar actualización ahora.
+Probar: Ajustes debe decir 2.7.1; en la tarjeta Actualizaciones, «Buscar actualización ahora» debe decir que ya tienes la más reciente.
+
 # Nova Negocio 2.7.0 · 4-nov-2026
 
 Hecho en 2.7.0: en Actualizar catálogo, Quitar / Modificar / Unificar cada renglón (repetidos por sabor) y Deshacer;
