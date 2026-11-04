@@ -1,4 +1,9 @@
-# Nova Negocio 2.8.1 · 4-nov-2026
+# Nova Negocio 2.8.2 · 4-nov-2026
+
+Hecho en 2.8.2: el % de la terminal recalcula precios (comisión incluida); el Excel reconoce productos existentes por
+descripción (con imagen reemplaza existencias, sin imagen suma piezas) y deja eliminar los que no vienen; repetidos en Stock.
+Probar: Ajustes → Cambiar porcentaje. Ajustes → Actualizar catálogo con tu Excel original. Stock → «N productos repetidos».
+
 
 Hecho en 2.8.1: eliminar productos en Stock (mantener presionado o desde el detalle); Cargar pedido y Actualizar catálogo
 en 3 pasos con poco texto.

@@ -3114,8 +3114,8 @@ function AppContent({ business }: { business?: Business }) {
             /^\d{1,2}(\.\d{1,2})?$/.test(raw),
             "Escribe la comisión como porcentaje, por ejemplo 4.06",
           );
-          b.setFeeBps(Math.round(Number(raw) * 100));
-          done = `Comisión: ${feeLabel(Math.round(Number(raw) * 100))}`;
+          const repriced = b.setFeeBps(Math.round(Number(raw) * 100));
+          done = `Comisión: ${feeLabel(Math.round(Number(raw) * 100))}${repriced ? ` · ${repriced} precios ajustados` : ""}`;
           // Es un parámetro: se publica de inmediato a la base en línea (vendedores y servidor).
           setTimeout(() => void syncRef.current(), 0);
           break;
@@ -3492,7 +3492,7 @@ function AppContent({ business }: { business?: Business }) {
   const tabOf = (p: string) =>
     TABS.some((t) => t.name === p)
       ? p
-      : ["Catálogo", "Detalle producto", "Lotes"].includes(p)
+      : ["Catálogo", "Detalle producto", "Lotes", "Repetidos"].includes(p)
         ? "Stock"
         : ["Detalle venta", "Corte de caja", "Resumen de ventas", "Cobros"].includes(p)
           ? "Ventas"
@@ -4540,7 +4540,7 @@ function AppContent({ business }: { business?: Business }) {
                 {form === "Configuración" && (
                   <>
                     {field("rate", "Comisión (%) *", true, "4.06")}
-                    <Note>Normalmente 4.06% (3.5% + IVA de Mercado Pago). Se envía a tus vendedores; las ventas anteriores no cambian.</Note>
+                    <Note>{`Normalmente 4.06% (3.5% + IVA de Mercado Pago).${data?.feeInPrice ? " Tus precios se ajustan solos al nuevo %." : ""} Las ventas anteriores no cambian.`}</Note>
                   </>
                 )}
                 <View style={{ height: 16 }} />

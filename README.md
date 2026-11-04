@@ -1,6 +1,13 @@
-# Nova Negocio · 2.8.1
+# Nova Negocio · 2.8.2
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
+
+**2.8.2 · Comisión que recalcula precios, Excel que reconoce lo que ya tienes y repetidos (versionCode 58):**
+
+- **% de la terminal**: con la comisión dentro del precio, cambiar el % en Ajustes recalcula todos los precios solos (se quita la comisión anterior y se suma la nueva; los precios en pesos cerrados se quedan cerrados) y se publica a los vendedores.
+- **Actualizar catálogo**: un renglón sin SKU se reconoce por descripción (marca, tipo de suplemento, presentación y sabor). Lo que ya existe viene confirmado (se puede desmarcar o decir «No es»): con imagen, sus existencias quedan como en el archivo («se reemplazará»); sin imagen, solo se suman las piezas. Sus datos (nombre, precio) no se tocan. Los parecidos preguntan «¿Es tu…?».
+- **No vienen**: los productos de la app que no están en el archivo se muestran y se pueden eliminar (uno o todos); con ventas se archivan.
+- **Repetidos en Stock**: aviso «N productos repetidos · Revisar»; «Unificar aquí» junta las piezas (con su costo y caducidad, sin contar como merma) y elimina los otros.
 
 **2.8.1 · Eliminar productos y flujos en 3 pasos (versionCode 57):**
 
