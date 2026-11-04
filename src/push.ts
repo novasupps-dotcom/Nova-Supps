@@ -50,7 +50,8 @@ export function setupNotifications(
       handleNotification: async (notification) => {
         const content: { title?: string | null; data?: unknown } = notification?.request?.content || {};
         const data = (content.data || {}) as Row;
-        let show = enabled();
+        // 2.7.1: el aviso de versión nueva se muestra siempre (también con la app abierta).
+        let show = data?.kind === "update" ? true : enabled();
         if (b && data?.kind === "sale" && data.saleId) {
           const key =
             "remote:" +
@@ -506,5 +507,42 @@ async function doSchedule(
     return count;
   } catch {
     return 0;
+  }
+}
+
+/**
+ * 2.7.1 · Notificación del teléfono cuando una versión nueva de la app ya se descargó.
+ * No pide permiso (solo avisa si ya está dado) y no se repite para la misma versión.
+ */
+export async function notifyUpdateReady(
+  b: Business,
+  update: { id: string; version: string },
+): Promise<boolean> {
+  if (b.setting("updateNotified", "") === update.id) return true;
+  const N = notifications();
+  if (!N) return false;
+  try {
+    if (!(await N.getPermissionsAsync()).granted) return false;
+    if (Platform.OS === "android")
+      await N.setNotificationChannelAsync("actualizaciones", {
+        name: "Actualizaciones de la app",
+        importance: N.AndroidImportance.HIGH,
+        sound: "default",
+        enableVibrate: true,
+      });
+    await N.scheduleNotificationAsync({
+      identifier: "update-" + update.id,
+      content: {
+        title: "Nueva versión de Nova Negocio lista",
+        body: `${update.version ? "Versión " + update.version + ". " : ""}Abre la app y toca «Instalar ahora»; también se instala sola al volver a abrirla.`,
+        sound: "default",
+        data: { kind: "update", updateId: update.id },
+      },
+      trigger: { channelId: "actualizaciones" },
+    });
+    b.setSetting("updateNotified", update.id);
+    return true;
+  } catch {
+    return false;
   }
 }
