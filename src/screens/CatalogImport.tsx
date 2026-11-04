@@ -15,7 +15,9 @@ import { Text, TextInput } from "../text";
 import { feeLabel, money, type Business } from "../business";
 import {
   EDITABLE,
+  CATALOG_FILE_KEY,
   applyCatalogImport,
+  catalogCheckpoint,
   catalogWorkbook,
   dropAllErrors,
   dropRow,
@@ -32,9 +34,10 @@ import {
   type PlanRow,
 } from "../catalogImport";
 import { base64ToBytes } from "../photos";
+import { sha256Hex } from "../sha256";
 import { XLSX_MIME } from "../salesExcel";
 import { base64 } from "../xlsx";
-import { Button, C, Card, Chips, Note, Steps, TextButton, productHasImage, s } from "../ui";
+import { Button, C, Card, Chips, Note, Steps, TextButton, fmtDay, productHasImage, s } from "../ui";
 
 const FILE_TYPES = [
   XLSX_MIME,
@@ -75,6 +78,9 @@ export function CatalogImportPage({
   const [links, setLinks] = useState<Record<number, string | null>>({});
   const [off, setOff] = useState<number[]>([]);
   const [remove, setRemove] = useState<string[]>([]);
+  // 2.8.2: huella del archivo; si ya se cargó, primero se confirma (punto de control).
+  const [fileHash, setFileHash] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
 
   // El plan se recalcula con cada arreglo (quitar, modificar, unificar) o al cambiar la comisión.
   const { plan, planError } = useMemo(() => {
@@ -106,6 +112,8 @@ export function CatalogImportPage({
     setLinks({});
     setOff([]);
     setRemove([]);
+    setFileHash("");
+    setConfirmed(false);
   }
 
   async function download() {
@@ -139,10 +147,12 @@ export function CatalogImportPage({
       // Deja pintar «Leyendo…» antes del trabajo pesado.
       await new Promise((ok) => setTimeout(ok, 30));
       const raw = await FS.readAsStringAsync(asset.uri, { encoding: FS.EncodingType.Base64 });
-      const next = readCatalogFile(base64ToBytes(raw));
+      const bytes = base64ToBytes(raw);
+      const next = readCatalogFile(bytes);
       const first = planCatalogImport(b, next, { addFee, hasImage: productHasImage }); // valida encabezados antes de mostrar
       reset();
       setTable(next);
+      setFileHash(sha256Hex(bytes));
       setFileName(asset.name || "archivo");
       setStep(1);
       setView(first.counts.error ? "Errores" : first.counts.new + first.counts.update ? "Cambios" : "Sin cambios");
@@ -170,7 +180,7 @@ export function CatalogImportPage({
     setError("");
     try {
       await keepCopy(b);
-      const r = applyCatalogImport(b, p);
+      const r = applyCatalogImport(b, p, { hash: fileHash, name: fileName });
       reset();
       setStep(0);
       onChanged();
@@ -203,7 +213,7 @@ export function CatalogImportPage({
         ? "sin cambios"
         : r.mode === "replace"
           ? `Existencias ${c.from} → ${c.to} · se reemplazará`
-          : `sin imagen · ${c.to} piezas`;
+          : `tienes ${c.from} · ${c.to} piezas`;
       return `Ya existe: «${r.matchName}» · ${what}`;
     }
     if (r.kind === "same") return "Igual que en la app";
@@ -265,6 +275,26 @@ export function CatalogImportPage({
         </Card>
       </>
     );
+
+  // ---------------- Punto de control (2.8.2): el archivo ya se cargó → solo confirmar.
+  const before = fileHash ? (b.setting(CATALOG_FILE_KEY(fileHash), null) as { at?: string } | null) : null;
+  if (step === 1 && before && !confirmed) {
+    const cp = catalogCheckpoint(b, plan);
+    return (
+      <>
+        <Steps step={0} names={["Archivo", "Revisar", "Aplicar"]} />
+        <Card>
+          <Text style={s.subtitle}>Este archivo ya se cargó</Text>
+          <Text style={[s.body, { marginTop: 4 }]}>
+            {`${before.at ? `El ${fmtDay(String(before.at).slice(0, 10))}. ` : ""}Actualmente tienes ${cp.have} piezas y vas a agregar ${cp.add} piezas más de ${fileName}.`}
+          </Text>
+          <View style={{ height: 8 }} />
+          <Button title="Confirmar" onPress={() => setConfirmed(true)} />
+          <Button title="Cancelar" secondary onPress={() => (reset(), setStep(0))} />
+        </Card>
+      </>
+    );
+  }
 
   // ---------------- 2. Revisar
   if (step === 1)
