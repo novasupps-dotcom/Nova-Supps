@@ -2,7 +2,8 @@
 // clientes, cobra a precio de lista (sin descuentos ni crédito) y consulta sus
 // ventas del día. Las ventas llegan al teléfono del dueño por la base en línea.
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, AppState, BackHandler, FlatList, Image, Keyboard, Linking, Modal, Pressable, ScrollView, Share, StatusBar, View } from "react-native";
+import { ActivityIndicator, AppState, BackHandler, FlatList, Image, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, Share, StatusBar, View } from "react-native";
+import { KEYBOARD_BEHAVIOR, useKeyboardFollow } from "./keyboard";
 import { Text, TextInput } from "./text";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -194,6 +195,9 @@ export function SellerApp({
   // 2.0.1 · Vender tiene dos pantallas separadas: productos y carrito (cliente, forma de pago y cobro).
   const [cartOpen, setCartOpen] = useState(false);
   const scrollRef = useRef<ScrollView | null>(null);
+  // 2.9: la pantalla se desplaza al campo donde escribes cuando aparece el teclado.
+  const kbList = useRef<any>(null);
+  const kbFollow = useKeyboardFollow(kbList);
   const [cart, setCart] = useState<{ productId: string; qty: number }[]>([]);
   const cartRef = useRef(cart);
   cartRef.current = cart;
@@ -738,6 +742,7 @@ export function SellerApp({
       imageUri: p.scan_data?.imageUri || "",
       lookupSource: p.scan_data?.lookupSource || "",
       lookupSourceUrl: p.scan_data?.lookupSourceUrl || "",
+      description: p.scan_data?.description || "",
       imageKey: p.image_key,
       tag: promos.length
         ? promoTagFor(promos, p.product_id, segmentOf(p), day)
@@ -1366,6 +1371,72 @@ export function SellerApp({
   const chosen = customer;
   const cartBox = !!cart.length && (
     <>
+      {/* 2.9: cobro directo: total y forma de pago primero, luego productos y cliente. */}
+      <View style={[s.card, { marginTop: 0 }]}>
+        <View style={s.between}>
+          <Text style={[s.body, { color: C.muted }]}>Subtotal</Text>
+          <Text style={[s.body, { fontVariant: ["tabular-nums"] }]}>{money(charge0.subtotal)}</Text>
+        </View>
+        {charge0.discount > 0 && (
+          <View style={s.between}>
+            <Text style={[s.body, { flex: 1, color: C.muted }]}>
+              {promo.hits.length
+                ? `Descuento · ${promoSummary(promo.hits)
+                    .map((x) => x.name)
+                    .join(", ")}`
+                : "Descuento"}
+            </Text>
+            <Text style={[s.body, { color: C.red }]}>
+              {"−" + money(charge0.discount)}
+            </Text>
+          </View>
+        )}
+        <View style={[s.between, { marginTop: 6 }]}>
+          <Text style={[s.body, { fontWeight: "600" }]}>Total</Text>
+          <Text style={{ fontSize: 30, fontWeight: "700", color: C.ink, fontVariant: ["tabular-nums"] }}>
+            {money(total)}
+          </Text>
+        </View>
+        <Note>Mismo precio con cualquier forma de pago. Descuentos o crédito: pídeselos al dueño.</Note>
+      </View>
+      <Text style={s.section}>Forma de pago</Text>
+      <PayOptions
+        options={allowed.map((m) => ({
+          id: m,
+          name: m === "Tarjeta" ? "Tarjeta (terminal)" : m,
+          kind: m,
+        }))}
+        value={method}
+        onChange={(v) => setMethod(v as any)}
+      />
+      {method === "Transferencia" && myTransferAccounts(cache).length > 1 && (
+        <>
+          <Text style={[s.label, { marginTop: 12 }]}>¿A qué cuenta te transfirió?</Text>
+          <Chips
+            options={myTransferAccounts(cache).map((t) => ({
+              id: t.id,
+              name: t.label,
+            }))}
+            value={transferId}
+            onChange={setTransferId}
+          />
+        </>
+      )}
+      {method === "Transferencia" && (
+        <TransferInfo
+          list={
+            ((all: Row[]) =>
+              all.some((t) => t.id === transferId)
+                ? all.filter((t) => t.id === transferId)
+                : all)(myTransferAccounts(cache)) as any
+          }
+          amount={total}
+          phone={newCustomer?.phone || ""}
+          concept={sessionName ? `Venta ${sessionName}` : ""}
+          emptyText="El dueño aún no te asignó datos para transferencia. Pídeselos antes de cobrar así."
+        />
+      )}
+      <View style={{ height: 14 }} />
       <View style={[s.between, { marginBottom: 6, paddingHorizontal: 4 }]}>
         <Text
           style={[s.subtitle, { marginBottom: 0 }]}
@@ -1403,7 +1474,7 @@ export function SellerApp({
           );
         })}
       </View>
-      <Text style={s.section}>Cliente</Text>
+      <Text style={s.section}>Cliente (opcional)</Text>
       {newCustomer ? (
         <Card>
           <TextInput
@@ -1445,70 +1516,6 @@ export function SellerApp({
           ]}
         />
       )}
-      <Text style={s.section}>Forma de pago</Text>
-      <PayOptions
-        options={allowed.map((m) => ({
-          id: m,
-          name: m === "Tarjeta" ? "Tarjeta (terminal)" : m,
-          kind: m,
-        }))}
-        value={method}
-        onChange={(v) => setMethod(v as any)}
-      />
-      {method === "Transferencia" && myTransferAccounts(cache).length > 1 && (
-        <>
-          <Text style={[s.label, { marginTop: 12 }]}>¿A qué cuenta te transfirió?</Text>
-          <Chips
-            options={myTransferAccounts(cache).map((t) => ({
-              id: t.id,
-              name: t.label,
-            }))}
-            value={transferId}
-            onChange={setTransferId}
-          />
-        </>
-      )}
-      {method === "Transferencia" && (
-        <TransferInfo
-          list={
-            ((all: Row[]) =>
-              all.some((t) => t.id === transferId)
-                ? all.filter((t) => t.id === transferId)
-                : all)(myTransferAccounts(cache)) as any
-          }
-          amount={total}
-          phone={newCustomer?.phone || ""}
-          concept={sessionName ? `Venta ${sessionName}` : ""}
-          emptyText="El dueño aún no te asignó datos para transferencia. Pídeselos antes de cobrar así."
-        />
-      )}
-      <View style={[s.card, { marginTop: 14 }]}>
-        <View style={s.between}>
-          <Text style={[s.body, { color: C.muted }]}>Subtotal</Text>
-          <Text style={[s.body, { fontVariant: ["tabular-nums"] }]}>{money(charge0.subtotal)}</Text>
-        </View>
-        {charge0.discount > 0 && (
-          <View style={s.between}>
-            <Text style={[s.body, { flex: 1, color: C.muted }]}>
-              {promo.hits.length
-                ? `Descuento · ${promoSummary(promo.hits)
-                    .map((x) => x.name)
-                    .join(", ")}`
-                : "Descuento"}
-            </Text>
-            <Text style={[s.body, { color: C.red }]}>
-              {"−" + money(charge0.discount)}
-            </Text>
-          </View>
-        )}
-        <View style={[s.between, { marginTop: 6 }]}>
-          <Text style={[s.body, { fontWeight: "600" }]}>Total</Text>
-          <Text style={{ fontSize: 30, fontWeight: "700", color: C.ink, fontVariant: ["tabular-nums"] }}>
-            {money(total)}
-          </Text>
-        </View>
-        <Note>Mismo precio con cualquier forma de pago. Descuentos o crédito: pídeselos al dueño.</Note>
-      </View>
       {errorBox}
       <Button
         icon={busy ? undefined : method === "Tarjeta" ? "credit-card" : "check"}
@@ -1593,6 +1600,8 @@ export function SellerApp({
               onSegment={setSeg}
               query={gridQuery}
               onQuery={setGridQuery}
+              cartCount={cart.reduce((n, i) => n + i.qty, 0)}
+              onCheckout={() => (setCartOpen(true), setError(""))}
             />
           ) : (
             <Note>
@@ -1860,9 +1869,12 @@ export function SellerApp({
         }
       />
       {mainHeader}
-      <View style={{ flex: 1 }}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "android" ? KEYBOARD_BEHAVIOR : undefined}>
         {list ? (
           <FlatList
+            ref={kbList}
+            scrollEventThrottle={64}
+            onScroll={kbFollow.onScroll}
             automaticallyAdjustKeyboardInsets
             key={tab}
             data={list}
@@ -1894,7 +1906,12 @@ export function SellerApp({
           <ScrollView
             automaticallyAdjustKeyboardInsets
             key={tab === "Vender" && cartOpen ? "Vender-carrito" : tab}
-            ref={scrollRef}
+            ref={(r) => {
+              scrollRef.current = r;
+              kbList.current = r;
+            }}
+            scrollEventThrottle={64}
+            onScroll={kbFollow.onScroll}
             contentContainerStyle={s.content}
             keyboardShouldPersistTaps="handled"
           >
@@ -1902,7 +1919,7 @@ export function SellerApp({
             {body}
           </ScrollView>
         )}
-      </View>
+      </KeyboardAvoidingView>
       {!keyboard && (
         <BottomDock>
           {!!toast && (
