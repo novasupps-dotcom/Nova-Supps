@@ -51,7 +51,7 @@ async function adv(){await press('Ajustes');const sw=ui.root.findAll(n=>n.type==
   await pressExact('Nuevo cliente');await type('Nombre *','Cliente Dos');await pressExact('Guardar');assert(!formOpen(),'el 2º formulario no se cerró');assert.equal(count('customers'),n+2);});
  await check('Editar cliente',async()=>{await press('Clientes');const ed=exact('Editar');await act(async()=>ed[0].props.onPress());await type('Nombre *','Cliente Editado');await pressExact('Frecuente');await pressExact('Guardar');assert(!formOpen());assert(sql.prepare("SELECT count(*) n FROM customers WHERE name='Cliente Editado' AND stage='Frecuente'").get().n===1);});
  await check('Cliente creado desde una venta y luego cobrar',async()=>{const s0=count('sales');
-  await press('Stock');await sellFromStock();await choose('Cliente','＋ Crear cliente');await type('Nombre *','Cliente Desde Venta');await pressExact('Guardar');
+  await press('Stock');await sellFromStock();await pressExact('＋ Cliente y más opciones');await choose('Cliente','＋ Crear cliente');await type('Nombre *','Cliente Desde Venta');await pressExact('Guardar');
   assert(text(ui.root).includes('Cliente Desde Venta'),'el cliente no quedó elegido en la venta');
   await press('Cobrar $');assert(!formOpen(),'la venta no se guardó (botón sin respuesta)');assert.equal(count('sales'),s0+1);
   const c=sql.prepare("SELECT s.customerId FROM sales s ORDER BY created DESC").get();assert.equal(sql.prepare('SELECT name FROM customers WHERE id=?').get(c.customerId).name,'Cliente Desde Venta');});
@@ -68,7 +68,7 @@ async function adv(){await press('Ajustes');const sw=ui.root.findAll(n=>n.type==
   await pressExact('Nueva entrada');await choose('Producto *','Prod C');await type('Cantidad *','2');await type('Costo unitario MXN *','10');await pressExact('Compra pagada');await pressExact(cash);await pressExact('Guardar');assert(!formOpen(),'compra no guardada');assert.equal(count('lots'),n+2);});
  await check('Venta a crédito, abono y editar seguimiento',async()=>{await press('Clientes');const nv=exact('Nueva venta');await act(async()=>nv[0].props.onPress());
   await gridAdd('Prod B');await openCart();assert(!/Cliente\s+Público general/.test(text(ui.root))&&/Cliente\s+Cliente Desde Venta/.test(text(ui.root)),'el cliente se queda elegido en el carrito');
-  await pressExact('＋ Más detalles (opcional)');await type('Cobro de hoy MXN','100');await press('Cobrar $');assert(!formOpen(),'venta a crédito no guardada');
+  await pressExact('＋ Cliente y más opciones');await type('Cobro de hoy MXN','100');await press('Cobrar $');assert(!formOpen(),'venta a crédito no guardada');
   await press('Ventas');await pressExact('Por cobrar');const ab=exact('Abonar');await act(async()=>ab[0].props.onPress());await pressExact('Guardar');assert(!formOpen(),'abono no guardado');
   await press('Ventas');await pressExact('Activas');const card=ui.root.findAll(n=>n.type==='Pressable'&&text(n).includes('Cliente Editado')&&typeof n.props.onPress==='function');await act(async()=>card[0].props.onPress());
   await pressExact('Editar seguimiento');await pressExact('WhatsApp');await pressExact('Guardar');assert(!formOpen(),'seguimiento no guardado');});

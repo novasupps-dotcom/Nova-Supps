@@ -112,7 +112,11 @@ const day = (n) => addDays(require("../src/business.ts").today(), n);
   assert(tiles().includes(snack.name), "la búsqueda encuentra en todas las categorías");
   // El carrito: productos, cliente, forma de cobro y desglose en una sola pantalla.
   await pressLabel("Abrir carrito");
-  assert(all().includes("Tu carrito · 1 pieza") && all().includes("Solo lo ves tú") && all().includes("Total a cobrar"), "carrito con desglose del dueño");
+  // 2.9: cobro directo: total y forma de pago arriba; lo privado detrás de un toque.
+  assert(all().includes("Tu carrito · 1 pieza") && all().includes("Total a cobrar") && !all().includes("Solo lo ves tú"), all().slice(0, 600));
+  assert(all().indexOf("Forma de pago") < all().indexOf("Tu carrito"), "la forma de pago va antes de los productos");
+  await pressLabel("Ver lo que recibes");
+  assert(all().includes("Solo lo ves tú"), "carrito con desglose del dueño");
   assert(!ui.root.findAll((n) => /^Categoría /.test(n.props.accessibilityLabel || "")).length, "el carrito no repite el catálogo");
   await pressExact("Cerrar");
   assert(ui.root.findAll((n) => n.props.accessibilityLabel === "Abrir carrito").length, "cerrar no vacía el carrito");

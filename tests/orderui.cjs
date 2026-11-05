@@ -137,6 +137,30 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   issues.push(...screenIssues(ui, "sabores"));
   await act(async () => ui.unmount());
 
+  // 2.9 · Tocar un producto abre su ficha (imagen grande, descripción); «Agregar» agrega sin abrirla; «Cobrar» va al cobro.
+  b.quickProduct({ id: crea, sku: "NS-CRE-003", name: "Creatine · GAT Sport · 1 kg", category: "Creatina", brand: "GAT Sport", flavor: "Sin Sabor", presentation: "1 kg", price: 64000, description: "Monohidrato de creatina micronizada." });
+  const grid2 = b.stock().filter((p) => !p.archived);
+  let checkout = 0;
+  const props2 = () => ({ ...props(), products: grid2, limitOf: (id) => grid2.find((p) => p.id === id).available, cartCount: Object.values(cart).reduce((n, q) => n + q, 0), onCheckout: () => checkout++ });
+  await act(async () => { ui = renderer.create(React.createElement(ProductGrid, props2())); });
+  assert(!ui.root.findAll((n) => n.type === "Modal").length, "sin ficha abierta");
+  await act(async () => pressables((n) => n.props.accessibilityLabel === "Agregar Creatine · GAT Sport · 1 kg")[0].props.onPress());
+  assert.equal(cart[crea], 1, "+ agrega sin abrir la ficha");
+  assert(!ui.root.findAll((n) => n.type === "Modal").length);
+  await act(async () => pressables((n) => n.props.accessibilityLabel === "Ver Creatine · GAT Sport · 1 kg")[0].props.onPress());
+  await act(async () => ui.update(React.createElement(ProductGrid, props2())));
+  const sheet = ui.root.findAll((n) => n.type === "Modal")[0];
+  assert(text(sheet).includes("Monohidrato de creatina micronizada.") && text(sheet).includes("GAT Sport · 1 kg"), text(sheet));
+  assert(text(sheet).includes("En el carrito"), text(sheet));
+  issues.push(...screenIssues(ui, "ficha"));
+  await act(async () => pressables((n) => n.props.accessibilityLabel === "Agregar otra de Sin Sabor")[0].props.onPress());
+  assert.equal(cart[crea], 2);
+  await act(async () => ui.update(React.createElement(ProductGrid, props2())));
+  await press("Cobrar · 3 piezas");
+  assert.equal(checkout, 1, "Cobrar lleva al cobro");
+  assert(!ui.root.findAll((n) => n.type === "Modal").length, "la ficha se cierra");
+  await act(async () => ui.unmount());
+
   if (issues.length) throw new Error(issues.join("\n"));
-  console.log("CARGAR PEDIDO: OK (PDF, existentes y nuevos, calculadora, confirmar producto, cuenta obligatoria, carga, punto de control, margen y elegir sabor al vender)");
+  console.log("CARGAR PEDIDO: OK (PDF, existentes y nuevos, calculadora, confirmar producto, cuenta obligatoria, carga, punto de control, margen, elegir sabor y ficha del producto al vender)");
 })().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });
