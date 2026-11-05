@@ -159,7 +159,7 @@ const flush=async(n=6,ms=15)=>{for(let i=0;i<n;i++)await act(async()=>{await new
   assert(msg.includes('Hola Ana')&&msg.includes(`${fake.BASE}/storage/v1/object/public/${key}`),'mensaje con el enlace: '+msg);
   const sends=ob.setting('catalogSends',[]);assert.equal(sends[0].name,'Ana López');assert(sends[0].url.endsWith(key));assert(sends[0].count>0);
   assert(o.all().includes('Catálogo enviado a Ana López'),'avisa que se envió');assert(o.all().includes('Últimos envíos'));}
- await o.press('Clientes');await o.type('Buscar nombre o teléfono','Ana');await flush(2);assert(o.all().includes('Catálogo enviado ·'),'la tarjeta del cliente lo muestra');
+ await o.press('Clientes');await o.type('Buscar nombre o teléfono','Ana');await flush(2);assert(/Catálogo \d/.test(o.all()),'la tarjeta del cliente lo muestra');
  // Cliente sin número: se escribe y se guarda. Si falta el SQL 2.5 (sin bucket), se manda en texto y dice qué falta.
  fake.state.noBucket=true;await o.type('Buscar nombre o teléfono','Beto');await flush(2);await o.press('Enviar catálogo a Beto Ruiz');await flush(2);
  await o.type('WhatsApp del cliente (10 dígitos)','55 4444 5555');await o.press('Enviar catálogo a Beto por WhatsApp');for(let i=0;i<8;i++)await flush(6);

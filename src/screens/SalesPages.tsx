@@ -245,26 +245,19 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
             <Text style={{ fontSize: 34, fontWeight: "700", color: C.ink, marginTop: 10, fontVariant: ["tabular-nums"] }}>
               {money(v.total)}
             </Text>
-            <Text style={s.muted}>
-              Cobrado {money(v.paid)} · Saldo {money(balance)}
-            </Text>
-            {!!v.mpOrderId && (
-              <Note>Cobrado en terminal Mercado Pago · {v.mpOrderId}</Note>
+            {balance > 0 && (
+              <Text style={s.muted}>{`Cobrado ${money(v.paid)} · Saldo ${money(balance)}`}</Text>
             )}
-            {!!v.seller && (
-              <Note>{`Vendida por ${v.seller} desde su teléfono`}</Note>
-            )}
-            {!!v.revisions && (
+            {/* 2.9: los datos extra en una sola línea. */}
+            {(!!v.mpOrderId || !!v.seller || !!v.revisions) && (
               <Note>
-                Modificada{" "}
-                {v.revisions === 1 ? "1 vez" : `${v.revisions} veces`}{" "}
-                (devoluciones o cambios de productos).
-              </Note>
-            )}
-            {!!v.cardFeePassed && (
-              <Note>
-                Incluye {money(v.cardFeePassed)} de comisión de tarjeta cobrada
-                al cliente (precio {money(v.basePrice)}).
+                {[
+                  v.mpOrderId ? "Terminal Mercado Pago" : "",
+                  v.seller ? `Vendió ${v.seller}` : "",
+                  v.revisions ? `Modificada ${v.revisions === 1 ? "1 vez" : `${v.revisions} veces`}` : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </Note>
             )}
             {!!v.notes && <Note>{v.notes}</Note>}
@@ -406,47 +399,28 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                 small
                 onPress={() => confirmDeleteSale(v, back)}
               />
-              <Note>
-                Si fue una venta de prueba o un error, elimínala para que no
-                aparezca en ningún reporte.
-              </Note>
+              <Note>Si fue de prueba o un error, elimínala de los reportes.</Note>
             </Card>
           )}
           <Card>
-            <Text style={s.subtitle}>Desglose de productos</Text>
-            {v.lines.map((l: Row) => (
+            <Text style={s.subtitle}>Productos</Text>
+            {v.lines.map((l: Row, i: number) => (
               <View
                 key={l.id}
-                style={{
-                  paddingVertical: 10,
-                  borderBottomWidth: 0.5,
-                  borderBottomColor: C.inputLine,
-                }}
+                style={{ paddingVertical: 8, borderTopWidth: i ? 0.5 : 0, borderTopColor: C.inputLine }}
               >
-                <Text style={s.body}>
-                  {l.qty} × {l.name}
+                <View style={[s.between, { gap: 8 }]}>
+                  <Text style={[s.body, { flex: 1 }]} numberOfLines={2}>{`${l.qty} × ${l.name}`}</Text>
+                  {l.total !== null && <Text style={[s.body, { fontWeight: "600" }]}>{money(l.total)}</Text>}
+                </View>
+                <Text style={[s.muted, { fontSize: 12.5 }]}>
+                  {l.total === null ? `${l.sku} · venta antigua sin precio por renglón` : `${l.sku} · ${money(l.unitPrice)} c/u · costo ${money(l.cost)}`}
                 </Text>
-                <Note>{l.sku}</Note>
-                {l.total === null ? (
-                  <Note>
-                    Esta venta histórica conserva el total, pero no tenía precio
-                    por renglón.
-                  </Note>
-                ) : (
-                  <>
-                    <Note>
-                      Precio unitario registrado: {money(l.unitPrice)}
-                    </Note>
-                    <Text style={s.body}>
-                      Importe: {money(l.total)} · Costo: {money(l.cost)}
-                    </Text>
-                  </>
-                )}
               </View>
             ))}
           </Card>
           <Card>
-            <Text style={s.subtitle}>Cobros, comisión y ganancia</Text>
+            <Text style={s.subtitle}>Cobros</Text>
             {v.movements
               .filter((x: Row) => ["sale", "refund"].includes(x.kind))
               .map((x: Row) => (
@@ -461,13 +435,9 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                 </Text>
               ))}
             {v.commission > 0 && (
-              <Text
-                style={s.body}
-              >{`Tu precio ${money(v.basePrice)} + comisión absorbida por el cliente ${money(v.commission)}`}</Text>
+              <Note>{`Tu precio ${money(v.basePrice)} + comisión del cliente ${money(v.commission)}`}</Note>
             )}
-            <Text style={s.body}>
-              Comisión tarjeta (Mercado Pago): {money(v.fees)}
-            </Text>
+            {v.fees > 0 && <Note>{`Comisión Mercado Pago ${money(v.fees)}`}</Note>}
             {terminalPayments(v).map((x: Row, i: number) => (
               <View
                 key={x.orderId || i}
@@ -515,12 +485,10 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                 </View>
               </View>
             ))}
-            <Text style={s.body}>Cobro neto: {money(v.netCollected)}</Text>
-            <Text style={s.body}>Ganancia estimada: {money(v.profit)}</Text>
-            <Note>
-              La ganancia usa costos registrados/importados; no equivale a
-              utilidad fiscal.
-            </Note>
+            <View style={[s.between, { marginTop: 8 }]}>
+              <Text style={[s.body, { fontWeight: "600" }]}>{`Recibiste ${money(v.netCollected)}`}</Text>
+              <Text style={[s.body, { fontWeight: "700", color: v.profit >= 0 ? C.green : C.red }]}>{`Ganas ${money(v.profit)}`}</Text>
+            </View>
           </Card>
         </>
       ),
@@ -665,10 +633,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
             )}
             {filter === "Canceladas" ? (
               <>
-                <Note>
-                  Las ventas canceladas no cuentan en ventas ni en reportes y se
-                  ocultan de las demás listas.
-                </Note>
+                <Note>No cuentan en tus ventas ni en reportes.</Note>
                 {list.length > 0 && (
                   <Button
                     icon="trash-2" title={`Eliminar ${list.length === 1 ? "la venta cancelada" : `las ${list.length} ventas canceladas`}`}
@@ -736,7 +701,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                 />
               </View>
               {lines.length > 0 && (
-                <Text style={[s.muted, { marginTop: 6 }]} numberOfLines={2}>
+                <Text style={[s.muted, { marginTop: 6 }]} numberOfLines={1}>
                   {lines.map((l) => `${l.qty} × ${l.name}`).join(" · ")}
                 </Text>
               )}

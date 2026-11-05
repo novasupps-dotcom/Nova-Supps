@@ -82,6 +82,8 @@ export type OwnerPageContext = {
   saleSeg: string;
   setSaleSeg: React.Dispatch<React.SetStateAction<string>>;
   emptyBasket: () => void;
+  /** 2.9: abrir el cobro del carrito (directo a la forma de pago). */
+  openCheckout: () => void;
   filters: Record<string, string>;
   matching: (rows: Row[]) => Row[];
   searchBox: (placeholder: string) => React.JSX.Element;

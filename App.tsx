@@ -140,6 +140,7 @@ import {
 } from "./src/ui";
 
 import { VERSION } from "./src/screens/ownerShared";
+import { KEYBOARD_BEHAVIOR, useKeyboardFollow } from "./src/keyboard";
 import {
   HOME,
   PAGES,
@@ -231,6 +232,13 @@ function AppContent({ business }: { business?: Business }) {
   const [selector, setSelector] = useState<Selector | null>(null),
     [search, setSearch] = useState("");
   const [barcodeScanner, setBarcodeScanner] = useState(false);
+  // 2.9: en el cobro, «Recibes / ganas» se abre con un toque.
+  const [privateOpen, setPrivateOpen] = useState(false);
+  // 2.9: el formulario abierto (o, si no hay, la pantalla) se desplaza al campo con teclado.
+  const mainList = useRef<any>(null);
+  const formList = useRef<any>(null);
+  const mainKeyboard = useKeyboardFollow(mainList, !form);
+  const formKeyboard = useKeyboardFollow(formList, !!form && !selector);
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<{
     text: string;
@@ -307,6 +315,9 @@ function AppContent({ business }: { business?: Business }) {
   const ownerBound = useRef(false);
   const syncRef = useRef<(manual?: boolean) => Promise<void>>(async () => {});
   const backingUp = useRef(false);
+  // 2.9: recuerda dónde ibas en cada pantalla.
+  const scrollAt = useRef<Record<string, number>>({});
+  const restore = useRef<{ page: string; y: number; until: number } | null>(null);
   const { width } = useWindowDimensions();
   const wide = width >= 700;
 
@@ -1810,7 +1821,10 @@ function AppContent({ business }: { business?: Business }) {
   goRef.current = go;
   const back = () => {
     if (history.length) {
-      setPage(history[history.length - 1]);
+      const to = history[history.length - 1];
+      // 2.9: al regresar, la pantalla queda donde estabas (por ejemplo, en el producto que editaste).
+      restore.current = { page: to, y: scrollAt.current[to] ?? 0, until: Date.now() + 2500 };
+      setPage(to);
       setHistory(history.slice(0, -1));
       setQuery("");
     } else if (page !== HOME) {
@@ -2379,6 +2393,7 @@ function AppContent({ business }: { business?: Business }) {
       saleSeg,
       setSaleSeg,
       emptyBasket,
+      openCheckout,
       filters,
       matching,
       searchBox,
@@ -2693,7 +2708,7 @@ function AppContent({ business }: { business?: Business }) {
       quick={quick}
     />
   );
-  const more = () => (
+  const more = (label = "＋ Más detalles (opcional)") => (
     <Pressable
       accessibilityRole="button"
       onPress={() => setAdvanced(!advanced)}
@@ -2703,7 +2718,7 @@ function AppContent({ business }: { business?: Business }) {
       ]}
     >
       <Text style={{ color: C.brand, fontSize: 15, fontWeight: "500" }}>
-        {advanced ? "− Menos detalles" : "＋ Más detalles (opcional)"}
+        {advanced ? "− Menos detalles" : label}
       </Text>
     </Pressable>
   );
@@ -3483,6 +3498,33 @@ function AppContent({ business }: { business?: Business }) {
   );
   const listBody = body && "list" in body ? body.list : null;
   const contentStyle = [s.content, wide && { maxWidth: 860 }];
+  // 2.9: dónde va cada pantalla (para regresar al mismo lugar) y desplazarse al campo con teclado.
+  const restoreScroll = () => {
+    const r = restore.current;
+    const list = mainList.current;
+    if (!r || r.page !== page || !list) return;
+    if (Date.now() > r.until || r.y <= 0) {
+      restore.current = null;
+      return;
+    }
+    if (typeof list.scrollToOffset === "function") list.scrollToOffset({ offset: r.y, animated: false });
+    else list.scrollTo?.({ y: r.y, animated: false });
+  };
+  const mainScrollProps = {
+    scrollEventThrottle: 64,
+    onScroll: (e: any) => {
+      mainKeyboard.onScroll(e);
+      const y = e.nativeEvent.contentOffset.y;
+      scrollAt.current[page] = y;
+      const r = restore.current;
+      if (r && r.page === page && Math.abs(y - r.y) < 4) restore.current = null;
+    },
+    onScrollBeginDrag: () => {
+      if (restore.current?.page === page) restore.current = null;
+    },
+    onContentSizeChange: restoreScroll,
+    onLayout: restoreScroll,
+  };
   const basketPieces = basket.reduce((n, i) => n + i.qty, 0);
   // Lo que pagará el cliente (tus precios + la comisión que absorbe).
   const basketTotal = cartCharge(
@@ -3557,9 +3599,11 @@ function AppContent({ business }: { business?: Business }) {
           ) : undefined
         }
       />
-      <View style={{ flex: 1 }}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "android" ? KEYBOARD_BEHAVIOR : undefined}>
         {listBody ? (
           <FlatList
+            ref={mainList}
+            {...mainScrollProps}
             automaticallyAdjustKeyboardInsets
             key={page}
             data={listBody.data}
@@ -3574,6 +3618,8 @@ function AppContent({ business }: { business?: Business }) {
           />
         ) : (
           <ScrollView
+            ref={mainList}
+            {...mainScrollProps}
             automaticallyAdjustKeyboardInsets
             key={page}
             contentContainerStyle={contentStyle}
@@ -3582,7 +3628,7 @@ function AppContent({ business }: { business?: Business }) {
             {body && "scroll" in body ? body.scroll : null}
           </ScrollView>
         )}
-      </View>
+      </KeyboardAvoidingView>
       <BottomDock>
         {toast && (
           <View
@@ -3648,10 +3694,7 @@ function AppContent({ business }: { business?: Business }) {
         }
       >
         <SafeAreaView style={s.safe}>
-          <KeyboardAvoidingView
-            style={{ flex: 1 }}
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-          >
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={KEYBOARD_BEHAVIOR}>
             <View style={s.modalHeader}>
               <View style={{ flex: 1 }}>
                 <Text style={[s.title, { fontSize: 24, marginBottom: 2 }]}>
@@ -3779,6 +3822,9 @@ function AppContent({ business }: { business?: Business }) {
               </ScrollView>
             ) : (
               <ScrollView
+                ref={formList}
+                scrollEventThrottle={64}
+                onScroll={formKeyboard.onScroll}
                 contentContainerStyle={[s.content, wide && { maxWidth: 720 }]}
                 keyboardShouldPersistTaps="handled"
               >
@@ -4157,175 +4203,122 @@ function AppContent({ business }: { business?: Business }) {
                     {field("note", "Concepto *")}
                   </>
                 )}
-                {form === "Venta" && (
-                  <>
-                    {cartEditor}
-                    <View style={{ height: 14 }} />
-                    {choose(
-                      "customerId",
-                      "Cliente",
-                      customers.filter(
-                        (c) => !c.archived || c.id === val("customerId"),
-                      ),
-                      true,
-                      "Cliente",
-                    )}
-                    {accountField("accountId", "Forma de cobro *", saleAccounts)}
-                    {["Banco", "Billetera"].includes(
-                      accounts.find((a) => a.id === val("accountId"))?.kind ||
-                        "",
-                    ) && (
-                      <TransferInfo
-                        list={((all: TransferAccount[]) =>
-                          all.some((t) => t.accountId === val("accountId"))
-                            ? all.filter(
-                                (t) => t.accountId === val("accountId"),
-                              )
-                            : all.filter((t) => !t.ownerHidden))(
-                          b!.setting("transferAccounts", []),
-                        )}
-                        amount={saleTotal}
-                        phone={
-                          customers.find((c) => c.id === val("customerId"))
-                            ?.phone || ""
-                        }
-                        emptyText="Captura tus datos de transferencia en Ajustes → Formas de pago para mandárselos al cliente."
-                      />
-                    )}
-                    {more()}
-                    {advanced && (
+                {form === "Venta" &&
+                  (() => {
+                    // 2.9 · Cobro directo: total y forma de pago arriba; productos en compacto;
+                    // cliente y lo demás en «Más opciones»; lo privado detrás de un toque.
+                    const cost = cart.reduce((n, i) => {
+                      const p = products.find((x) => x.id === i.productId);
+                      return n + (p && p.stock > 0 ? Math.round((p.value / p.stock) * i.qty) : 0);
+                    }, 0);
+                    const fee = saleIsCard && salePaid ? cardFee(salePaid, bps) : 0;
+                    const received = (salePaid ?? saleTotal) - fee;
+                    const row = (label: string, value: string, opts: { bold?: boolean; color?: string } = {}) => (
+                      <View key={label} style={[s.between, { gap: 8, paddingVertical: 2 }]}>
+                        <Text style={[s.body, { flex: 1, color: opts.bold ? C.ink : C.muted }, opts.bold && { fontWeight: "600" }]}>{label}</Text>
+                        <Text style={[s.body, { fontWeight: opts.bold ? "700" : "500", fontVariant: ["tabular-nums"] }, opts.color ? { color: opts.color } : null]}>
+                          {value}
+                        </Text>
+                      </View>
+                    );
+                    const fromBasket = checkoutFromBasket.current;
+                    return (
                       <>
-                        {moneyField(
-                          "total",
-                          "Precio especial MXN (lo que quieres recibir)",
-                          amount(listTotal),
-                        )}
-                        {moneyField(
-                          "paid",
-                          "Cobro de hoy MXN",
-                          "Vacío = pago completo",
-                        )}
-                        {chips("channel", "Canal *", options(channels))}
-                        {field("notes", "Notas", false, "", true)}
-                        <View style={[s.between, { marginBottom: 6 }]}>
-                          <Text style={[s.body, { flex: 1 }]}>
-                            Autorizar venta debajo del costo (solo esta venta)
-                          </Text>
-                          <Switch value={allow} onValueChange={setAllow} />
-                        </View>
-                      </>
-                    )}
-                    <Card>
-                      {(() => {
-                        const cost = cart.reduce((n, i) => {
-                          const p = products.find((x) => x.id === i.productId);
-                          return (
-                            n +
-                            (p && p.stock > 0
-                              ? Math.round((p.value / p.stock) * i.qty)
-                              : 0)
-                          );
-                        }, 0);
-                        const fee =
-                          saleIsCard && salePaid ? cardFee(salePaid, bps) : 0;
-                        const received = (salePaid ?? saleTotal) - fee;
-                        const row = (
-                          label: string,
-                          value: string,
-                          opts: { bold?: boolean; color?: string } = {},
-                        ) => (
-                          <View key={label} style={[s.between, { gap: 8, paddingVertical: 2 }]}>
-                            <Text
-                              style={[
-                                s.body,
-                                { flex: 1, color: opts.bold ? C.ink : C.muted },
-                                opts.bold && { fontWeight: "600" },
-                              ]}
-                            >
-                              {label}
-                            </Text>
-                            <Text
-                              style={[
-                                s.body,
-                                { fontWeight: opts.bold ? "700" : "500", fontVariant: ["tabular-nums"] },
-                                opts.color ? { color: opts.color } : null,
-                              ]}
-                            >
-                              {value}
-                            </Text>
+                        {!fromBasket && cartEditor}
+                        <Card>
+                          <View style={s.between}>
+                            <Text style={[s.body, { fontWeight: "600" }]}>Total a cobrar</Text>
+                            <Text style={{ fontSize: 30, fontWeight: "700", color: C.ink, fontVariant: ["tabular-nums"] }}>{money(saleTotal)}</Text>
                           </View>
-                        );
-                        return (
-                          <>
-                            {row("Subtotal", money(saleCharge.subtotal))}
-                            {saleCharge.discount > 0 &&
-                              row(
-                                saleCharge.promo.hits.length
-                                  ? `Descuento · ${promoSummary(
-                                      saleCharge.promo.hits,
-                                    )
-                                      .map((x) => x.name)
-                                      .join(", ")}`
-                                  : "Descuento",
-                                minus(saleCharge.discount),
-                                { color: C.red },
-                              )}
-                            <View style={[s.between, { marginTop: 8 }]}>
-                              <Text style={[s.body, { fontWeight: "600" }]}>Total a cobrar</Text>
-                              <Text style={{ fontSize: 30, fontWeight: "700", color: C.ink, fontVariant: ["tabular-nums"] }}>
-                                {money(saleTotal)}
-                              </Text>
-                            </View>
-                            {salePaid !== null &&
-                              salePaid !== saleTotal &&
-                              row("Cobro de hoy", money(salePaid))}
-                            {salePaid !== null &&
-                              salePaid !== saleTotal &&
-                              row(
-                                "Queda a crédito",
-                                money(Math.max(0, saleTotal - salePaid)),
-                                { color: C.amber },
-                              )}
-                            <View style={{ backgroundColor: C.soft, borderRadius: 18, padding: 14, marginTop: 12, gap: 1 }}>
-                            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                              <Icon name="lock" size={14} color={C.muted} />
-                              <Text style={[s.label, { margin: 0 }]}>Solo lo ves tú</Text>
-                            </View>
-                            {row("Tu precio", money(saleBase))}
-                            {row(
-                              "Comisión que absorbe el cliente",
-                              "+" + money(saleCommission),
+                          {saleCharge.discount > 0 &&
+                            row(
+                              saleCharge.promo.hits.length
+                                ? `Descuento · ${promoSummary(saleCharge.promo.hits)
+                                    .map((x) => x.name)
+                                    .join(", ")}`
+                                : "Descuento",
+                              minus(saleCharge.discount),
+                              { color: C.red },
                             )}
-                            {saleIsCard &&
-                              row(
-                                `Mercado Pago descuenta ${feeLabel(bps)}`,
-                                minus(fee),
-                                { color: C.red },
-                              )}
-                            {row("Recibes", money(received), {
-                              bold: true,
-                              color: C.green,
-                            })}
-                            {cost > 0 &&
-                              row("Ganancia estimada", money(received - cost), {
-                                color: received - cost >= 0 ? C.green : C.red,
-                              })}
-                            {cost > 0 &&
-                              saleBase < cost &&
-                              saleCharge.promo.total > 0 &&
-                              saleBase + saleCharge.promo.total >= cost && (
-                                <Note color={C.amber}>
-                                  Con la promoción esta venta queda debajo del
-                                  costo. Se permite porque tú la configuraste.
-                                </Note>
-                              )}
+                          {salePaid !== null && salePaid !== saleTotal && row("Cobro de hoy", money(salePaid))}
+                          {salePaid !== null &&
+                            salePaid !== saleTotal &&
+                            row("Queda a crédito", money(Math.max(0, saleTotal - salePaid)), { color: C.amber })}
+                        </Card>
+                        {accountField("accountId", "Forma de pago *", saleAccounts)}
+                        {["Banco", "Billetera"].includes(accounts.find((a) => a.id === val("accountId"))?.kind || "") && (
+                          <TransferInfo
+                            list={((all: TransferAccount[]) =>
+                              all.some((t) => t.accountId === val("accountId"))
+                                ? all.filter((t) => t.accountId === val("accountId"))
+                                : all.filter((t) => !t.ownerHidden))(b!.setting("transferAccounts", []))}
+                            amount={saleTotal}
+                            phone={customers.find((c) => c.id === val("customerId"))?.phone || ""}
+                            emptyText="Captura tus datos de transferencia en Ajustes → Formas de pago para mandárselos al cliente."
+                          />
+                        )}
+                        {fromBasket && cartEditor}
+                        {(advanced || !!val("customerId")) &&
+                          choose(
+                            "customerId",
+                            "Cliente",
+                            customers.filter((c) => !c.archived || c.id === val("customerId")),
+                            true,
+                            "Cliente",
+                          )}
+                        {more("＋ Cliente y más opciones")}
+                        {advanced && (
+                          <>
+                            {moneyField("total", "Precio especial MXN (lo que quieres recibir)", amount(listTotal))}
+                            {moneyField("paid", "Cobro de hoy MXN", "Vacío = pago completo")}
+                            {chips("channel", "Canal *", options(channels))}
+                            {field("notes", "Notas", false, "", true)}
+                            <View style={[s.between, { marginBottom: 6 }]}>
+                              <Text style={[s.body, { flex: 1 }]}>Autorizar venta debajo del costo (solo esta venta)</Text>
+                              <Switch value={allow} onValueChange={setAllow} />
                             </View>
                           </>
-                        );
-                      })()}
-                    </Card>
-                  </>
-                )}
+                        )}
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Ver lo que recibes"
+                          onPress={() => setPrivateOpen((x) => !x)}
+                          style={({ pressed }) => [
+                            { backgroundColor: C.soft, borderRadius: 18, padding: 14, gap: 1 },
+                            pressed && { opacity: 0.8 },
+                          ]}
+                        >
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                            <Icon name="lock" size={14} color={C.muted} />
+                            <Text style={[s.body, { flex: 1, fontWeight: "600" }]}>
+                              {`Recibes ${money(received)}${cost > 0 ? ` · ganas ${money(received - cost)}` : ""}`}
+                            </Text>
+                            <Icon name={privateOpen ? "chevron-down" : "chevron-right"} size={16} color={C.muted} />
+                          </View>
+                          {privateOpen && (
+                            <>
+                              <Text style={[s.label, { marginTop: 6, marginBottom: 2 }]}>Solo lo ves tú</Text>
+                              {row("Subtotal", money(saleCharge.subtotal))}
+                              {row("Tu precio", money(saleBase))}
+                              {row("Comisión que absorbe el cliente", "+" + money(saleCommission))}
+                              {saleIsCard && row(`Mercado Pago descuenta ${feeLabel(bps)}`, minus(fee), { color: C.red })}
+                              {row("Recibes", money(received), { bold: true, color: C.green })}
+                              {cost > 0 &&
+                                row("Ganancia estimada", money(received - cost), {
+                                  color: received - cost >= 0 ? C.green : C.red,
+                                })}
+                            </>
+                          )}
+                          {cost > 0 && saleBase < cost && saleCharge.promo.total > 0 && saleBase + saleCharge.promo.total >= cost && (
+                            <Note color={C.amber}>
+                              Con la promoción esta venta queda debajo del costo. Se permite porque tú la configuraste.
+                            </Note>
+                          )}
+                        </Pressable>
+                        <View style={{ height: 12 }} />
+                      </>
+                    );
+                  })()}
                 {form === "Editar venta" && (
                   <>
                     {choose(

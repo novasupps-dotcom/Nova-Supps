@@ -1,6 +1,14 @@
-# Nova Negocio · 2.8.4
+# Nova Negocio · 2.9.0
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
+
+**2.9.0 · Teclado, regresar al mismo lugar, ficha del producto y cobro directo (versionCode 61, solo JavaScript):**
+
+- **Teclado**: en Android (pantalla completa) la pantalla deja el espacio del teclado y se desplaza al campo donde escribes, en las pantallas, formularios y la app del vendedor (`src/keyboard.ts`).
+- **Regresar**: al volver a la pantalla anterior queda donde estabas (por ejemplo, en el producto que editaste).
+- **Vender**: tocar un producto abre su ficha (imagen grande, sabores, descripción, precio y existencias); el botón «＋ Agregar» agrega sin abrirla; «Cobrar» desde la ficha lleva directo al cobro. La descripción también llega a los vendedores.
+- **Cobro directo**: total y forma de pago arriba, productos en compacto, «＋ Cliente y más opciones»; «Recibes / ganas» (solo dueño) detrás de un toque. En la app del vendedor, el mismo orden.
+- **Menos texto**: detalle de venta (productos y cobros en corto), tarjetas de Stock (sin «Cliente paga» cuando es igual), Clientes (seguimiento y catálogo en una línea), Ajustes (cobros).
 
 **2.8.4 · Cambiar la cantidad (inventario duplicado) (versionCode 60):**
 

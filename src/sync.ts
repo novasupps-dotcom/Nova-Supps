@@ -105,6 +105,8 @@ export async function publish(
         : "",
       lookupSource: p.lookupSource || "",
       lookupSourceUrl: p.lookupSourceUrl || "",
+      // 2.9: la ficha del producto del vendedor muestra la descripción.
+      description: String(p.description || "").slice(0, 400),
     },
   }));
   // Servidor sin el schema 2.1 (catálogo sin categoría de venta ni código de barras): se publica

@@ -52,12 +52,13 @@ async function flush(ms=800){await act(async()=>{await new Promise(r=>setTimeout
   require('../src/business.ts');new (require('../src/business.ts').Business)(db).setSetting('transferAccounts',[{id:'banamex',label:'Banamex',bank:'Banamex',holder:'Emmanuel M',clabe:'002180700000000000',account:'',card:'',note:''},{id:'oculta',label:'Cuenta oculta',bank:'BBVA',holder:'Emmanuel M',clabe:'',account:'',card:'4152313812345678',note:'',ownerHidden:true}]);
   await press(cash);assert(!text(ui.root).includes('Datos para transferencia'),'efectivo: sin datos de transferencia');
   await press(transfer);assert(text(ui.root).includes('Datos para transferencia')&&text(ui.root).includes('Banamex'),'transferencia: el dueño ve sus datos');assert(!text(ui.root).includes('Cuenta oculta'),'2.5: sin las que el dueño no usa');}
+ assert(!text(ui.root).includes('Solo lo ves tú'),'2.9: lo privado va detrás de un toque');assert(/Recibes \$/.test(text(ui.root)),'2.9: una línea Recibes');{const t=ui.root.findAll(n=>n.type==='Pressable'&&n.props.accessibilityLabel==='Ver lo que recibes');assert(t.length,'toque privado');await act(async()=>t[0].props.onPress());}
  await press(cash);assert(text(ui.root).includes('Comisión que absorbe el cliente'),'2.0: en efectivo también la absorbe el cliente');
  await press(card);assert(text(ui.root).includes('Mercado Pago descuenta 4.06%'));
  assert(!text(ui.root).includes('Sumar comisión'),'2.0: sin interruptor, siempre la absorbe el cliente');assert(text(ui.root).includes('Solo lo ves tú')&&text(ui.root).includes('Recibes')&&text(ui.root).includes('Subtotal'),'desglose del dueño');
  await act(async()=>callbacks.state('background'));
  await act(async()=>ui.unmount());await act(async()=>{ui=renderer.create(React.createElement(App));});
- assert(/1\s+×\s+\$/.test(text(ui.root)));assert(text(ui.root).includes('Mercado Pago descuenta 4.06%'));
+ assert(/1\s+×\s+\$/.test(text(ui.root)));{const t=ui.root.findAll(n=>n.type==='Pressable'&&n.props.accessibilityLabel==='Ver lo que recibes');await act(async()=>t[0].props.onPress());}assert(text(ui.root).includes('Mercado Pago descuenta 4.06%'));
  const before=sql.prepare('SELECT count(*) n FROM sales').get().n;
  const action=buttons('Cobrar $')[0];
  await act(async()=>{action.props.onPress();action.props.onPress();});
