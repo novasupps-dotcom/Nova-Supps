@@ -1,4 +1,9 @@
-# Nova Negocio 2.8.4 · 4-nov-2026
+# Nova Negocio 2.9.0 · 4-nov-2026
+
+Hecho en 2.9.0: teclado que acomoda la pantalla al campo; regresar deja la pantalla donde estaba; Vender con ficha del
+producto (imagen grande) y botón Agregar; cobro directo a la forma de pago; menos texto en Ventas, Stock, Clientes y Ajustes.
+Probar en el teléfono: escribir en campos de abajo (Producto, Conteo, Cobro); Stock → producto → Atrás; Vender → tocar un producto.
+
 
 Hecho en 2.8.4: cambiar la cantidad. Stock → producto → «Cantidad» (motivo «Se duplicó»: corrige sin merma, quita primero
 lo más reciente). Al cargar Excel/PDF se puede cambiar la cantidad antes de aplicar.
