@@ -54,6 +54,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
     saleSeg,
     setSaleSeg,
     emptyBasket,
+    openCheckout,
     filters,
     matching,
     searchBox,
@@ -209,6 +210,8 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
             onInventoryCode={(barcode) =>
               open("Inventario por código", { barcode, autoSell: "1" })
             }
+            cartCount={basket.reduce((n: number, i: any) => n + i.qty, 0)}
+            onCheckout={openCheckout}
           />
           <View style={s.wrap}>
             <Button
@@ -298,11 +301,13 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                     {p.brand || p.category} · {p.sku}
                   </Text>
                   <Text style={[s.price, { marginTop: 6, marginBottom: 0 }]}>{money(p.price)}</Text>
-                  <Text style={[s.muted, { fontSize: 12.5 }]}>{`Cliente paga ${money(grossUp(p.price, d.feeBps))}`}</Text>
+                  {grossUp(p.price, d.feeBps) !== p.price && (
+                    <Text style={[s.muted, { fontSize: 12.5 }]}>{`Cliente paga ${money(grossUp(p.price, d.feeBps))}`}</Text>
+                  )}
                   <View style={{ marginTop: 6 }}>
                     {p.inventoryKnown ? (
                       <Pill
-                        text={`${p.available} disponibles · ${p.stock} físicas`}
+                        text={p.available === p.stock ? `${p.available} disponibles` : `${p.available} disponibles · ${p.stock} físicas`}
                         tone={p.available < 1 ? "bad" : lowStock ? "warn" : "ok"}
                       />
                     ) : (
@@ -400,12 +405,16 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
             {p.archived && <Pill text="Archivado" tone="warn" />}
             <View style={{ flexDirection: "row", alignItems: "baseline", gap: 10, marginTop: 10 }}>
               <Text style={[s.price, { fontSize: 26 }]}>{money(p.price)}</Text>
-              <Text style={s.muted}>{`Cliente paga ${money(grossUp(p.price, d.feeBps))}`}</Text>
+              {grossUp(p.price, d.feeBps) !== p.price && (
+                <Text style={s.muted}>{`Cliente paga ${money(grossUp(p.price, d.feeBps))}`}</Text>
+              )}
             </View>
             <Pill
               text={
                 p.inventoryKnown
-                  ? `${p.stock} físicas · ${p.available} vendibles`
+                  ? p.available === p.stock
+                    ? `${p.available} disponibles`
+                    : `${p.available} disponibles · ${p.stock} físicas`
                   : "Inventario por confirmar"
               }
               tone={p.available < 1 ? "bad" : "ok"}

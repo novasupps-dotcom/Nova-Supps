@@ -219,11 +219,6 @@ export function renderParameters(ctx: OwnerPageContext): Body | null {
             {stat("El cliente paga", money(pays))}
             {stat("Recibes", money(pays - cardFee(pays, rate)), C.green)}
           </View>
-          <Note>
-            {d.feeInPrice
-              ? "El precio del catálogo ya trae la comisión: al cobrar no se suma nada."
-              : "La comisión se suma al cobrar, con cualquier forma de pago."}
-          </Note>
           <Button
             title="Cambiar porcentaje"
             secondary

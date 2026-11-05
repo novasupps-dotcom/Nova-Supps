@@ -185,23 +185,21 @@ export function renderCustomersPages(ctx: OwnerPageContext): Body | null {
                   }
                 />
               </View>
-              {late !== null && (
-                <Text style={[s.muted, { marginTop: 8, color: late >= 0 ? C.red : C.muted }]}>
-                  {late > 0
-                    ? `Contactar: vencido hace ${late} ${late === 1 ? "día" : "días"}`
-                    : late === 0
-                      ? "Contactar: hoy"
-                      : `Próximo contacto: ${fmtDay(c.nextDate)}`}
-                </Text>
-              )}
-              {lastCatalog.has(c.id) && (
-                <Text style={[s.muted, { marginTop: 4, fontSize: 13 }]}>
-                  {`Catálogo enviado · ${fmtDay(localDay(lastCatalog.get(c.id)!))}`}
-                </Text>
-              )}
-              {!!c.notes && !/^importado del excel/i.test(String(c.notes)) && (
-                <Text style={[s.muted, { marginTop: 4 }]} numberOfLines={1}>
-                  {c.notes}
+              {/* 2.9: seguimiento y catálogo enviado en una sola línea. */}
+              {(late !== null || lastCatalog.has(c.id)) && (
+                <Text style={[s.muted, { marginTop: 8, fontSize: 13, color: late !== null && late >= 0 ? C.red : C.muted }]} numberOfLines={1}>
+                  {[
+                    late === null
+                      ? ""
+                      : late > 0
+                        ? `Contactar: vencido hace ${late} ${late === 1 ? "día" : "días"}`
+                        : late === 0
+                          ? "Contactar: hoy"
+                          : `Próximo contacto: ${fmtDay(c.nextDate)}`,
+                    lastCatalog.has(c.id) ? `Catálogo ${fmtDay(localDay(lastCatalog.get(c.id)!))}` : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </Text>
               )}
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12 }}>
