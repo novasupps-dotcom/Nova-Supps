@@ -103,6 +103,9 @@ import {
   TabBar,
   Icon,
   IconButton,
+  CartButton,
+  CartFlyLayer,
+  noteTouch,
   BottomDock,
   MenuList,
   PayOptions,
@@ -1210,6 +1213,11 @@ export function SellerApp({
         right={
           <>
             {tab !== "Vender" && offline}
+            {/* 2.10: carrito con animación al agregar un producto. */}
+            <CartButton
+              count={cart.reduce((n, i) => n + i.qty, 0)}
+              onPress={() => (setTab("Vender"), setCartOpen(!!cart.length), setError(""))}
+            />
             <IconButton icon="circle-user" label="Cuenta" onPress={openAccount} />
           </>
         }
@@ -1855,7 +1863,7 @@ export function SellerApp({
   }
 
   return (
-    <SafeAreaView style={s.safe} edges={["top", "left", "right"]}>
+    <SafeAreaView style={s.safe} edges={["top", "left", "right"]} onTouchStart={noteTouch}>
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
       <UpdateNotice
         b={b}
@@ -2196,6 +2204,7 @@ export function SellerApp({
           </View>
         </View>
       )}
+      <CartFlyLayer />
     </SafeAreaView>
   );
 }

@@ -1,6 +1,6 @@
 // Componentes compartidos. El lector se carga solo si existe su módulo nativo.
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Image, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text, TextInput } from "./text";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { catalogueImages } from "./catalogueImages";
@@ -1269,7 +1269,7 @@ function ProductSheet({
   };
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)" }}>
+      <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)" }} onTouchStart={noteTouch}>
         <View style={{ backgroundColor: C.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, maxHeight: "92%" }}>
           <ScrollView>
             <View style={{ height: Math.min(320, Math.round(height * 0.36)), borderRadius: 18, backgroundColor: C.soft, overflow: "hidden", marginBottom: 12 }}>
@@ -1294,6 +1294,7 @@ function ProductSheet({
             <Button title="Listo" onPress={onClose} />
           )}
         </View>
+        <CartFlyLayer />
       </View>
     </Modal>
   );
@@ -1861,7 +1862,184 @@ const FLOAT = {
   shadowOffset: { width: 0, height: 8 },
 } as const;
 const NUM = { fontVariant: ["tabular-nums" as const] };
+// ---------------------------------------------------------------------------
+// 2.10 · Animación del carrito. Al agregar un producto, un círculo con el carrito
+// sale de donde tocaste y vuela al botón del carrito (junto al engrane de
+// Ajustes), que rebota y muestra cuántas piezas llevas. Sin dependencias: usa
+// Animated de React Native y, si no existe (pruebas), solo actualiza el contador.
+type Pt = { x: number; y: number };
+const cartFx: {
+  touch: (Pt & { t: number }) | null;
+  measure: ((done: (p: Pt | null) => void) => void) | null;
+  layers: ((from: Pt, to: Pt, done: () => void) => void)[];
+} = { touch: null, measure: null, layers: [] };
+
+/** Guarda el último toque (coordenadas de pantalla) para que el vuelo salga de ahí. */
+export function noteTouch(e: any) {
+  const n = e?.nativeEvent;
+  if (n && Number.isFinite(n.pageX) && Number.isFinite(n.pageY)) cartFx.touch = { x: n.pageX, y: n.pageY, t: Date.now() };
+}
+
+/** Lanza el vuelo hacia el carrito; `done` corre al llegar (o de inmediato si no hay animación). */
+function flyToCart(done: () => void) {
+  const layer = cartFx.layers[cartFx.layers.length - 1];
+  if (!layer || !cartFx.measure || !Animated) return done();
+  const touch = cartFx.touch && Date.now() - cartFx.touch.t < 1500 ? cartFx.touch : null;
+  cartFx.measure((to) => {
+    if (!to) return done();
+    layer(touch ?? { x: to.x - 120, y: to.y + 260 }, to, done);
+  });
+}
+
+/** Capa (sin toques) donde vuela el carrito. Va al final de la pantalla o de un Modal transparente. */
+export function CartFlyLayer() {
+  const ref = useRef<any>(null);
+  const progress = useRef(Animated ? new Animated.Value(0) : null).current;
+  const [flight, setFlight] = useState<{ from: Pt; to: Pt; key: number } | null>(null);
+  useEffect(() => {
+    if (!progress) return;
+    const run = (from: Pt, to: Pt, done: () => void) => {
+      const start = (origin: Pt) => {
+        progress.stopAnimation();
+        setFlight({ from: { x: from.x - origin.x, y: from.y - origin.y }, to: { x: to.x - origin.x, y: to.y - origin.y }, key: Date.now() });
+        progress.setValue(0);
+        Animated.timing(progress, {
+          toValue: 1,
+          duration: 650,
+          easing: Easing?.inOut ? Easing.inOut(Easing.quad) : undefined,
+          useNativeDriver: true,
+        }).start(({ finished }: { finished: boolean }) => {
+          if (finished) setFlight(null);
+          done();
+        });
+      };
+      if (ref.current?.measure) ref.current.measure((_x: number, _y: number, _w: number, _h: number, px: number, py: number) => start({ x: px || 0, y: py || 0 }));
+      else start({ x: 0, y: 0 });
+    };
+    cartFx.layers.push(run);
+    return () => {
+      cartFx.layers = cartFx.layers.filter((f) => f !== run);
+    };
+  }, [progress]);
+  const R = 22;
+  let chip: React.ReactNode = null;
+  if (flight && progress) {
+    const { from, to } = flight;
+    const lift = Math.min(from.y, to.y) - 70;
+    chip = (
+      <Animated.View
+        key={flight.key}
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          width: R * 2,
+          height: R * 2,
+          borderRadius: R,
+          backgroundColor: C.brand,
+          alignItems: "center",
+          justifyContent: "center",
+          shadowColor: "#000",
+          shadowOpacity: 0.25,
+          shadowRadius: 6,
+          shadowOffset: { width: 0, height: 3 },
+          elevation: 8,
+          opacity: progress.interpolate({ inputRange: [0, 0.85, 1], outputRange: [1, 1, 0.2] }),
+          transform: [
+            { translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [from.x - R, to.x - R] }) },
+            { translateY: progress.interpolate({ inputRange: [0, 0.35, 1], outputRange: [from.y - R, lift - R, to.y - R] }) },
+            { scale: progress.interpolate({ inputRange: [0, 0.15, 0.8, 1], outputRange: [0.4, 1.15, 0.8, 0.35] }) },
+            { rotate: progress.interpolate({ inputRange: [0, 1], outputRange: ["-20deg", "15deg"] }) },
+          ],
+        }}
+      >
+        <Icon name="shopping-cart" size={20} color="#fff" />
+      </Animated.View>
+    );
+  }
+  return (
+    <View ref={ref} pointerEvents="none" style={StyleSheet.absoluteFill} collapsable={false}>
+      {chip}
+    </View>
+  );
+}
+
+/** Botón del carrito con contador (junto al engrane). Rebota cada vez que entra una pieza. */
+export function CartButton({ count, onPress }: { count: number; onPress: () => void }) {
+  const ref = useRef<any>(null);
+  const bounce = useRef(Animated ? new Animated.Value(1) : null).current;
+  const [shown, setShown] = useState(count);
+  const prev = useRef(count);
+  useEffect(() => {
+    cartFx.measure = (done) =>
+      ref.current?.measure
+        ? ref.current.measure((_x: number, _y: number, w: number, h: number, px: number, py: number) => done(Number.isFinite(px) ? { x: px + w / 2, y: py + h / 2 } : null))
+        : done(null);
+    return () => {
+      cartFx.measure = null;
+    };
+  }, []);
+  useEffect(() => {
+    const before = prev.current;
+    prev.current = count;
+    if (count <= before) return setShown(count);
+    flyToCart(() => {
+      setShown(prev.current);
+      if (bounce)
+        Animated.sequence([
+          Animated.spring(bounce, { toValue: 1.35, speed: 40, bounciness: 14, useNativeDriver: true }),
+          Animated.spring(bounce, { toValue: 1, speed: 18, bounciness: 10, useNativeDriver: true }),
+        ]).start();
+    });
+  }, [count]);
+  const body = (
+    <>
+      <Icon name="shopping-cart" size={21} color={shown ? "#fff" : C.ink} />
+      {shown > 0 && (
+        <View style={s.cartBadge}>
+          <Text style={s.cartBadgeText} numberOfLines={1}>
+            {shown > 99 ? "99+" : String(shown)}
+          </Text>
+        </View>
+      )}
+    </>
+  );
+  return (
+    <Pressable
+      ref={ref}
+      accessibilityRole="button"
+      accessibilityLabel={shown ? `Carrito con ${shown} ${shown === 1 ? "pieza" : "piezas"}` : "Carrito vacío"}
+      hitSlop={8}
+      onPress={onPress}
+      collapsable={false}
+      style={({ pressed }) => [s.iconBtn, shown > 0 && { backgroundColor: C.brand }, pressed && { opacity: 0.6 }]}
+    >
+      {bounce ? (
+        <Animated.View style={{ transform: [{ scale: bounce }], alignItems: "center", justifyContent: "center" }}>{body}</Animated.View>
+      ) : (
+        <View>{body}</View>
+      )}
+    </Pressable>
+  );
+}
+
 export const s = StyleSheet.create({
+  // 2.10 · Contador del botón del carrito.
+  cartBadge: {
+    position: "absolute",
+    top: -11,
+    right: -13,
+    minWidth: 19,
+    height: 19,
+    borderRadius: 10,
+    paddingHorizontal: 4,
+    backgroundColor: C.ink,
+    borderWidth: 1.5,
+    borderColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cartBadgeText: { color: "#fff", fontSize: 11, fontWeight: "700", lineHeight: 13 },
   safe: { flex: 1, backgroundColor: C.bg },
   header: {
     paddingHorizontal: 20,

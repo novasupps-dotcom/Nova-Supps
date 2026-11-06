@@ -1,10 +1,11 @@
-// Excel de ventas con el detalle completo: cada venta, cada producto vendido,
-// cada movimiento de dinero (cobros, abonos, devoluciones y comisiones) y un
-// resumen del periodo. Todas las consultas son por lote (sin N+1).
+// Excel de ventas con el detalle completo: cada venta (un renglón por producto
+// del folio), cada movimiento de dinero (cobros, abonos, devoluciones y
+// comisiones) y un resumen ejecutivo del periodo. Todas las consultas son por
+// lote (sin N+1).
 import { salesReport } from "./reports";
-import { feeLabel, localDay, saleSegment, type Business, type Row } from "./business";
+import { feeLabel, localDay, money, saleSegment, spread, type Business, type Row } from "./business";
 import { cardLabel } from "./receipt";
-import { buildXlsx, type Sheet } from "./xlsx";
+import { buildXlsx, type RowStyle, type Sheet } from "./xlsx";
 
 export const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 export const EXPORT_PERIODS = ["Hoy", "Esta semana", "Este mes", "Mes pasado", "Este año", "Todo"] as const;
@@ -71,10 +72,9 @@ export function salesSheets(b: Business, range: { from: string | null; to: strin
   const isFee = (x: Row) => x.kind === "expense" && String(x.note || "").startsWith("Comisión tarjeta");
 
   const saleRows: any[][] = [];
-  const productRows: any[][] = [];
   const moneyRows: any[][] = [];
   const byMethod = new Map<string, { sales: Set<string>; amount: number; fee: number }>();
-  const bySeller = new Map<string, { n: number; total: number }>();
+  const bySeller = new Map<string, { n: number; total: number; profit: number }>();
   const bySegment = new Map<string, { units: number; amount: number }>();
   let active = 0,
     activeTotal = 0,
@@ -111,65 +111,68 @@ export function salesSheets(b: Business, range: { from: string | null; to: strin
     // 1.9: comisión que pagó el cliente (va dentro del total).
     const commission = Number(v.commission) > 0 ? Number(v.commission) : 0;
     const folio = v.folio || String(v.id).slice(-8).toUpperCase();
-    saleRows.push([
-      when(v.created),
-      folio,
-      STATUS[v.status] || v.status,
-      v.customer || "Público general",
-      v.customerId ? phones.get(v.customerId) || "" : "",
-      seller,
-      v.channel || "",
-      ls.map((l) => `${l.qty}× ${l.name}`).join("; "),
-      units,
-      pesos(v.total - commission),
+    // 2.10 · Un renglón por producto del folio. Lo que es de toda la venta (total, cobros,
+    // comisiones, utilidad) va solo en el primer renglón para que los totales cuadren.
+    const goods = Math.max(0, v.total - commission);
+    const stored = ls.map((l) => {
+      const meta = lineMeta.get(l.id);
+      return meta && Number.isFinite(meta.unitPrice) ? Math.round(meta.unitPrice * l.qty - (meta.discount || 0)) : null;
+    });
+    const amounts = ls.length && stored.every((x) => x !== null) ? (stored as number[]) : spread(goods, ls.map((l) => Number(l.qty)));
+    const saleCols = [
+      pesos(goods),
       pesos(commission || null),
       pesos(v.total),
       pesos(paid),
       pesos(refunded || null),
       pesos(balance),
-      methods.join(" + ") || (ok ? "Sin cobro" : ""),
-      accounts.join(" + "),
+    ];
+    const payCols = [methods.join(" + ") || (ok ? "Sin cobro" : ""), accounts.join(" + ")];
+    const feeCols = [
       fee > 0 ? "Sí" : "No",
       pesos(fee),
       fee > 0 ? (realFee ? "Real Mercado Pago" : `Estimada ${feeLabel(bps)}`) : "",
       pesos(net - fee),
       pesos(ok ? v.cost : 0),
       pesos(saleProfit),
-      card ? cardLabel(card) : "",
-      card?.authorization || "",
-      card?.operation || v.mpPaymentId || "",
-      v.notes || "",
-    ]);
-    for (const l of ls) {
-      const meta = lineMeta.get(l.id);
-      const value = meta && Number.isFinite(meta.unitPrice) ? Math.round(meta.unitPrice * l.qty - (meta.discount || 0)) : null;
-      const lc = lineCost.get(l.id) ?? 0;
-      const seg = saleSegment({ category: l.category, name: l.pname || l.name });
-      productRows.push([
+    ];
+    const cardCols = [card ? cardLabel(card) : "", card?.authorization || "", card?.operation || v.mpPaymentId || "", v.notes || ""];
+    (ls.length ? ls : [null]).forEach((l: Row | null, i: number) => {
+      const meta = l ? lineMeta.get(l.id) : null;
+      const lc = l ? (lineCost.get(l.id) ?? 0) : null;
+      const amount = l ? amounts[i] : null;
+      const firstRow = i === 0;
+      saleRows.push([
         when(v.created),
         folio,
+        ls.length > 1 ? `${i + 1} de ${ls.length}` : "1 de 1",
         STATUS[v.status] || v.status,
         v.customer || "Público general",
+        v.customerId ? phones.get(v.customerId) || "" : "",
         seller,
-        l.name,
-        l.sku || "",
-        l.category || "",
-        seg,
-        l.qty,
-        meta && Number.isFinite(meta.unitPrice) ? pesos(meta.unitPrice) : null,
+        v.channel || "",
+        l ? l.name : "",
+        l ? l.sku || "" : "",
+        l ? l.category || "" : "",
+        l ? l.qty : null,
+        meta && Number.isFinite(meta.unitPrice) ? pesos(meta.unitPrice) : l && l.qty ? pesos(Math.round((amount ?? 0) / l.qty)) : null,
         meta?.discount ? pesos(meta.discount) : null,
-        pesos(value),
+        pesos(amount),
         pesos(lc),
-        value === null ? null : pesos(value - lc),
-        methods.join(" + "),
+        amount === null || lc === null ? null : pesos(amount - lc),
+        ...(firstRow ? saleCols : saleCols.map(() => null)),
+        ...payCols,
+        ...(firstRow ? feeCols : [feeCols[0], null, feeCols[2], null, null, null]),
+        ...(firstRow ? cardCols : [cardCols[0], cardCols[1], cardCols[2], ""]),
       ]);
-      if (ok) {
+      if (ok && l) {
+        const seg = saleSegment({ category: l.category, name: l.pname || l.name });
         const g = bySegment.get(seg) ?? { units: 0, amount: 0 };
         g.units += l.qty;
-        g.amount += value ?? 0;
+        g.amount += amount ?? 0;
         bySegment.set(seg, g);
       }
-    }
+    });
     for (const x of mv) {
       const kind = x.kind === "sale" ? "Cobro" : x.kind === "refund" ? "Devolución" : isFee(x) ? (String(x.note).includes("real") ? "Comisión tarjeta (real)" : "Comisión tarjeta (estimada)") : x.kind;
       moneyRows.push([when(x.created), folio, v.customer || "Público general", kind, methodLabel(x.accountKind, x.account), x.account, pesos(x.amount), x.note || ""]);
@@ -196,9 +199,10 @@ export function salesSheets(b: Business, range: { from: string | null; to: strin
       if (commission > 0) commissionSales++;
       cost += v.cost;
       profit += saleProfit;
-      const g = bySeller.get(seller) ?? { n: 0, total: 0 };
+      const g = bySeller.get(seller) ?? { n: 0, total: 0, profit: 0 };
       g.n++;
-      g.total += v.total;
+      g.total += goods;
+      g.profit += saleProfit;
       bySeller.set(seller, g);
     } else {
       cancelled++;
@@ -208,49 +212,97 @@ export function salesSheets(b: Business, range: { from: string | null; to: strin
 
   const fmtDay = (iso: string | null) => (iso ? localDay(iso).split("-").reverse().join("/") : "");
   const lastDay = range.to ? new Date(new Date(range.to).getTime() - 1).toISOString() : null;
-  const summary: any[][] = [
-    [`Periodo: ${periodName}${range.from ? ` (${fmtDay(range.from)} – ${fmtDay(lastDay)})` : ""}`, null, null],
-    [`Generado: ${fmtNow(new Date())}`, null, null],
-    [`Comisión: ${feeLabel(bps)} de Mercado Pago, la absorbe el cliente con cualquier forma de pago (recibes tu precio completo)`, null, null],
-    [null, null, null],
-    ["Ventas activas", active, pesos(activeTotal)],
-    ["Ventas canceladas", cancelled, pesos(cancelledTotal)],
-    ["Piezas vendidas", pieces, null],
-    ["Cobrado (neto de devoluciones)", null, pesos(collected)],
-    ["Por cobrar", null, pesos(receivable)],
-    ["Comisión absorbida por clientes (incluida en las ventas)", commissionSales, pesos(commissions)],
-    ["Ventas sin comisión al cliente (anteriores)", active - commissionSales, null],
-    ["Comisión Mercado Pago (cobros con tarjeta)", feeSales, pesos(fees)],
-    ["Neto después de la comisión de Mercado Pago", null, pesos(collected - fees)],
-    ["Costo de la mercancía", null, pesos(cost)],
-    ["Utilidad (ventas − costo − comisión Mercado Pago)", null, pesos(profit)],
-    [null, null, null],
-    ["POR FORMA DE COBRO (ventas · cobrado)", null, null],
-    ...[...byMethod.entries()].sort((a, b) => b[1].amount - a[1].amount).flatMap(([k, g]) => [[k, g.sales.size, pesos(g.amount)], ...(g.fee ? [[`   Comisión Mercado Pago ${k}`, null, pesos(-g.fee)]] : [])]),
-    [null, null, null],
-    ["POR VENDEDOR (ventas · total)", null, null],
-    ...[...bySeller.entries()].sort((a, b) => b[1].total - a[1].total).map(([k, g]) => [k, g.n, pesos(g.total)]),
-    [null, null, null],
-    ["POR CATEGORÍA (piezas · importe)", null, null],
-    ...[...bySegment.entries()].sort((a, b) => b[1].amount - a[1].amount).map(([k, g]) => [k, g.units, pesos(g.amount)]),
-  ];
+  const report = salesReport(b, range);
+
+  // 2.10 · Resumen ejecutivo: indicadores clave, estado de resultados, flujo de dinero y
+  // lo que más se vendió. Importes en tu precio salvo donde se indica.
+  const goodsTotal = activeTotal - commissions;
+  const share = (part: number, whole: number) => (whole ? part / whole : null);
+  const summary: any[][] = [];
+  const styles: RowStyle[] = [];
+  const add = (row: any[], style?: RowStyle) => (summary.push(row), styles.push(style ?? null));
+  const blank = () => add([null, null, null, null]);
+  const section = (title: string, cols: [string, string, string] = ["Cantidad", "Importe", "%"]) => add([title, ...cols], "section");
+  add(["Resumen ejecutivo de ventas · Nova Supps", null, null, null], "title");
+  add([`Periodo: ${periodName}${range.from ? ` (${fmtDay(range.from)} – ${fmtDay(lastDay)})` : ""} · Generado: ${fmtNow(new Date())}`, null, null, null]);
+  blank();
+  section("INDICADORES CLAVE", ["Cantidad", "Importe", "% / margen"]);
+  add(["Ventas (a tu precio)", active, pesos(goodsTotal), null], "strong");
+  add(["Utilidad", null, pesos(profit), share(profit, goodsTotal)], "strong");
+  add(["Ticket promedio", null, active ? pesos(Math.round(goodsTotal / active)) : null, null]);
+  add(["Piezas vendidas", pieces, null, null]);
+  add(["Cobrado (neto de devoluciones)", null, pesos(collected), share(collected, activeTotal)]);
+  add(["Por cobrar", null, pesos(receivable), share(receivable, activeTotal)]);
+  add(["Ventas canceladas", cancelled, pesos(cancelledTotal), null]);
+  if (report.totals.discount) add(["Descuentos por promociones", null, pesos(-report.totals.discount), share(report.totals.discount, goodsTotal)]);
+  blank();
+  section("ESTADO DE RESULTADOS", ["Ventas", "Importe", "% de ventas"]);
+  add(["Ventas a tu precio", active, pesos(goodsTotal), share(goodsTotal, goodsTotal)]);
+  add(["(+) Comisión absorbida por clientes", commissionSales, pesos(commissions), share(commissions, goodsTotal)]);
+  add(["(=) Total cobrado a clientes", null, pesos(activeTotal), share(activeTotal, goodsTotal)], "strong");
+  add(["(−) Costo de la mercancía", null, pesos(-cost), share(cost, goodsTotal)]);
+  add(["(−) Comisión Mercado Pago (cobros con tarjeta)", feeSales, pesos(-fees), share(fees, goodsTotal)]);
+  add(["(=) Utilidad", null, pesos(profit), share(profit, goodsTotal)], "strong");
+  blank();
+  section("FLUJO DE DINERO", ["Ventas", "Importe", "%"]);
+  add(["Cobrado (neto de devoluciones)", null, pesos(collected), null]);
+  add(["(−) Comisión Mercado Pago", feeSales, pesos(-fees), null]);
+  add(["(=) Neto recibido", null, pesos(collected - fees), null], "strong");
+  add(["Por cobrar a clientes", null, pesos(receivable), null]);
+  blank();
+  section("TOP 5 PRODUCTOS", ["Piezas", "Importe", "% de ventas"]);
+  for (const p of report.products.slice(0, 5)) add([p.name, p.units, pesos(p.revenue), share(p.revenue, report.totals.revenue)]);
+  if (!report.products.length) add(["Sin ventas en el periodo", null, null, null]);
+  blank();
+  section("POR FORMA DE COBRO", ["Ventas", "Cobrado", "% del cobrado"]);
+  const methodTotal = [...byMethod.values()].reduce((n, g) => n + g.amount, 0);
+  for (const [k, g] of [...byMethod.entries()].sort((x, y) => y[1].amount - x[1].amount)) {
+    add([k, g.sales.size, pesos(g.amount), share(g.amount, methodTotal)]);
+    if (g.fee) add([`   Comisión Mercado Pago ${k}`, null, pesos(-g.fee), null]);
+  }
+  blank();
+  section("POR VENDEDOR", ["Ventas", "Importe", "% de ventas"]);
+  for (const [k, g] of [...bySeller.entries()].sort((x, y) => y[1].total - x[1].total)) add([`${k} · utilidad ${money(g.profit)}`, g.n, pesos(g.total), share(g.total, goodsTotal)]);
+  blank();
+  section("POR CATEGORÍA", ["Piezas", "Importe", "% de ventas"]);
+  const segTotal = [...bySegment.values()].reduce((n, g) => n + g.amount, 0);
+  for (const [k, g] of [...bySegment.entries()].sort((x, y) => y[1].amount - x[1].amount)) add([k, g.units, pesos(g.amount), share(g.amount, segTotal)]);
+  blank();
+  add(["NOTAS", null, null, null], "section");
+  add([`Comisión: ${feeLabel(bps)} de Mercado Pago, la absorbe el cliente con cualquier forma de pago (recibes tu precio completo).`, null, null, null]);
+  add([`Ventas sin comisión al cliente (anteriores a 1.9): ${active - commissionSales}.`, null, null, null]);
+  add(["El detalle está en la hoja Ventas: un renglón por producto; el total de cada folio va en su primer renglón.", null, null, null]);
 
   const sheets: Sheet[] = [
-    { name: "Resumen", columns: [{ header: "Concepto", width: 56 }, { header: "Cantidad", type: "int", width: 11 }, { header: "Importe", type: "money", width: 16 }], rows: summary },
+    {
+      name: "Resumen",
+      report: true,
+      rowStyles: styles,
+      columns: [{ header: "Concepto", width: 58 }, { header: "Cantidad", type: "int", width: 12 }, { header: "Importe", type: "money", width: 16 }, { header: "%", type: "pct", width: 13 }],
+      rows: summary,
+    },
     {
       name: "Ventas",
       totals: true,
       columns: [
         { header: "Fecha", type: "date" },
         { header: "Folio", width: 12 },
+        { header: "Renglón", width: 9 },
         { header: "Estado", width: 11 },
         { header: "Cliente", width: 24 },
         { header: "Teléfono", width: 14 },
         { header: "Vendedor", width: 14 },
         { header: "Canal", width: 12 },
-        { header: "Productos", width: 48 },
+        { header: "Producto", width: 40 },
+        { header: "SKU", width: 12 },
+        { header: "Categoría", width: 18 },
         { header: "Piezas", type: "int" },
-        { header: "Tu precio", type: "money" },
+        { header: "Precio unitario", type: "money", sum: false },
+        { header: "Descuento", type: "money" },
+        { header: "Importe del producto", type: "money" },
+        { header: "Costo del producto", type: "money" },
+        { header: "Utilidad del producto", type: "money" },
+        { header: "Tu precio (venta)", type: "money" },
         { header: "Comisión absorbida por el cliente", type: "money" },
         { header: "Total venta", type: "money" },
         { header: "Cobrado", type: "money" },
@@ -262,37 +314,14 @@ export function salesSheets(b: Business, range: { from: string | null; to: strin
         { header: "Comisión Mercado Pago", type: "money" },
         { header: "Tipo de comisión", width: 20 },
         { header: "Neto recibido", type: "money" },
-        { header: "Costo mercancía", type: "money" },
-        { header: "Utilidad", type: "money" },
+        { header: "Costo mercancía (venta)", type: "money" },
+        { header: "Utilidad (venta)", type: "money" },
         { header: "Tarjeta", width: 22 },
         { header: "Autorización", width: 13 },
         { header: "Operación MP", width: 16 },
         { header: "Notas", width: 30 },
       ],
       rows: saleRows,
-    },
-    {
-      name: "Productos vendidos",
-      totals: true,
-      columns: [
-        { header: "Fecha", type: "date" },
-        { header: "Folio", width: 12 },
-        { header: "Estado", width: 11 },
-        { header: "Cliente", width: 24 },
-        { header: "Vendedor", width: 14 },
-        { header: "Producto", width: 40 },
-        { header: "SKU", width: 12 },
-        { header: "Categoría", width: 18 },
-        { header: "Segmento", width: 14 },
-        { header: "Cantidad", type: "int" },
-        { header: "Precio unitario", type: "money" },
-        { header: "Descuento", type: "money" },
-        { header: "Importe", type: "money" },
-        { header: "Costo", type: "money" },
-        { header: "Utilidad", type: "money" },
-        { header: "Forma de cobro", width: 26 },
-      ],
-      rows: productRows,
     },
     {
       name: "Cobros y comisiones",
@@ -310,37 +339,36 @@ export function salesSheets(b: Business, range: { from: string | null; to: strin
       rows: moneyRows,
     },
     // 2.1 · Resumen por producto y por vendedor (ventas confirmadas del periodo, en tu precio).
-    ...((r) => [
-      {
-        name: "Por producto",
-        totals: true,
-        columns: [
-          { header: "Producto", width: 40 },
-          { header: "Segmento", width: 14 },
-          { header: "Piezas", type: "int" },
-          { header: "Ventas", type: "int" },
-          { header: "Importe (tu precio)", type: "money" },
-          { header: "Descuento promociones", type: "money" },
-          { header: "Costo", type: "money" },
-          { header: "Utilidad", type: "money" },
-        ],
-        rows: r.products.map((p) => [p.name, p.segment, p.units, p.sales, p.revenue, p.discount, p.cost, p.profit]),
-      } as Sheet,
-      {
-        name: "Por vendedor",
-        totals: true,
-        columns: [
-          { header: "Vendedor", width: 24 },
-          { header: "Ventas", type: "int" },
-          { header: "Piezas", type: "int" },
-          { header: "Importe (tu precio)", type: "money" },
-          { header: "Cobrado al cliente", type: "money" },
-          { header: "Costo", type: "money" },
-          { header: "Utilidad", type: "money" },
-        ],
-        rows: r.sellers.map((x) => [x.seller, x.sales, x.units, x.revenue, x.charged, x.cost, x.profit]),
-      } as Sheet,
-    ])(salesReport(b, range)),
+    {
+      name: "Por producto",
+      totals: true,
+      columns: [
+        { header: "Producto", width: 40 },
+        { header: "Segmento", width: 14 },
+        { header: "Piezas", type: "int" },
+        { header: "Ventas", type: "int" },
+        { header: "Importe (tu precio)", type: "money" },
+        { header: "Descuento promociones", type: "money" },
+        { header: "Costo", type: "money" },
+        { header: "Utilidad", type: "money" },
+      ],
+      // 2.10: importes en pesos (antes salían en centavos).
+      rows: report.products.map((p) => [p.name, p.segment, p.units, p.sales, pesos(p.revenue), pesos(p.discount), pesos(p.cost), pesos(p.profit)]),
+    },
+    {
+      name: "Por vendedor",
+      totals: true,
+      columns: [
+        { header: "Vendedor", width: 24 },
+        { header: "Ventas", type: "int" },
+        { header: "Piezas", type: "int" },
+        { header: "Importe (tu precio)", type: "money" },
+        { header: "Cobrado al cliente", type: "money" },
+        { header: "Costo", type: "money" },
+        { header: "Utilidad", type: "money" },
+      ],
+      rows: report.sellers.map((x) => [x.seller, x.sales, x.units, pesos(x.revenue), pesos(x.charged), pesos(x.cost), pesos(x.profit)]),
+    },
   ];
   return { sheets, count: sales.length };
 }
