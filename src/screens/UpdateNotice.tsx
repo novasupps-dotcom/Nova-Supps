@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Alert, AppState, View } from "react-native";
+import { Alert, AppState, Pressable, View } from "react-native";
 import { Text } from "../text";
 import type { Business } from "../business";
 import { notifyUpdateReady } from "../push";
-import { Button, C, Card, Note, s } from "../ui";
+import { Button, C, Card, Icon, Note, s } from "../ui";
 import {
   POLL_INTERVAL,
   checkForUpdates,
@@ -34,6 +34,7 @@ export function UpdateNotice({
   beforeRestart?: () => void;
 }) {
   const [ready, setReady] = useState(updateIsReady()),
+    [dismissed, setDismissed] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const check = useRef(canRestart);
@@ -65,6 +66,7 @@ export function UpdateNotice({
     const announce = (u: ReadyUpdate) => {
       if (!alive) return;
       setReady(true);
+      setDismissed(false);
       void notifyUpdateReady(b, u);
       if (b.setting("updatePopupFor", "") === u.id) return;
       try {
@@ -76,7 +78,7 @@ export function UpdateNotice({
           "Nueva versión lista",
           `${name} ya se descargó. ¿La instalas ahora? Tarda unos segundos y tus datos no cambian.`,
           [
-            { text: "Después", style: "cancel" },
+            { text: "Después", style: "cancel", onPress: () => setDismissed(true) },
             { text: "Instalar ahora", onPress: () => void installRef.current() },
           ],
         );
@@ -126,20 +128,47 @@ export function UpdateNotice({
       sub.remove();
     };
   }, [b]);
-  if (!ready) return null;
+  if (!ready || dismissed) return null;
   const v = readyUpdate()?.version;
   return (
-    <View style={{ padding: 12, backgroundColor: C.goldSoft, borderBottomWidth: 1, borderColor: C.amberLine }}>
-      <Text style={s.subtitle}>{v ? `Versión nueva lista · ${v}` : "Versión nueva lista"}</Text>
-      <Note>Se instala sola la próxima vez que abras la app; nunca a media venta.</Note>
-      {!canRestart() && <Note>Termina el cobro y cierra los formularios para instalarla ahora.</Note>}
-      {!!error && <Note color={C.red}>{error}</Note>}
+    <View
+      style={{
+        marginHorizontal: 18,
+        marginTop: 6,
+        marginBottom: 2,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 20,
+        backgroundColor: C.goldSoft,
+        borderWidth: 1,
+        borderColor: C.amberLine,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+      }}
+    >
+      <View style={{ flex: 1 }}>
+        <Text style={[s.subtitle, { fontSize: 14.5, marginBottom: 0 }]}>
+          {v ? `Versión nueva lista · ${v}` : "Versión nueva lista"}
+        </Text>
+        {!canRestart() && <Note>Termina el cobro para instalarla.</Note>}
+        {!!error && <Note color={C.red}>{error}</Note>}
+      </View>
       <Button
         title={busy ? "Instalando…" : "Instalar ahora"}
         small
         disabled={busy || !canRestart()}
         onPress={() => void install()}
       />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Ocultar aviso de actualización"
+        hitSlop={8}
+        onPress={() => setDismissed(true)}
+        style={{ padding: 4 }}
+      >
+        <Icon name="x" size={18} color={C.muted} />
+      </Pressable>
     </View>
   );
 }

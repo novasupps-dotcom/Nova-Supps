@@ -1614,11 +1614,7 @@ export function SellerApp({
                 : "Toca Cuenta → Actualizar para descargar el catálogo."}
             </Note>
           )}
-          {!!products.length && !cart.length && (
-            <View style={{ marginTop: 8 }}>
-              <Note>Toca la foto de un producto para agregarlo al carrito.</Note>
-            </View>
-          )}
+
         </>
       );
   } else if (tab === "Stock") list = visible;
@@ -1927,24 +1923,26 @@ export function SellerApp({
       {!keyboard && (
         <BottomDock>
           {!!toast && (
-            <View style={[s.toast, { flexDirection: "row", gap: 10, alignItems: "center" }]} pointerEvents="none">
-              <Icon name="circle-check" size={20} color="#fff" />
-              <Text style={[s.toastText, { flex: 1 }]}>{toast}</Text>
-            </View>
+            <Pressable
+              onPress={() => setToast("")}
+              style={[s.toast, { flexDirection: "row", gap: 8, alignItems: "center" }]}
+            >
+              <Icon name="circle-check" size={18} color="#fff" />
+              <Text style={s.toastText} numberOfLines={2}>{toast}</Text>
+            </Pressable>
           )}
           {tab === "Vender" && !cartOpen && !!cart.length && !charge && (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Ver carrito"
-              style={({ pressed }) => [s.cartBar, { flexDirection: "row", gap: 12 }, pressed && { opacity: 0.9 }]}
+              style={({ pressed }) => [s.cartBar, pressed && { opacity: 0.9 }]}
               onPress={() => (setCartOpen(true), setError(""))}
             >
-              <Icon name="shopping-cart" size={20} color="#fff" />
-              <Text style={[s.cartBarText, { flex: 1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
-                {`Ver carrito · ${cart.reduce((n, i) => n + i.qty, 0)} ${cart.reduce((n, i) => n + i.qty, 0) === 1 ? "pieza" : "piezas"}`}
+              <Icon name="shopping-cart" size={18} color="#fff" />
+              <Text style={s.cartBarText} numberOfLines={1}>
+                {`Ver carrito · ${cart.reduce((n, i) => n + i.qty, 0)} ${cart.reduce((n, i) => n + i.qty, 0) === 1 ? "pieza" : "piezas"} · ${money(total)}`}
               </Text>
-              <Text style={[s.cartBarText, { fontWeight: "700" }]} numberOfLines={1}>{money(total)}</Text>
-              <Icon name="chevron-right" size={18} color="#fff" />
+              <Icon name="chevron-right" size={16} color="#fff" />
             </Pressable>
           )}
         <TabBar

@@ -1,6 +1,12 @@
-# Nova Negocio · 2.10.1
+# Nova Negocio · 2.10.2
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
+
+**2.10.2 · Píldoras flotantes, cuadrícula directa sin botón «Agregar» inicial y optimización general (versionCode 64, solo JavaScript):**
+
+- **Sin barras horizontales fijas**: la barra inferior del carrito y los avisos pasan a ser píldoras flotantes compactas (los avisos se cierran al tocarlos y duran menos; el carrito flotante solo aparece en Vender y Stock); el aviso de versión nueva se puede ocultar con «Después» o «×».
+- **Vender directo al tocar**: se elimina el botón «＋ Agregar» / «＋ Sabor» fijo en las tarjetas de productos; tocar la tarjeta agrega directo al carrito (y muestra «− cantidad +» solo cuando ya llevas piezas), y el ícono «i» (o mantener presionado) abre la ficha del producto.
+- **Optimización y limpieza**: se quita el botón flotante redundante «＋ Venta», se memorizan el filtrado y la agrupación de sabores en la cuadrícula y se evita normalizar búsquedas vacías en listas.
 
 **2.10.1 · Sin aviso al registrar la venta y cantidad editable desde Stock (versionCode 63, solo JavaScript):**
 

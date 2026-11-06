@@ -265,10 +265,10 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                 { label: "Conteo", icon: "list-checks", onPress: () => open("Ajuste de inventario") },
               ]}
             />
-            <View style={[s.wrap, { gap: 8 }]}>
-              <Button title="Cargar pedido del proveedor (PDF)" icon="file-text" secondary small onPress={() => go("Cargar pedido")} />
+            <View style={[s.row, { gap: 8, marginBottom: 4 }]}>
+              <Button title="Cargar pedido del proveedor (PDF)" icon="file-text" secondary small flex onPress={() => go("Cargar pedido")} />
               {page === "Stock" && (
-                <Button title="Reporte de stock (Excel)" icon="file-spreadsheet" secondary small onPress={() => void exportStock()} />
+                <Button title="Reporte de stock (Excel)" icon="file-spreadsheet" secondary small flex onPress={() => void exportStock()} />
               )}
             </View>
             {!!dups.length && (

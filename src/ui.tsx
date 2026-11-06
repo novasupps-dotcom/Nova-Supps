@@ -893,15 +893,19 @@ export function ProductGrid({
       ? segment
       : segments[0] || "Todos";
   const q = fold(query.trim());
-  const shown = products.filter((p) =>
-    q
-      ? (index.hay.get(p.id) || "").includes(q)
-      : current === "Todos" || index.seg.get(p.id) === current,
+  const shown = useMemo(
+    () =>
+      products.filter((p) =>
+        q
+          ? (index.hay.get(p.id) || "").includes(q)
+          : current === "Todos" || index.seg.get(p.id) === current,
+      ),
+    [products, index, q, current],
   );
   // 2.8: los sabores de un mismo producto se muestran como una sola tarjeta.
   type Entry = { kind: "one"; p: GridProduct } | { kind: "family"; key: string; name: string; members: GridProduct[] };
-  const entries: Entry[] = [];
-  {
+  const entries = useMemo<Entry[]>(() => {
+    const list: Entry[] = [];
     const byFamily = new Map<string, GridProduct[]>();
     for (const p of shown) if (p.family) byFamily.set(p.family, [...(byFamily.get(p.family) ?? []), p]);
     const done = new Set<string>();
@@ -910,10 +914,11 @@ export function ProductGrid({
       if (members.length > 1) {
         if (done.has(p.family!)) continue;
         done.add(p.family!);
-        entries.push({ kind: "family", key: p.family!, name: p.familyName || p.name, members });
-      } else entries.push({ kind: "one", p });
+        list.push({ kind: "family", key: p.family!, name: p.familyName || p.name, members });
+      } else list.push({ kind: "one", p });
     }
-  }
+    return list;
+  }, [shown]);
   const familyMembers = openFamily
     ? products.filter((p) => p.family === openFamily)
     : openOne
@@ -1054,18 +1059,8 @@ export function ProductGrid({
                   </Text>
                   <Text style={s.tilePrice}>{(prices.some((x) => x !== low) ? "desde " : "") + money(low)}</Text>
                   <Text style={[s.tileStock, { color: avail < 1 ? C.red : C.muted }]}>
-                    {`${entry.members.length} sabores · ${avail < 1 ? "sin existencias" : `${left} por agregar`}`}
+                    {`${entry.members.length} sabores · ${avail < 1 ? "sin existencias" : `${left} disponibles`}`}
                   </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Sabores de ${entry.name}`}
-                  disabled={out}
-                  style={({ pressed }) => [s.tileAdd, pressed && { opacity: 0.8 }]}
-                  onPress={() => setOpenFamily(entry.key)}
-                >
-                  <Icon name="plus" size={16} color={C.brand} />
-                  <Text style={s.tileAddText}>Sabor</Text>
                 </Pressable>
               </View>
             );
@@ -1087,8 +1082,11 @@ export function ProductGrid({
             >
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Ver ${p.name}`}
-                onPress={() => setOpenOne(p.id)}
+                accessibilityLabel={`Agregar ${p.name}`}
+                accessibilityState={{ disabled: out || atMax }}
+                disabled={out}
+                onPress={() => onAdd(p.id)}
+                onLongPress={() => setOpenOne(p.id)}
               >
                 <View style={s.tilePhoto}>
                   <ProductPhoto
@@ -1125,19 +1123,15 @@ export function ProductGrid({
                       : `${max} ${max === 1 ? "disponible" : "disponibles"}`}
                 </Text>
               </Pressable>
-              {qty < 1 && (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Agregar ${p.name}`}
-                  accessibilityState={{ disabled: out || atMax }}
-                  disabled={out}
-                  style={({ pressed }) => [s.tileAdd, out && { opacity: 0.5 }, pressed && { opacity: 0.8 }]}
-                  onPress={() => onAdd(p.id)}
-                >
-                  <Icon name="plus" size={16} color={C.brand} />
-                  <Text style={s.tileAddText}>Agregar</Text>
-                </Pressable>
-              )}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Ver ${p.name}`}
+                hitSlop={8}
+                style={s.tileInfo}
+                onPress={() => setOpenOne(p.id)}
+              >
+                <Icon name="info" size={14} color={C.muted} />
+              </Pressable>
               {qty > 0 && (
                 <View style={s.tileActions}>
                   <Pressable
@@ -2101,7 +2095,7 @@ export const s = StyleSheet.create({
   content: {
     paddingHorizontal: 18,
     paddingTop: 4,
-    paddingBottom: 180,
+    paddingBottom: 140,
     width: "100%",
     alignSelf: "center",
   },
@@ -2258,15 +2252,17 @@ export const s = StyleSheet.create({
   },
   fabText: { color: "#fff", fontWeight: "600", fontSize: 16 },
   toast: {
-    marginHorizontal: 24,
+    alignSelf: "center",
+    maxWidth: "88%",
+    marginHorizontal: 18,
     marginBottom: 10,
-    backgroundColor: "rgba(28,28,30,0.95)",
-    borderRadius: 22,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
+    backgroundColor: "rgba(28,28,30,0.92)",
+    borderRadius: 28,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     ...FLOAT,
   },
-  toastText: { color: "#fff", fontSize: 15, fontWeight: "500" },
+  toastText: { color: "#fff", fontSize: 14, fontWeight: "600" },
   modalHeader: {
     paddingHorizontal: 20,
     paddingTop: 14,
@@ -2290,16 +2286,19 @@ export const s = StyleSheet.create({
     borderColor: C.line,
   },
   cartBar: {
-    marginHorizontal: 16,
+    alignSelf: "flex-end",
+    marginRight: 18,
     marginBottom: 10,
     backgroundColor: C.ink,
-    borderRadius: 30,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
+    borderRadius: 28,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+    flexDirection: "row",
     alignItems: "center",
+    gap: 8,
     ...FLOAT,
   },
-  cartBarText: { color: "#fff", fontWeight: "600", fontSize: 16, ...NUM },
+  cartBarText: { color: "#fff", fontWeight: "600", fontSize: 14.5, ...NUM },
   tile: {
     backgroundColor: C.paper,
     borderRadius: 22,
@@ -2310,12 +2309,24 @@ export const s = StyleSheet.create({
   },
   tileOn: { borderColor: C.brand },
   tilePhoto: {
-    height: 124,
+    height: 116,
     borderRadius: 14,
     backgroundColor: C.paper,
-    marginBottom: 8,
+    marginBottom: 6,
     alignItems: "center",
     justifyContent: "center",
+  },
+  tileInfo: {
+    position: "absolute",
+    top: 10,
+    left: 10,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "rgba(242,242,247,0.88)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
   },
   tileBadge: {
     position: "absolute",

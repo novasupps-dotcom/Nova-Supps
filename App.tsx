@@ -453,7 +453,7 @@ function AppContent({ business }: { business?: Business }) {
   }, []);
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), 2600);
+    const t = setTimeout(() => setToast(null), 1800);
     return () => clearTimeout(t);
   }, [toast]);
 
@@ -2117,8 +2117,10 @@ function AppContent({ business }: { business?: Business }) {
   }
 
   // ---------- Pantallas ----------
-  const matching = (rows: Row[]) =>
-    rows.filter((r) =>
+  const matching = (rows: Row[]) => {
+    const q = normalize(query);
+    if (!q) return rows;
+    return rows.filter((r) =>
       normalize(
         [
           r.name,
@@ -2131,8 +2133,9 @@ function AppContent({ business }: { business?: Business }) {
           r.customer,
           r.folio,
         ].join(" "),
-      ).includes(normalize(query)),
+      ).includes(q),
     );
+  };
   const editProduct = (p: Row) => {
     const { imageUri, ...rest } = p;
     // La foto guardada no se copia al borrador: así el borrador no pesa ~1 MB por tecla.
@@ -2185,7 +2188,7 @@ function AppContent({ business }: { business?: Business }) {
         icon="shopping-cart" title={n ? `En el carrito: ${n} · ＋1` : "Al carrito"}
         small
         disabled={p.available < 1 || n >= p.available}
-        onPress={() => addToBasket(p.id)}
+        onPress={() => addToBasket(p.id, 1, true)}
       />
     );
   };
@@ -3581,11 +3584,7 @@ function AppContent({ business }: { business?: Business }) {
     basket,
     basketF.total ? tryCents(basketF.total) : null,
   ).total;
-  const showBasket = !form && basket.length > 0;
-  const showFab =
-    !form &&
-    !showBasket &&
-    ["Ventas", "Stock", "Catálogo", "Clientes"].includes(page);
+  const showBasket = !form && basket.length > 0 && (page === "Vender" || page === "Stock");
   const isTabRoot = TABS.some((t) => t.name === page);
   const tabOf = (p: string) =>
     TABS.some((t) => t.name === p)
@@ -3690,28 +3689,17 @@ function AppContent({ business }: { business?: Business }) {
       </KeyboardAvoidingView>
       <BottomDock>
         {toast && (
-          <View
+          <Pressable
             key={toast.key}
+            onPress={() => setToast(null)}
             style={[
               s.toast,
-              { flexDirection: "row", gap: 10, alignItems: "center" },
+              { flexDirection: "row", gap: 8, alignItems: "center" },
               toast.bad && { backgroundColor: C.red },
             ]}
-            pointerEvents="none"
           >
-            <Icon name={toast.bad ? "triangle-alert" : "circle-check"} size={20} color="#fff" />
-            <Text style={[s.toastText, { flex: 1 }]}>{toast.text}</Text>
-          </View>
-        )}
-        {showFab && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Nueva venta"
-            onPress={() => openSale()}
-            style={({ pressed }) => [s.fab, pressed && { opacity: 0.85 }]}
-          >
-            <Icon name="plus" size={20} color="#fff" />
-            <Text style={s.fabText}>Venta</Text>
+            <Icon name={toast.bad ? "triangle-alert" : "circle-check"} size={18} color="#fff" />
+            <Text style={s.toastText} numberOfLines={2}>{toast.text}</Text>
           </Pressable>
         )}
         {showBasket && (
@@ -3719,16 +3707,13 @@ function AppContent({ business }: { business?: Business }) {
             accessibilityRole="button"
             accessibilityLabel="Abrir carrito"
             onPress={openCheckout}
-            style={({ pressed }) => [s.cartBar, { flexDirection: "row", gap: 12 }, pressed && { opacity: 0.9 }]}
+            style={({ pressed }) => [s.cartBar, pressed && { opacity: 0.9 }]}
           >
-            <Icon name="shopping-cart" size={20} color="#fff" />
-            <Text style={[s.cartBarText, { flex: 1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
-              {`Carrito · ${basketPieces} ${basketPieces === 1 ? "pieza" : "piezas"}`}
+            <Icon name="shopping-cart" size={18} color="#fff" />
+            <Text style={s.cartBarText} numberOfLines={1}>
+              {`Carrito · ${basketPieces} ${basketPieces === 1 ? "pieza" : "piezas"} · ${money(basketTotal)}`}
             </Text>
-            <Text style={[s.cartBarText, { fontWeight: "700" }]} numberOfLines={1}>{money(basketTotal)}</Text>
-            <View style={{ backgroundColor: C.brand, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 }}>
-              <Text style={[s.cartBarText, { fontSize: 14 }]}>Cobrar</Text>
-            </View>
+            <Icon name="chevron-right" size={16} color="#fff" />
           </Pressable>
         )}
         <TabBar
@@ -3771,12 +3756,8 @@ function AppContent({ business }: { business?: Business }) {
                           : "Nueva venta"
                         : form}
                 </Text>
-                {!selector && form !== "Venta" && (
-                  <Note>
-                    {stack.length
-                      ? "Guarda y volverás a la captura anterior."
-                      : "Los campos con * son obligatorios."}
-                  </Note>
+                {!selector && form !== "Venta" && stack.length > 0 && (
+                  <Note>Guarda y volverás a la captura anterior.</Note>
                 )}
               </View>
               <TextButton

@@ -1,4 +1,8 @@
-# Nova Negocio 2.10.1 · 6-nov-2026
+# Nova Negocio 2.10.2 · 6-nov-2026
+
+Hecho en 2.10.2: carrito y avisos como píldoras flotantes (sin barra horizontal fija); tarjetas en Vender sin botón «＋ Agregar» inicial (tocar agrega directo; ícono «i» abre ficha); optimización de cuadrícula y búsquedas.
+
+Hecho en 2.10.1 · 6-nov-2026
 
 Hecho en 2.10.1: sin barra de aviso al registrar una venta; Stock → botón de cajas para cambiar la cantidad; Editar producto
 con campo «Existencias». Probar: vender (no aparece la barra); Stock → cajas → nueva cantidad; Stock → producto → Editar.
