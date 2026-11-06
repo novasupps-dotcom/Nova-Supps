@@ -1,6 +1,12 @@
-# Nova Negocio · 2.10.0
+# Nova Negocio · 2.10.1
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
+
+**2.10.1 · Sin aviso al registrar la venta y cantidad editable desde Stock (versionCode 63, solo JavaScript):**
+
+- **Venta registrada**: ya no aparece la barra horizontal de aviso al registrar una venta (dueño y vendedor); solo vibra. Si la venta del vendedor queda pendiente de enviar, sí avisa.
+- **Stock → cambiar la cantidad**: botón de cajas en cada producto de la lista; abre el ajuste con el motivo «Corrección» (no mueve dinero ni cuenta como merma). Para merma sigue «Conteo».
+- **Editar producto**: nuevo campo «Existencias (piezas)»; al guardar corrige la cantidad (sin merma).
 
 **2.10.0 · Reporte financiero ejecutivo, renglón por producto, reporte de stock y animación del carrito (versionCode 62, solo JavaScript):**
 
