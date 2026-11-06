@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { STORE_NAME } from "./src/theme";
 import { canLoadFonts, fontsReady, loadFonts } from "./src/fonts";
-import { ActivityIndicator, Alert, AppState, BackHandler, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StatusBar, Switch, Share, Vibration, View, useWindowDimensions } from "react-native";
+import { Alert, AppState, BackHandler, FlatList, Image, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StatusBar, Share, Vibration, View, useWindowDimensions } from "react-native";
 import { Text, TextInput } from "./src/text";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import * as SQLite from "expo-sqlite";
@@ -16,14 +16,13 @@ import {
   today,
   localDay,
   assert,
-  STAGES,
   feeLabel,
-  cardFee,
   grossUp,
   chargeFor,
   promoSummary,
   promoTagFor,
   saleSegment,
+  jordanianStack,
   type PromoHit,
   type Row,
 } from "./src/business";
@@ -36,10 +35,7 @@ import {
 import { pickPhotoIOS, type PickedPhoto } from "./src/iosPhoto";
 import { pickPhotoAndroid } from "./src/androidPhoto";
 import { secureStore } from "./src/secure";
-import { canScan } from "./src/native";
-import { CameraScanner } from "./src/scanner";
-import { findProductByCode, normalizeProductCode } from "./src/barcodes";
-import { InventoryCodeForm } from "./src/screens/InventoryCodeForm";
+import { findProductByCode } from "./src/barcodes";
 import {
   autoRegisterPush,
   setupNotifications,
@@ -64,10 +60,7 @@ import {
 } from "./src/sync";
 import { SellerApp } from "./src/seller";
 import { LoginScreen, loginHere, type LoginResult } from "./src/login";
-import {
-  TransferInfo,
-  type TransferAccount,
-} from "./src/transfer";
+import { type TransferAccount } from "./src/transfer";
 import {
   saleReceiptText,
   cardReceiptText,
@@ -76,17 +69,9 @@ import {
   mergeCard,
   terminalPayments,
   whatsappNumber,
-  validWhatsapp,
 } from "./src/receipt";
 import { LockGate, useLock } from "./src/lock";
-import { when } from "./src/screens/CloudBackup";
-import {
-  backupDue,
-  downloadBackup,
-  listBackups,
-  uploadBackup,
-  type CloudBackup,
-} from "./src/cloudBackup";
+import { backupDue, uploadBackup } from "./src/cloudBackup";
 import { catalogueImages } from "./src/catalogueImages";
 import { LOGO_FULL, LOGO_FULL_RATIO, LOGO_HEADER, LOGO_HEADER_RATIO } from "./src/brand";
 import {
@@ -105,7 +90,6 @@ import {
   orderPayment,
   paymentFee,
   manualOrder,
-  terminalPaymentLabel,
   type MpConfig,
   type TerminalPayment,
 } from "./src/mercadopago";
@@ -115,16 +99,12 @@ import {
   Button,
   Card,
   Note,
-  Pill,
   Chips,
   SearchBox,
   ProductPhoto,
   ProductGrid,
-  CardFeePreview,
-  Checkbox,
   DateField,
   QUICK_FOLLOWUP,
-  QUICK_EXPIRY,
   addDays,
   daysBetween,
   fmtDay,
@@ -152,7 +132,6 @@ import {
   PAGES,
   TABS,
   pageTitle,
-  channels,
   normalize,
   amount,
   strings,
@@ -170,6 +149,7 @@ import {
   type Selector,
 } from "./src/screens/ownerShared";
 import { renderOwnerPage } from "./src/screens/OwnerPages";
+import { FollowUpPopupModal, OwnerFormModal, OwnerSetup, PayOverlayModal } from "./src/screens/OwnerModals";
 
 /** Datos de pantalla: se leen una vez por cambio (no en cada tecla). */
 function load(b: Business) {
@@ -849,13 +829,27 @@ function AppContent({ business }: { business?: Business }) {
       const id = b!.sell(...x.args);
       saleId = id;
       b!.updateSaleDetails(id, { ...d.f, channel: d.f.channel });
-      if (d.f.customerId && Number(d.f.autoFollow) > 0) {
+      if (d.f.customerId) {
         const cust = data?.customers.find((c) => c.id === d.f.customerId);
-        if (cust) {
+        const markLoyal =
+          d.f.markLoyal === "1" ||
+          ((d.f.applyDiscount === "1" || !!d.f.total) && d.f.markLoyal !== "0");
+        if (cust && (Number(d.f.autoFollow) > 0 || markLoyal)) {
+          const prevNotes = String(cust.notes || "").trim();
+          const loyalTag = "⭐ Cliente Leal";
+          const nextNotes =
+            markLoyal && !prevNotes.includes(loyalTag)
+              ? [prevNotes, loyalTag].filter(Boolean).join(" · ")
+              : prevNotes;
           b!.saveCustomer({
             ...strings(cust),
             id: cust.id,
-            nextDate: addDays(today(), Number(d.f.autoFollow)),
+            stage: markLoyal ? "Frecuente" : cust.stage || "Cliente",
+            notes: nextNotes,
+            nextDate:
+              Number(d.f.autoFollow) > 0
+                ? addDays(today(), Number(d.f.autoFollow))
+                : cust.nextDate || "",
           });
         }
       }
@@ -3383,51 +3377,36 @@ function AppContent({ business }: { business?: Business }) {
         </View>
       )}
       {form === "Venta" && !!cart.length && (() => {
-        const inCartIds = new Set(cart.map((i) => i.productId));
-        const inCartSegs = new Set(
-          cart.map((i) => {
-            const p = productById.get(i.productId);
-            return p ? saleSegment(p) : "";
-          }),
-        );
-        const targetSegs = inCartSegs.has("Proteínas")
-          ? ["Creatinas", "PWO", "Salud"]
-          : inCartSegs.has("Creatinas") || inCartSegs.has("PWO")
-            ? ["Proteínas", "Salud"]
-            : ["Proteínas", "Creatinas"];
-        const sug =
-          gridProducts.find(
-            (p: any) =>
-              !inCartIds.has(p.id) &&
-              p.available > 0 &&
-              targetSegs.includes(saleSegment(p)),
-          ) ||
-          gridProducts.find(
-            (p: any) => !inCartIds.has(p.id) && p.available > 0,
-          );
-        if (!sug) return null;
+        const jStack = jordanianStack(b!, gridProducts as any, cart, val("customerId") || null);
+        if (jStack.complete || !jStack.items.length) return null;
         return (
-          <View style={{ alignItems: "flex-start", marginBottom: 6 }}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => addOne(sug.id)}
-              style={[
-                s.chip,
-                {
-                  backgroundColor: C.brandSoft,
-                  paddingVertical: 6,
-                  paddingHorizontal: 12,
-                  maxWidth: "100%",
-                },
-              ]}
-            >
-              <Text
-                style={[s.chipText, { color: C.brand, fontSize: 12.5, fontWeight: "600" }]}
-                numberOfLines={1}
-              >
-                {`⚡ Stack sugerido: ＋ ${sug.name} (${money(sug.price)})`}
-              </Text>
-            </Pressable>
+          <View style={{ marginBottom: 8, gap: 4 }}>
+            <Text style={[s.label, { marginBottom: 0, color: C.brand }]}>{jStack.label}</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+              {jStack.items.map((sug: any) => (
+                <Pressable
+                  key={sug.id}
+                  accessibilityRole="button"
+                  onPress={() => addOne(sug.id)}
+                  style={[
+                    s.chip,
+                    {
+                      backgroundColor: C.brandSoft,
+                      paddingVertical: 6,
+                      paddingHorizontal: 12,
+                      maxWidth: "100%",
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[s.chipText, { color: C.brand, fontSize: 12.5, fontWeight: "600" }]}
+                    numberOfLines={1}
+                  >
+                    {`＋ ${sug.name} (${money(sug.price)})`}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
         );
       })()}
@@ -3491,184 +3470,25 @@ function AppContent({ business }: { business?: Business }) {
         catalogueImages[val("id")] ||
         [];
 
-  const payOverlay = pay && (
-    <View style={s.payOverlay}>
-      <View style={s.payCard}>
-        <Text style={[s.label, { color: C.muted }]}>
-          {pay.test
-            ? "Cobro de prueba"
-            : pay.abono
-              ? "Abono con tarjeta"
-              : "Cobro con tarjeta"}{" "}
-          · Terminal Mercado Pago
-        </Text>
-        <Text style={[s.heroAmount, { color: C.ink, marginVertical: 4 }]}>
-          {money(pay.amount)}
-        </Text>
-        {(pay.outcome === "sending" ||
-          pay.outcome === "pending" ||
-          pay.outcome === "searching") && (
-          <ActivityIndicator
-            size="large"
-            color={C.ink}
-            style={{ marginVertical: 10 }}
-          />
-        )}
-        <Text
-          style={[
-            s.body,
-            { textAlign: "center", marginBottom: 12 },
-            ["failed", "canceled", "expired", "error"].includes(
-              pay.outcome,
-            ) && { color: C.red },
-            (pay.outcome === "approved" || pay.outcome === "done") && {
-              color: C.green,
-              fontWeight: "700",
-            },
-          ]}
-        >
-          {pay.text}
-        </Text>
-        {(pay.outcome === "sending" || pay.outcome === "pending") && (
-          <Button
-            title="Cancelar cobro"
-            danger
-            onPress={() => void cancelCharge()}
-          />
-        )}
-        {pay.outcome === "pending" && (pay.fails || 0) >= 3 && (
-          <Button
-            title="Cerrar y revisar después"
-            secondary
-            onPress={reviewLater}
-          />
-        )}
-        {pay.outcome === "pending" &&
-          !pay.atTerminal &&
-          (pay.tick || 0) >= 8 &&
-          !pay.test && (
-            <Button
-              title="¿No llega a la terminal? Cobrar ahí directo"
-              secondary
-              onPress={() => void chargeOnTerminalInstead()}
-            />
-          )}
-        {pay.outcome === "notpdv" && (pay.draft || pay.abono) && (
-          <Button
-            icon="circle-check" title="Ya cobré en la terminal · buscar el pago"
-            onPress={() => void findManualPayment()}
-          />
-        )}
-        {pay.outcome === "choose" &&
-          (pay.found || []).map((x) => (
-            <Button
-              key={x.id}
-              title={`${terminalPaymentLabel(x)} · ${money(x.amount)}`}
-              secondary
-              onPress={() => linkManualPayment(x)}
-            />
-          ))}
-        {pay.outcome === "choose" && (
-          <Button
-            title="Ninguno es de esta venta"
-            secondary
-            small
-            onPress={() =>
-              setPay({
-                ...pay,
-                outcome: "notpdv",
-                found: undefined,
-                text: manualOwnerText(pay.amount),
-              })
-            }
-          />
-        )}
-        {pay.outcome === "check" && (
-          <>
-            <Button
-              title="Sí, la terminal dice aprobado"
-              onPress={() => finishApproved(pay.order)}
-            />
-            <Button
-              title="No se aprobó"
-              secondary
-              onPress={() => (
-                b!.setSetting("mpPending", null),
-                setPay(null),
-                refresh()
-              )}
-            />
-          </>
-        )}
-        {pay.outcome === "approved" && !!pay.orderId && (
-          <Button
-            title={`Devolver ${money(pay.amount)}`}
-            danger
-            onPress={() => void refundCharge(pay.orderId!)}
-          />
-        )}
-        {pay.outcome === "notpdv" && (pay.draft || pay.abono) && (
-          <Button
-            title="Enviar a la terminal de todos modos"
-            secondary
-            onPress={() =>
-              void startCharge(pay.amount, pay.draft, false, pay.abono)
-            }
-          />
-        )}
-        {(pay.outcome === "notpdv" ||
-          (pay.outcome === "error" && !pay.orderId)) &&
-          (pay.draft || pay.abono) && (
-            <Button
-              title="Registrar sin datos del pago"
-              secondary
-              small
-              onPress={registerWithoutTerminal}
-            />
-          )}
-        {["failed", "canceled", "expired", "error"].includes(pay.outcome) &&
-          (pay.draft || pay.abono || pay.test) && (
-            <Button
-              title="Reintentar"
-              secondary={pay.outcome === "error" && !pay.orderId}
-              onPress={() =>
-                void (pay.test
-                  ? startCharge(pay.amount, null, true)
-                  : checkTerminalThenCharge(pay.amount, pay.draft, pay.abono))
-              }
-            />
-          )}
-        {pay.outcome === "done" && !!pay.saleId && (
-          <Button
-            icon="send" title="Enviar comprobante por WhatsApp"
-            onPress={() => {
-              const v = b!.saleDetail(pay.saleId!);
-              const entry = terminalPayments(v).find(
-                (x) => x.orderId === pay.orderId,
-              ) || { orderId: pay.orderId, amount: pay.amount };
-              setPay(null);
-              void sendCardReceipt(v, entry);
-            }}
-          />
-        )}
-        {pay.outcome === "done" && (
-          <Button
-            title="Listo"
-            secondary
-            onPress={() => (refresh(), setPay(null))}
-          />
-        )}
-        {!["sending", "pending", "check", "done", "searching"].includes(
-          pay.outcome,
-        ) && (
-          <Button
-            title="Cerrar"
-            secondary
-            onPress={() => (refresh(), setPay(null))}
-          />
-        )}
-      </View>
-    </View>
+  const payOverlay = (
+    <PayOverlayModal
+      pay={pay}
+      setPay={setPay}
+      b={b}
+      refresh={refresh}
+      cancelCharge={cancelCharge}
+      reviewLater={reviewLater}
+      chargeOnTerminalInstead={chargeOnTerminalInstead}
+      findManualPayment={findManualPayment}
+      linkManualPayment={linkManualPayment}
+      finishApproved={finishApproved}
+      refundCharge={refundCharge}
+      startCharge={startCharge}
+      registerWithoutTerminal={registerWithoutTerminal}
+      checkTerminalThenCharge={checkTerminalThenCharge}
+      terminalPayments={terminalPayments}
+      sendCardReceipt={sendCardReceipt}
+    />
   );
   const listBody = body && "list" in body ? body.list : null;
   const contentStyle = [s.content, wide && { maxWidth: 860 }];
@@ -3838,1232 +3658,97 @@ function AppContent({ business }: { business?: Business }) {
       </BottomDock>
       <CartFlyLayer />
       {!form && payOverlay}
-      {followPopup && (
-        <Modal
-          visible
-          transparent
-          animationType="fade"
-          onRequestClose={() => setFollowPopup(false)}
-        >
-          <View style={s.payOverlay}>
-            <View style={[s.payCard, { maxWidth: 480, maxHeight: "86%" }]}>
-              <View style={[s.between, { marginBottom: 8 }]}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
-                  <Icon name="bell" size={20} color={C.amber} />
-                  <Text style={[s.subtitle, { marginBottom: 0 }]}>
-                    Seguimientos pendientes
-                  </Text>
-                </View>
-                <IconButton
-                  icon="x"
-                  label="Cerrar seguimientos"
-                  bg={C.soft}
-                  onPress={() => setFollowPopup(false)}
-                />
-              </View>
-              <ScrollView style={{ maxHeight: 380 }}>
-                {(() => {
-                  const due = followUpsDue(customers);
-                  if (!due.length)
-                    return <Note>No tienes seguimientos pendientes.</Note>;
-                  return due.map((c) => {
-                    const wa = whatsappNumber(c.phone);
-                    return (
-                      <View
-                        key={c.id}
-                        style={{
-                          paddingVertical: 10,
-                          borderBottomWidth: 1,
-                          borderColor: C.line,
-                        }}
-                      >
-                        <View style={s.between}>
-                          <Text
-                            style={[s.body, { fontWeight: "600", flex: 1 }]}
-                            numberOfLines={1}
-                          >
-                            {c.name}
-                          </Text>
-                          <Text
-                            style={[
-                              s.muted,
-                              {
-                                fontSize: 13,
-                                color: c.daysLeft < 0 ? C.red : C.amber,
-                                fontWeight: "600",
-                              },
-                            ]}
-                          >
-                            {followUpLabel(c.daysLeft, c.nextDate)}
-                          </Text>
-                        </View>
-                        {!!c.notes && (
-                          <Text style={[s.muted, { fontSize: 12.5 }]} numberOfLines={1}>
-                            {c.notes}
-                          </Text>
-                        )}
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            flexWrap: "wrap",
-                            alignItems: "center",
-                            gap: 6,
-                            marginTop: 8,
-                          }}
-                        >
-                          {!!wa && (
-                            <Button
-                              icon="message-circle"
-                              title="WhatsApp"
-                              secondary
-                              small
-                              onPress={() =>
-                                void Linking.openURL("https://wa.me/" + wa).catch(
-                                  () => {},
-                                )
-                              }
-                            />
-                          )}
-                          <Button
-                            title="Vender"
-                            small
-                            onPress={() => {
-                              setFollowPopup(false);
-                              openSale({ customerId: c.id });
-                            }}
-                          />
-                          <Button
-                            title="+7 días"
-                            secondary
-                            small
-                            onPress={() =>
-                              act(
-                                () =>
-                                  b.saveCustomer({
-                                    ...strings(c),
-                                    id: c.id,
-                                    nextDate: addDays(today(), 7),
-                                  }),
-                                "Seguimiento pospuesto 7 días",
-                              )
-                            }
-                          />
-                          <IconButton
-                            icon="trash-2"
-                            label={`Eliminar notificación de ${c.name}`}
-                            bg={C.redSoft}
-                            color={C.red}
-                            onPress={() => {
-                              const left = due.length - 1;
-                              act(
-                                () =>
-                                  b.saveCustomer({
-                                    ...strings(c),
-                                    id: c.id,
-                                    nextDate: "",
-                                  }),
-                                "Notificación de seguimiento eliminada",
-                              );
-                              if (left <= 0) setFollowPopup(false);
-                            }}
-                          />
-                        </View>
-                      </View>
-                    );
-                  });
-                })()}
-              </ScrollView>
-              <View style={{ height: 10 }} />
-              <View style={[s.wrap, { justifyContent: "space-between" }]}>
-                <Button
-                  title="Eliminar todas"
-                  danger
-                  small
-                  onPress={() => {
-                    const due = followUpsDue(customers);
-                    act(() => {
-                      for (const c of due)
-                        b.saveCustomer({
-                          ...strings(c),
-                          id: c.id,
-                          nextDate: "",
-                        });
-                    }, "Notificaciones eliminadas");
-                    setFollowPopup(false);
-                  }}
-                />
-                <Button
-                  title="Ver en Clientes"
-                  secondary
-                  small
-                  onPress={() => {
-                    setFollowPopup(false);
-                    go("Clientes", "Próximos 5 días");
-                  }}
-                />
-                <Button
-                  title="Cerrar"
-                  secondary
-                  small
-                  onPress={() => setFollowPopup(false)}
-                />
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
-      <Modal
-        visible={!!form}
-        animationType="slide"
-        onRequestClose={() =>
-          pay ? undefined : selector ? setSelector(null) : close()
-        }
-      >
-        <SafeAreaView style={s.safe}>
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={KEYBOARD_BEHAVIOR}>
-            <View style={s.modalHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={[s.title, { fontSize: 24, marginBottom: 2 }]}>
-                  {selector
-                    ? selector.label
-                    : val("id") &&
-                        !form.startsWith("Editar") &&
-                        !form.startsWith("Renombrar") &&
-                        form !== "Abono"
-                      ? "Editar " + form.toLowerCase()
-                      : form === "Venta"
-                        ? checkoutFromBasket.current
-                          ? "Carrito"
-                          : "Nueva venta"
-                        : form}
-                </Text>
-                {!selector && form !== "Venta" && stack.length > 0 && (
-                  <Note>Guarda y volverás a la captura anterior.</Note>
-                )}
-              </View>
-              <TextButton
-                title={selector ? "Volver" : "Cerrar"}
-                onPress={() => (selector ? setSelector(null) : close())}
-              />
-            </View>
-            {selector ? (
-              <ScrollView
-                contentContainerStyle={s.content}
-                keyboardShouldPersistTaps="handled"
-              >
-                <SearchBox
-                  value={search}
-                  onChange={setSearch}
-                  placeholder="Escribe para buscar…"
-                />
-                {selector.create && (
-                  <Button
-                    title={
-                      "＋ Crear " +
-                      selector.create.toLowerCase() +
-                      (search ? ` "${search}"` : "")
-                    }
-                    secondary
-                    onPress={() =>
-                      open(
-                        selector.create!,
-                        { name: search },
-                        selector.key,
-                      )
-                    }
-                  />
-                )}
-                <View style={{ height: 10 }} />
-                {selector.optional && (
-                  <Pressable
-                    style={s.option}
-                    onPress={() => {
-                      set(selector.key, "");
-                      setSelector(null);
-                    }}
-                  >
-                    <Text style={[s.body, { color: C.muted }]}>
-                      Sin asignar
-                    </Text>
-                  </Pressable>
-                )}
-                {selector.rows
-                  .filter((r) =>
-                    normalize(
-                      r.name + " " + (r.sku || "") + " " + (r.brand || ""),
-                    ).includes(normalize(search)),
-                  )
-                  .slice(0, 150)
-                  .map((r) => (
-                    <Pressable
-                      key={r.id}
-                      style={({ pressed }) => [
-                        s.option,
-                        pressed && { backgroundColor: C.soft },
-                        selector.key === "cartAdd" &&
-                          cartLimit(r.id) < 1 && { opacity: 0.45 },
-                      ]}
-                      onPress={() => {
-                        if (selector.key === "cartAdd") {
-                          const limit = cartLimit(r.id);
-                          const current =
-                            cart.find((i) => i.productId === r.id)?.qty ?? 0;
-                          if (current + 1 > limit) {
-                            setFormError(
-                              limit
-                                ? `Ya agregaste las ${units(limit)} disponibles de ${productName(r.id)}.`
-                                : `${productName(r.id)} no tiene existencias disponibles.`,
-                            );
-                            setSelector(null);
-                            return;
-                          }
-                          setFormError("");
-                          setCart((old) => addTo(old, r.id, 1));
-                        } else set(selector.key, r.id);
-                        setSelector(null);
-                      }}
-                    >
-                      <Text style={s.body}>{r.name}</Text>
-                    </Pressable>
-                  ))}
-                {(() => {
-                  const n = selector.rows.filter((r) =>
-                    normalize(
-                      r.name + " " + (r.sku || "") + " " + (r.brand || ""),
-                    ).includes(normalize(search)),
-                  ).length;
-                  return n > 150 ? (
-                    <Note>
-                      Mostrando 150 de {n}. Escribe para encontrar el resto.
-                    </Note>
-                  ) : null;
-                })()}
-                {!selector.rows.length && (
-                  <Note>No hay registros todavía.</Note>
-                )}
-              </ScrollView>
-            ) : (
-              <ScrollView
-                ref={formList}
-                scrollEventThrottle={64}
-                onScroll={formKeyboard.onScroll}
-                contentContainerStyle={[s.content, wide && { maxWidth: 720 }]}
-                keyboardShouldPersistTaps="handled"
-              >
-                {!!formError && (
-                  <View style={s.errorBox}>
-                    <Text style={[s.body, { color: C.red, fontWeight: "700" }]}>
-                      Revisa la operación
-                    </Text>
-                    <Text style={[s.body, { color: C.red }]}>{formError}</Text>
-                  </View>
-                )}
-                {form === "Inventario por código" && (
-                  <InventoryCodeForm
-                    b={b}
-                    code={val("barcode")}
-                    products={products}
-                    selectedId={val("productId")}
-                    startScanning={val("startScanning") === "1"}
-                    autoSell={val("autoSell") === "1"}
-                    onEnrich={(product, online) =>
-                      act(() =>
-                        b.saveProductLookupPhoto(String(product.id), online),
-                      )
-                    }
-                    picker={choose(
-                      "productId",
-                      "Elegir producto existente",
-                      products.filter((p) => !p.archived),
-                    )}
-                    onCode={(code) => {
-                      set("barcode", code);
-                      set("productId", "");
-                    }}
-                    onCreate={(barcode, online) => {
-                      if (findProductByCode(b.stock(), barcode)) {
-                        open("Inventario por código", { barcode });
-                        return;
-                      }
-                      open("Producto", {
-                        barcode,
-                        scanOrigin: "1",
-                        ...(online
-                          ? {
-                              name: online.name,
-                              brand: online.brand,
-                              presentation: online.presentation,
-                              flavor: online.flavor || "",
-                              description: online.description,
-                              imageUri: online.imageUri,
-                              lookupSource: online.source,
-                              lookupSourceUrl: online.sourceUrl,
-                            }
-                          : {}),
-                      });
-                    }}
-                    onReceive={(product, barcode) =>
-                      open("Entrada", {
-                        productId: String(product.id),
-                        scanProductId: String(product.id),
-                        barcode,
-                        qty: "1",
-                      })
-                    }
-                    onLink={(product, barcode, source) =>
-                      act(() =>
-                        b.linkProductCode(String(product.id), barcode, source),
-                      )
-                    }
-                    onRestore={(product) =>
-                      act(
-                        () => b.setProductArchived(String(product.id), false),
-                        "Producto restaurado",
-                      )
-                    }
-                    onDetail={(product) => {
-                      close();
-                      setProductDetailId(String(product.id));
-                      go("Detalle producto");
-                    }}
-                    onSell={(product) => {
-                      if (addToBasket(String(product.id))) {
-                        close();
-                        go("Vender");
-                      }
-                    }}
-                  />
-                )}
-                {form === "Producto" && (
-                  <>
-                    {field("name", "Nombre *")}
-                    {!!val("lookupSource") && (
-                      <Note>
-                        Datos obtenidos de {val("lookupSource")}. Confirma la
-                        presentación, el sabor y el precio de venta.
-                      </Note>
-                    )}
-                    {field("barcode", "Código de barras del empaque")}
-                    {canScan() && (
-                      <Button
-                        icon="scan-barcode" title="Leer código de barras"
-                        secondary
-                        small
-                        onPress={() => {
-                                                setBarcodeScanner(true);
-                        }}
-                      />
-                    )}
-                    <CameraScanner
-                      visible={barcodeScanner}
-                      continuous={false}
-                      instruction="Lee el código de barras del empaque para guardarlo en este producto."
-                      onClose={() => setBarcodeScanner(false)}
-                      onScan={(raw, tools) => {
-                        const code = normalizeProductCode(raw);
-                        if (!code || code.length > 40)
-                          return { text: "Código no válido. Vuelve a leerlo.", bad: true };
-                        const owner = findProductByCode(
-                          b.stock().filter((p) => p.id !== val("id")),
-                          code,
-                        );
-                        if (owner)
-                          return {
-                            text: `Ese código ya es de ${owner.name}`,
-                            bad: true,
-                            detail: `Código ${code}. Cada código identifica a un solo producto.`,
-                            actions: [{ label: "Leer otro", onPress: () => tools.update({ text: "Listo para leer otro código." }) }],
-                          };
-                        set("barcode", code);
-                        return { text: "Código guardado en el producto", detail: code, done: true };
-                      }}
-                    />
-
-                    {moneyField("price", "Precio de venta MXN *")}
-                    {(() => {
-                      const base = tryCents(val("price"));
-                      return (
-                        <Note>{data.feeInPrice ? `Precio con comisión ${feeLabel(data.cardFeeBps)} incluida.` : `Recibes este monto completo.${base ? ` Cliente paga ${money(grossUp(base, data.feeBps))} (${feeLabel(data.feeBps)}).` : ""}`}</Note>
-                      );
-                    })()}
-                    {!!val("id") && (
-                      <>
-                        {field("stockNow", "Existencias (piezas)", true, val("stockWas") || "0")}
-                        {val("stockNow").trim() !== "" && val("stockNow") !== val("stockWas") && (
-                          <Note color={C.amber}>
-                            {`Existencias ${val("stockWas") || "0"} → ${val("stockNow")} (corrección sin merma).`}
-                          </Note>
-                        )}
-                      </>
-                    )}
-                    {!val("id") && (
-                      <>
-                        {field("qty", "Stock inicial (opcional)", true, "0")}
-                        {Number(val("qty")) > 0 && (
-                          <>
-                            {moneyField("cost", "Costo por unidad MXN *")}
-                          </>
-                        )}
-                      </>
-                    )}
-                    {more()}
-                    {advanced && (
-                      <>
-                        {photoPreview.slice(0, 1).map((img: any, i: number) => (
-                          <Image
-                            key={i}
-                            source={img}
-                            style={s.photo}
-                            resizeMode="contain"
-                          />
-                        ))}
-                        <Button
-                          title={
-                            busy
-                              ? "Optimizando foto…"
-                              : photoPreview.length
-                                ? "Cambiar foto"
-                                : "Elegir foto"
-                          }
-                          secondary
-                          small
-                          disabled={busy}
-                          onPress={photo}
-                        />
-                        <View style={{ height: 12 }} />
-                        {field("sku", "SKU — automático si lo dejas vacío")}
-                        {field("category", "Categoría")}
-                        {field("brand", "Marca")}
-                        {field("flavor", "Sabor")}
-                        {field("presentation", "Presentación")}
-                        {field(
-                          "description",
-                          "Descripción del catálogo",
-                          false,
-                          "",
-                          true,
-                        )}
-                        {field("minimum", "Alerta de stock mínimo", true)}
-                        {!val("id") &&
-                          dateField(
-                            "expires",
-                            "Caducidad inicial",
-                            QUICK_EXPIRY,
-                          )}
-                        {field("notes", "Notas", false, "", true)}
-                      </>
-                    )}
-                    {editingProduct && (
-                      <Button
-                        title={
-                          editingProduct.archived
-                            ? "Restaurar producto"
-                            : "Archivar producto"
-                        }
-                        secondary
-                        small
-                        onPress={() => archiveFromForm("product")}
-                      />
-                    )}
-                  </>
-                )}
-                {form === "Cliente" && (
-                  <>
-                    {field("name", "Nombre *")}
-                    {field("phone", "Teléfono (opcional)")}
-                    {chips("stage", "Etapa", options(STAGES))}
-                    {dateField("nextDate", "Próximo contacto", QUICK_FOLLOWUP)}
-                    {more()}
-                    {advanced && (
-                      <>
-                        {field(
-                          "notes",
-                          "Notas / preferencias",
-                          false,
-                          "",
-                          true,
-                        )}
-                      </>
-                    )}
-                    {editingCustomer && (
-                      <Button
-                        title={
-                          editingCustomer.archived
-                            ? "Restaurar cliente"
-                            : "Archivar cliente"
-                        }
-                        secondary
-                        small
-                        onPress={() => archiveFromForm("customer")}
-                      />
-                    )}
-                  </>
-                )}
-                {form === "Cuenta" && (
-                  <>
-                    {field("name", "Nombre *")}
-                    {chips(
-                      "kind",
-                      "Tipo *",
-                      options(["Efectivo", "Banco", "Tarjeta", "Billetera"]),
-                    )}
-                    {moneyField("opening", "Saldo inicial MXN")}
-                  </>
-                )}
-                {form === "Entrada" && (
-                  <>
-                    {val("scanProductId")
-                      ? (() => {
-                          const product = products.find(
-                            (p) => p.id === val("scanProductId"),
-                          );
-                          return product ? (
-                            <Card>
-                              <Pill
-                                text="Ficha precargada de tu catálogo"
-                                tone="ok"
-                              />
-                              <View style={s.productRow}>
-                                <ProductPhoto
-                                  product={product}
-                                  style={s.productImage}
-                                />
-                                <View style={{ flex: 1 }}>
-                                  <Text style={s.subtitle}>{product.name}</Text>
-                                  <Note>
-                                    {[
-                                      product.brand,
-                                      product.presentation,
-                                      product.flavor,
-                                    ]
-                                      .filter(Boolean)
-                                      .join(" · ")}
-                                  </Note>
-                                  <Note>SKU: {product.sku}</Note>
-                                  <Text style={s.price}>
-                                    Precio de venta: {money(product.price)}
-                                  </Text>
-                                </View>
-                              </View>
-                              <Note>
-                                Precio registrado · no se puede cambiar desde
-                                esta entrada.
-                              </Note>
-                              <Note>
-                                {product.inventoryKnown
-                                  ? `${product.stock} piezas físicas · ${product.available} disponibles`
-                                  : "Inventario por confirmar"}
-                              </Note>
-                            </Card>
-                          ) : (
-                            <Note color={C.red}>
-                              El producto ya no está disponible. Vuelve a leer
-                              el código.
-                            </Note>
-                          );
-                        })()
-                      : choose(
-                          "productId",
-                          "Producto *",
-                          val("scanProductId")
-                            ? saleable.filter(
-                                (product) =>
-                                  product.id === val("scanProductId"),
-                              )
-                            : saleable,
-                          false,
-                          val("scanProductId") ? undefined : "Producto",
-                        )}
-                    {!!val("barcode") && (
-                      <Note>
-                        Código leído: {val("barcode")}. Se conserva vinculado a
-                        esta ficha junto con sus otros códigos.
-                      </Note>
-                    )}
-                    {field("qty", "Cantidad *", true)}
-                    {moneyField("cost", "Costo unitario MXN *")}
-                    {chips(
-                      "mode",
-                      "Tipo de entrada *",
-                      options(["Inventario inicial", "Compra pagada"]),
-                    )}
-                    {val("mode") === "Compra pagada" &&
-                      accountField("accountId", "Cuenta que paga *")}
-                    {dateField("expires", "Caducidad", QUICK_EXPIRY)}
-                    {more()}
-                    {advanced && field("label", "Nombre de lote")}
-                  </>
-                )}
-                {form === "Movimiento" && (
-                  <>
-                    {chips("kind", "Tipo *", [
-                      { id: "expense", name: "Gasto" },
-                      { id: "income", name: "Otro ingreso" },
-                      { id: "capital", name: "Aportación" },
-                      { id: "withdrawal", name: "Retiro" },
-                      { id: "transfer", name: "Traspaso" },
-                    ])}
-                    {accountField(
-                      "accountId",
-                      val("kind") === "transfer"
-                        ? "Cuenta origen *"
-                        : "Cuenta *",
-                    )}
-                    {val("kind") === "transfer" &&
-                      choose(
-                        "toId",
-                        "Cuenta destino *",
-                        accounts.filter((a) => a.id !== val("accountId")),
-                        false,
-                        "Cuenta",
-                      )}
-                    {moneyField("amount", "Importe MXN *")}
-                    {field("note", "Concepto *")}
-                  </>
-                )}
-                {form === "Venta" &&
-                  (() => {
-                    // 2.9 · Cobro directo: total y forma de pago arriba; productos en compacto;
-                    // cliente y lo demás en «Más opciones»; lo privado detrás de un toque.
-                    const cost = cart.reduce((n, i) => {
-                      const p = products.find((x) => x.id === i.productId);
-                      return n + (p && p.stock > 0 ? Math.round((p.value / p.stock) * i.qty) : 0);
-                    }, 0);
-                    const fee = saleIsCard && salePaid ? cardFee(salePaid, bps) : 0;
-                    const received = (salePaid ?? saleTotal) - fee;
-                    const row = (label: string, value: string, opts: { bold?: boolean; color?: string } = {}) => (
-                      <View key={label} style={[s.between, { gap: 8, paddingVertical: 2 }]}>
-                        <Text style={[s.body, { flex: 1, color: opts.bold ? C.ink : C.muted }, opts.bold && { fontWeight: "600" }]}>{label}</Text>
-                        <Text style={[s.body, { fontWeight: opts.bold ? "700" : "500", fontVariant: ["tabular-nums"] }, opts.color ? { color: opts.color } : null]}>
-                          {value}
-                        </Text>
-                      </View>
-                    );
-                    const fromBasket = checkoutFromBasket.current;
-                    return (
-                      <>
-                        {!fromBasket && cartEditor}
-                        <Card>
-                          <View style={s.between}>
-                            <Text style={[s.body, { fontWeight: "600" }]}>Total a cobrar</Text>
-                            <Text style={{ fontSize: 30, fontWeight: "700", color: C.ink, fontVariant: ["tabular-nums"] }}>{money(saleTotal)}</Text>
-                          </View>
-                          {saleCharge.discount > 0 &&
-                            row(
-                              saleCharge.promo.hits.length
-                                ? `Descuento · ${promoSummary(saleCharge.promo.hits)
-                                    .map((x) => x.name)
-                                    .join(", ")}`
-                                : "Descuento",
-                              minus(saleCharge.discount),
-                              { color: C.red },
-                            )}
-                          {salePaid !== null && salePaid !== saleTotal && row("Cobro de hoy", money(salePaid))}
-                          {salePaid !== null &&
-                            salePaid !== saleTotal &&
-                            row("Queda a crédito", money(Math.max(0, saleTotal - salePaid)), { color: C.amber })}
-                          {listTotal > 0 && (
-                            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                              {[
-                                { label: "5% desc.", val: amount(Math.max(100, Math.round(listTotal * 0.95))) },
-                                { label: "10% desc.", val: amount(Math.max(100, Math.round(listTotal * 0.90))) },
-                                ...(listTotal > 5000 ? [{ label: "$50 desc.", val: amount(listTotal - 5000) }] : []),
-                                ...(listTotal > 10000 ? [{ label: "$100 desc.", val: amount(listTotal - 10000) }] : []),
-                              ].map((dOpt) => {
-                                const active = val("total") === dOpt.val;
-                                return (
-                                  <Pressable
-                                    key={dOpt.label}
-                                    accessibilityRole="button"
-                                    onPress={() => set("total", active ? "" : dOpt.val)}
-                                    style={[s.chip, active && s.chipOn, { paddingVertical: 5, paddingHorizontal: 10 }]}
-                                  >
-                                    <Text style={[s.chipText, active && s.chipTextOn, { fontSize: 12 }]}>{dOpt.label}</Text>
-                                  </Pressable>
-                                );
-                              })}
-                              {!!val("total") && (
-                                <Pressable
-                                  accessibilityRole="button"
-                                  onPress={() => set("total", "")}
-                                  style={[s.chip, { paddingVertical: 5, paddingHorizontal: 10 }]}
-                                >
-                                  <Text style={[s.chipText, { fontSize: 12, color: C.red }]}>Precio normal</Text>
-                                </Pressable>
-                              )}
-                            </View>
-                          )}
-                        </Card>
-                        {accountField("accountId", "Forma de pago *", saleAccounts)}
-                        {accounts.find((a) => a.id === val("accountId"))?.kind === "Efectivo" && (salePaid ?? saleTotal) > 0 && (() => {
-                          const dueAmt = salePaid ?? saleTotal;
-                          const givenCents = tryCents(val("cashGiven"));
-                          const changeCents = givenCents !== null ? givenCents - dueAmt : null;
-                          const bills = [10000, 20000, 50000, 100000].filter((bAmt) => bAmt >= dueAmt);
-                          return (
-                            <View style={{ backgroundColor: C.paper, borderRadius: 16, padding: 10, marginBottom: 10, gap: 6 }}>
-                              <View style={[s.between, { flexWrap: "wrap", gap: 6 }]}>
-                                <Text style={[s.label, { marginBottom: 0 }]}>Calculadora de cambio (efectivo)</Text>
-                                {changeCents !== null && (
-                                  <Text style={[s.body, { fontWeight: "700", color: changeCents >= 0 ? C.green : C.amber }]}>
-                                    {changeCents >= 0 ? `Cambio: ${money(changeCents)}` : `Faltan: ${money(-changeCents)}`}
-                                  </Text>
-                                )}
-                              </View>
-                              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-                                <Pressable
-                                  accessibilityRole="button"
-                                  onPress={() => set("cashGiven", "")}
-                                  style={[s.chip, !val("cashGiven") && s.chipOn, { paddingVertical: 5, paddingHorizontal: 10 }]}
-                                >
-                                  <Text style={[s.chipText, !val("cashGiven") && s.chipTextOn, { fontSize: 12 }]}>Exacto</Text>
-                                </Pressable>
-                                {bills.map((bAmt) => {
-                                  const strAmt = amount(bAmt);
-                                  const on = val("cashGiven") === strAmt;
-                                  return (
-                                    <Pressable
-                                      key={bAmt}
-                                      accessibilityRole="button"
-                                      onPress={() => set("cashGiven", on ? "" : strAmt)}
-                                      style={[s.chip, on && s.chipOn, { paddingVertical: 5, paddingHorizontal: 10 }]}
-                                    >
-                                      <Text style={[s.chipText, on && s.chipTextOn, { fontSize: 12 }]}>{`Recibí ${money(bAmt)}`}</Text>
-                                    </Pressable>
-                                  );
-                                })}
-                              </View>
-                            </View>
-                          );
-                        })()}
-                        {["Banco", "Billetera"].includes(accounts.find((a) => a.id === val("accountId"))?.kind || "") && (
-                          <TransferInfo
-                            list={((all: TransferAccount[]) =>
-                              all.some((t) => t.accountId === val("accountId"))
-                                ? all.filter((t) => t.accountId === val("accountId"))
-                                : all.filter((t) => !t.ownerHidden))(b!.setting("transferAccounts", []))}
-                            amount={saleTotal}
-                            phone={customers.find((c) => c.id === val("customerId"))?.phone || ""}
-                            emptyText="Captura tus datos de transferencia en Ajustes → Formas de pago para mandárselos al cliente."
-                          />
-                        )}
-                        {fromBasket && cartEditor}
-                        {(advanced || !!val("customerId")) &&
-                          choose(
-                            "customerId",
-                            "Cliente",
-                            customers.filter((c) => !c.archived || c.id === val("customerId")),
-                            true,
-                            "Cliente",
-                          )}
-                        {!!val("customerId") && (() => {
-                          const sugDays = cart.some((i) =>
-                            /60\s*serv|2\s*kg|5\s*lb/i.test(
-                              (productById.get(i.productId)?.presentation || "") + " " + (productById.get(i.productId)?.name || ""),
-                            ),
-                          )
-                            ? 45
-                            : 25;
-                          const curFollow = val("autoFollow");
-                          return (
-                            <View style={{ marginBottom: 8 }}>
-                              <Text style={s.label}>Recordatorio de recompra (seguimiento)</Text>
-                              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-                                {[
-                                  { id: String(sugDays), label: `Recompra ${sugDays}d` },
-                                  { id: "15", label: "15 días" },
-                                  { id: "30", label: "30 días" },
-                                  { id: "", label: "Sin agendar" },
-                                ].map((opt) => {
-                                  const on = curFollow === opt.id;
-                                  return (
-                                    <Pressable
-                                      key={opt.id || "none"}
-                                      accessibilityRole="button"
-                                      onPress={() => set("autoFollow", opt.id)}
-                                      style={[s.chip, on && s.chipOn, { paddingVertical: 5, paddingHorizontal: 10 }]}
-                                    >
-                                      <Text style={[s.chipText, on && s.chipTextOn, { fontSize: 12 }]}>{opt.label}</Text>
-                                    </Pressable>
-                                  );
-                                })}
-                              </View>
-                            </View>
-                          );
-                        })()}
-                        {more("＋ Cliente y más opciones")}
-                        {advanced && (
-                          <>
-                            {moneyField("total", "Precio especial MXN (lo que quieres recibir)", amount(listTotal))}
-                            {moneyField("paid", "Cobro de hoy MXN", "Vacío = pago completo")}
-                            {chips("channel", "Canal *", options(channels))}
-                            {field("notes", "Notas", false, "", true)}
-                            <View style={[s.between, { marginBottom: 6 }]}>
-                              <Text style={[s.body, { flex: 1 }]}>Autorizar venta debajo del costo (solo esta venta)</Text>
-                              <Switch value={allow} onValueChange={setAllow} />
-                            </View>
-                          </>
-                        )}
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel="Ver lo que recibes"
-                          onPress={() => setPrivateOpen((x) => !x)}
-                          style={({ pressed }) => [
-                            { backgroundColor: C.soft, borderRadius: 18, padding: 14, gap: 1 },
-                            pressed && { opacity: 0.8 },
-                          ]}
-                        >
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                            <Icon name="lock" size={14} color={C.muted} />
-                            <Text style={[s.body, { flex: 1, fontWeight: "600" }]}>
-                              {`Recibes ${money(received)}${cost > 0 ? ` · ganas ${money(received - cost)}` : ""}`}
-                            </Text>
-                            <Icon name={privateOpen ? "chevron-down" : "chevron-right"} size={16} color={C.muted} />
-                          </View>
-                          {privateOpen && (
-                            <>
-                              <Text style={[s.label, { marginTop: 6, marginBottom: 2 }]}>Solo lo ves tú</Text>
-                              {row("Subtotal", money(saleCharge.subtotal))}
-                              {row("Tu precio", money(saleBase))}
-                              {row("Comisión que absorbe el cliente", "+" + money(saleCommission))}
-                              {saleIsCard && row(`Mercado Pago descuenta ${feeLabel(bps)}`, minus(fee), { color: C.red })}
-                              {row("Recibes", money(received), { bold: true, color: C.green })}
-                              {cost > 0 &&
-                                row("Ganancia estimada", money(received - cost), {
-                                  color: received - cost >= 0 ? C.green : C.red,
-                                })}
-                            </>
-                          )}
-                          {cost > 0 && saleBase < cost && saleCharge.promo.total > 0 && saleBase + saleCharge.promo.total >= cost && (
-                            <Note color={C.amber}>
-                              Con la promoción esta venta queda debajo del costo. Se permite porque tú la configuraste.
-                            </Note>
-                          )}
-                        </Pressable>
-                        <View style={{ height: 12 }} />
-                      </>
-                    );
-                  })()}
-                {form === "Editar venta" && (
-                  <>
-                    {choose(
-                      "customerId",
-                      "Cliente",
-                      customers,
-                      true,
-                      "Cliente",
-                    )}
-                    {chips("channel", "Canal *", options(channels))}
-                    {field("notes", "Notas", false, "", true)}
-                  </>
-                )}
-                {form === "Abono" && (
-                  <>
-                    {accountField("accountId", "Cuenta *")}
-                    {moneyField("amount", "Abono MXN *")}
-                    {accounts.find((a) => a.id === val("accountId"))?.kind ===
-                      "Tarjeta" && (
-                      <CardFeePreview
-                        value={tryCents(val("amount"))}
-                        bps={bps}
-                      />
-                    )}
-                  </>
-                )}
-                {form === "Enviar comprobante" &&
-                  (() => {
-                    const msg = receiptMessage();
-                    const v = receiptSale();
-                    const cust = v
-                      ? customers.find((c) => c.id === v.customerId)
-                      : null;
-                    return (
-                      <>
-                        {field(
-                          "phone",
-                          "WhatsApp del cliente (10 dígitos)",
-                          false,
-                          "55 1234 5678",
-                        )}
-                        {!!val("phone") && !validWhatsapp(val("phone")) && (
-                          <Note color={C.red}>
-                            Escribe el número a 10 dígitos, por ejemplo 55 1234
-                            5678.
-                          </Note>
-                        )}
-                        {!!cust && !cust.phone && (
-                          <Checkbox
-                            label={`Guardar este número en ${cust.name}`}
-                            value={val("savePhone") === "1"}
-                            onChange={(x) => set("savePhone", x ? "1" : "")}
-                          />
-                        )}
-                        <Text style={[s.label, { marginTop: 6 }]}>
-                          Vista previa
-                        </Text>
-                        <Card>
-                          <Text style={s.body}>{msg.replace(/\*/g, "")}</Text>
-                        </Card>
-                      </>
-                    );
-                  })()}
-                {form === "Modificar venta" && !revising && (
-                  <Note>Esta venta ya no está disponible.</Note>
-                )}
-                {form === "Modificar venta" && !!revising && (
-                  <>
-                    <Card>
-                      <Text style={s.subtitle}>
-                        {revising.folio ||
-                          String(revising.id).slice(-8).toUpperCase()}{" "}
-                        · {revising.customer || "Público general"}
-                      </Text>
-                      <Note>
-                        Total actual {money(revising.total)} · cobrado{" "}
-                        {money(revising.paid)}
-                      </Note>
-                    </Card>
-                    {cartEditor}
-                    <Note>Quita productos para devolverlos (regresan a su lote) o agrega más.</Note>
-                    <View style={{ height: 10 }} />
-                    {moneyField(
-                      "total",
-                      "Nuevo total MXN",
-                      amount(reviseSuggested),
-                    )}
-                    {!val("total") && (
-                      <Note>{`Vacío = ${money(reviseSuggested)}: cada producto al precio con el que se vendió; los nuevos a precio de lista${reviseFeeBps ? `, más la comisión que absorbe el cliente (${money(reviseSuggested - reviseGoods)})` : ""}.`}</Note>
-                    )}
-                    {reviseRefund > 0 && (
-                      <>
-                        {accountField(
-                          "refundAccountId",
-                          "Cuenta de donde sale la devolución *",
-                        )}
-                        {canMpRefund && (
-                          <Checkbox
-                            label={`Devolver ${money(reviseRefund)} también en Mercado Pago`}
-                            hint="Se regresa a la tarjeta del cliente desde tu cuenta de Mercado Pago. Si lo desmarcas, solo se registra en la app."
-                            value={val("mpRefund") === "1"}
-                            onChange={(v) => set("mpRefund", v ? "1" : "")}
-                          />
-                        )}
-                      </>
-                    )}
-                    {field("note", "Motivo / nota (opcional)")}
-                    {more()}
-                    {advanced && (
-                      <View style={[s.between, { marginBottom: 6 }]}>
-                        <Text style={[s.body, { flex: 1 }]}>
-                          Autorizar total debajo del costo
-                        </Text>
-                        <Switch value={allow} onValueChange={setAllow} />
-                      </View>
-                    )}
-                    <Card tone={reviseRefund > 0 ? "warn" : "ok"}>
-                      {line("Total anterior", money(revising.total))}
-                      {line(
-                        "Nuevo total",
-                        reviseTotal === null ? "—" : money(reviseTotal),
-                        { bold: true },
-                      )}
-                      {line("Ya cobrado", money(revisePaid))}
-                      {divider()}
-                      {reviseRefund > 0
-                        ? line("Devolver al cliente", money(reviseRefund), {
-                            bold: true,
-                            color: C.red,
-                          })
-                        : reviseBalance > 0
-                          ? line("Queda por cobrar", money(reviseBalance), {
-                              bold: true,
-                              color: C.amber,
-                            })
-                          : line("Sin movimiento de dinero", "✓")}
-                      <Note>
-                        Folio, fecha y cliente se conservan. La comisión del
-                        cobro original con tarjeta no cambia.
-                      </Note>
-                    </Card>
-                  </>
-                )}
-                {form === "Ajuste de inventario" &&
-                  (() => {
-                    const p = products.find((x) => x.id === val("productId"));
-                    const counted =
-                      val("counted").trim() === ""
-                        ? null
-                        : Number(val("counted"));
-                    const diff =
-                      p && counted !== null && Number.isFinite(counted)
-                        ? counted - p.stock
-                        : null;
-                    return (
-                      <>
-                        {choose("productId", "Producto *", saleable, false)}
-                        {!!p && (
-                          <Card>
-                            {line(
-                              "Unidades físicas en la app",
-                              String(p.stock),
-                            )}
-                            {line(
-                              "Disponibles para vender",
-                              String(p.available),
-                            )}
-                          </Card>
-                        )}
-                        {field(
-                          "counted",
-                          "Unidades que contaste *",
-                          true,
-                          p ? String(p.stock) : "0",
-                        )}
-                        {diff !== null && diff !== 0 && (
-                          <Note color={diff < 0 ? C.red : C.green}>
-                            {val("reason") === DUPLICATED || val("reason") === CORRECTION
-                              ? diff < 0
-                                ? `Se quitan ${-diff} ${-diff === 1 ? "pieza" : "piezas"} (primero las cargadas más recientemente). No cuenta como merma.`
-                                : `Se agregan ${diff} ${diff === 1 ? "pieza" : "piezas"} con el último costo. No cuenta como merma.`
-                              : diff < 0
-                                ? `Se descontarán ${-diff} ${-diff === 1 ? "unidad" : "unidades"} (primero de los lotes que caducan antes).`
-                                : `Se agregarán ${diff} ${diff === 1 ? "unidad" : "unidades"} con el último costo registrado.`}
-                          </Note>
-                        )}
-                        {chips(
-                          "reason",
-                          "Motivo *",
-                          options([
-                            CORRECTION,
-                            DUPLICATED,
-                            "Conteo físico",
-                            "Merma o caducado",
-                            "Regalo o muestra",
-                            "Dañado",
-                            "Otro",
-                          ]),
-                        )}
-                        {field("note", "Nota (opcional)")}
-                        <Note>
-                          {val("reason") === DUPLICATED || val("reason") === CORRECTION
-                            ? "Corrige la cantidad sin mover dinero ni contar como merma."
-                            : "El ajuste no mueve dinero. Las bajas cuentan como merma (a su costo) en tu utilidad; las altas la compensan."}
-                        </Note>
-                      </>
-                    );
-                  })()}
-                {form === "Renombrar cuenta" && (
-                  <>
-                    {field("name", "Nombre *")}
-                  </>
-                )}
-                {form === "Configuración" && (
-                  <>
-                    {field("rate", "Comisión (%) *", true, "4.06")}
-                    <Note>{`Normalmente 4.06% (3.5% + IVA de Mercado Pago).${data?.feeInPrice ? " Tus precios se ajustan solos al nuevo %." : ""} Las ventas anteriores no cambian.`}</Note>
-                  </>
-                )}
-                <View style={{ height: 16 }} />
-                {!!formError && <Note color={C.red}>{formError}</Note>}
-                {form === "Inventario por código" ? null : form === "Venta" &&
-                  mpActive &&
-                  saleIsCard &&
-                  (salePaid ?? 0) > 0 ? (
-                  <>
-                    <Button
-                      icon="credit-card" title={
-                        busy
-                          ? "Enviando…"
-                          : `Cobrar ${money(salePaid ?? 0)} en la terminal`
-                      }
-                      disabled={busy || !cart.length}
-                      onPress={() => save("terminal")}
-                    />
-                    <Button
-                      title="Ya lo cobré · registrar sin enviar a la terminal"
-                      secondary
-                      small
-                      disabled={busy || !cart.length}
-                      onPress={() => save()}
-                    />
-                    <Note>
-                      La venta se registra solo cuando Mercado Pago aprueba el
-                      pago.
-                    </Note>
-                  </>
-                ) : form === "Enviar comprobante" ? (
-                  <>
-                    <Button
-                      icon="message-circle" title="Enviar por WhatsApp"
-                      disabled={!validWhatsapp(val("phone"))}
-                      onPress={() => void sendTypedReceipt()}
-                    />
-                    <Button
-                      title="Compartir con otra app"
-                      secondary
-                      small
-                      onPress={() =>
-                        void Share.share({ message: receiptMessage() }).catch(
-                          () => {},
-                        )
-                      }
-                    />
-                  </>
-                ) : form === "Abono" &&
-                  mpActive &&
-                  accounts.find((a) => a.id === val("accountId"))?.kind ===
-                    "Tarjeta" &&
-                  (tryCents(val("amount")) ?? 0) > 0 ? (
-                  <>
-                    <Button
-                      icon="credit-card" title={
-                        busy
-                          ? "Enviando…"
-                          : `Cobrar abono de ${money(tryCents(val("amount")) ?? 0)} en la terminal`
-                      }
-                      disabled={busy}
-                      onPress={() => save("terminal")}
-                    />
-                    <Button
-                      title="Ya lo cobré · registrar sin enviar a la terminal"
-                      secondary
-                      small
-                      disabled={busy}
-                      onPress={() => save()}
-                    />
-                    <Note>
-                      El abono se registra solo cuando Mercado Pago aprueba el
-                      pago.
-                    </Note>
-                  </>
-                ) : (
-                  <Button
-                    title={
-                      busy
-                        ? "Guardando…"
-                        : form === "Venta"
-                          ? `Cobrar ${money(salePaid ?? saleTotal)}`
-                          : form === "Modificar venta"
-                            ? val("mpRefund") === "1" && canMpRefund
-                              ? "Devolver y guardar cambios"
-                              : "Guardar cambios"
-                            : "Guardar"
-                    }
-                    disabled={
-                      busy ||
-                      ((form === "Venta" || form === "Modificar venta") &&
-                        !cart.length)
-                    }
-                    onPress={() => save()}
-                  />
-                )}
-                <View style={{ height: 30 }} />
-              </ScrollView>
-            )}
-          </KeyboardAvoidingView>
-          {!!form && payOverlay}
-        </SafeAreaView>
-      </Modal>
+      <FollowUpPopupModal
+        visible={followPopup}
+        onClose={() => setFollowPopup(false)}
+        customers={customers}
+        b={b}
+        act={act}
+        openSale={openSale}
+        go={go}
+      />
+      <OwnerFormModal
+        form={form}
+        pay={pay}
+        selector={selector}
+        setSelector={setSelector}
+        close={close}
+        val={val}
+        set={set}
+        checkoutFromBasket={checkoutFromBasket}
+        stack={stack}
+        search={search}
+        setSearch={setSearch}
+        open={open}
+        cartLimit={cartLimit}
+        cart={cart}
+        setCart={setCart}
+        setFormError={setFormError}
+        productName={productName}
+        addTo={addTo}
+        formList={formList}
+        formKeyboard={formKeyboard}
+        wide={wide}
+        formError={formError}
+        b={b}
+        products={products}
+        act={act}
+        choose={choose}
+        setProductDetailId={setProductDetailId}
+        go={go}
+        addToBasket={addToBasket}
+        field={field}
+        barcodeScanner={barcodeScanner}
+        setBarcodeScanner={setBarcodeScanner}
+        moneyField={moneyField}
+        data={data}
+        more={more}
+        advanced={advanced}
+        photoPreview={photoPreview}
+        busy={busy}
+        photo={photo}
+        dateField={dateField}
+        editingProduct={editingProduct}
+        archiveFromForm={archiveFromForm}
+        chips={chips}
+        editingCustomer={editingCustomer}
+        saleable={saleable}
+        accountField={accountField}
+        accounts={accounts}
+        saleIsCard={saleIsCard}
+        salePaid={salePaid}
+        bps={bps}
+        saleTotal={saleTotal}
+        cartEditor={cartEditor}
+        saleCharge={saleCharge}
+        listTotal={listTotal}
+        customers={customers}
+        saleAccounts={saleAccounts}
+        productById={productById}
+        allow={allow}
+        setAllow={setAllow}
+        privateOpen={privateOpen}
+        setPrivateOpen={setPrivateOpen}
+        saleBase={saleBase}
+        saleCommission={saleCommission}
+        receiptMessage={receiptMessage}
+        receiptSale={receiptSale}
+        revising={revising}
+        reviseSuggested={reviseSuggested}
+        reviseFeeBps={reviseFeeBps}
+        reviseGoods={reviseGoods}
+        reviseRefund={reviseRefund}
+        canMpRefund={canMpRefund}
+        line={line}
+        reviseTotal={reviseTotal}
+        revisePaid={revisePaid}
+        divider={divider}
+        reviseBalance={reviseBalance}
+        mpActive={mpActive}
+        save={save}
+        sendTypedReceipt={sendTypedReceipt}
+        payOverlay={payOverlay}
+      />
     </SafeAreaView>
   );
 }
@@ -5071,130 +3756,6 @@ function AppContent({ business }: { business?: Business }) {
  * Teléfono nuevo del dueño (ya entró con su correo y contraseña de dueño): no se
  * puede empezar de cero; se restaura el respaldo del negocio.
  */
-function OwnerSetup({
-  b,
-  onDone,
-  onBack,
-}: {
-  b: Business;
-  onDone: () => void;
-  onBack: () => void;
-}) {
-  const [msg, setMsg] = useState("");
-  const [busy, setBusy] = useState(false);
-  // 2.1: si tienes respaldo en la nube, se restaura sin buscar el archivo.
-  const [cloudList, setCloudList] = useState<CloudBackup[] | null>(null);
-  const ownerCloud = () => {
-    const cfg = b.setting("cloudConfig", null);
-    const session = b.setting("cloudSession", null);
-    if (!cfg || !session) return null;
-    const c = new Cloud(cfg, session, (ns: CloudSession | null) =>
-      b.setSetting("cloudSession", ns),
-    );
-    c.device = deviceId(b);
-    return c;
-  };
-  useEffect(() => {
-    const c = ownerCloud();
-    if (c) listBackups(c).then(setCloudList, () => setCloudList([]));
-  }, []);
-  async function restoreCloud(x: CloudBackup) {
-    const c = ownerCloud();
-    if (!c) return;
-    setMsg("");
-    setBusy(true);
-    try {
-      b.restore(await downloadBackup(c, x));
-      try {
-        await migratePhotos(b);
-      } catch {}
-      b.setSetting("ownerVerified", null);
-      onDone();
-    } catch (e) {
-      setMsg(
-        `No se pudo restaurar: ${e instanceof Error ? e.message : String(e)}`,
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function restoreBackup() {
-    setMsg("");
-    try {
-      const r = await Picker.getDocumentAsync({
-        type: ["application/json", "text/plain"],
-        copyToCacheDirectory: true,
-      });
-      if (r.canceled) return;
-      setBusy(true);
-      const raw = await FS.readAsStringAsync(r.assets[0].uri);
-      b.restore(raw);
-      try {
-        await migratePhotos(b);
-      } catch {}
-      b.setSetting("ownerVerified", null);
-      onDone();
-    } catch (e) {
-      setMsg(
-        `No se pudo restaurar: ${e instanceof Error ? e.message : String(e)}`,
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <SafeAreaView style={s.safe}>
-      <ScrollView
-        automaticallyAdjustKeyboardInsets
-        contentContainerStyle={[s.content, { paddingTop: 30 }]}
-      >
-        <Image
-          source={LOGO_FULL}
-          accessibilityLabel="GGG · Nova Supps"
-          resizeMode="contain"
-          style={{
-            width: 220,
-            height: 220 / LOGO_FULL_RATIO,
-            marginBottom: 22,
-            alignSelf: "center",
-          }}
-        />
-        {!!msg && (
-          <View style={s.errorBox}>
-            <Text style={[s.body, { color: C.red }]}>{msg}</Text>
-          </View>
-        )}
-        <Text style={s.title}>Restaura tu negocio</Text>
-        <Note>Entraste como dueño ✓. Elige tu archivo de respaldo (Nova-respaldo-….json) para traer tu negocio a este teléfono.</Note>
-        <View style={{ height: 10 }} />
-        {!!cloudList?.length && (
-          <Button
-            icon="cloud-upload" title={
-              busy
-                ? "Restaurando…"
-                : `Restaurar de la nube (${when(cloudList[0].created_at)})`
-            }
-            disabled={busy}
-            onPress={() => void restoreCloud(cloudList[0])}
-          />
-        )}
-        <Button
-          icon="file-text" title={busy ? "Restaurando…" : "Elegir mi respaldo"}
-          secondary={!!cloudList?.length}
-          disabled={busy}
-          onPress={() => void restoreBackup()}
-        />
-        <View style={{ height: 14 }} />
-        <Button
-          title="Salir (cerrar sesión)"
-          secondary
-          small
-          onPress={onBack}
-        />
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
 /** Decide si este teléfono es el del dueño (todos los datos) o el de un vendedor. */
 function Root() {
   const [b, setB] = useState<Business | null>(null);

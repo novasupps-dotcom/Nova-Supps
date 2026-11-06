@@ -24,6 +24,8 @@ import {
   today,
   saleSegment,
   segmentsOf,
+  productBrand,
+  brandsOf,
   type Row,
   type Business,
 } from "./business";
@@ -872,39 +874,42 @@ export function ProductGrid({
   const query = queryProp ?? ownQuery;
   const setQuery = onQuery ?? setOwnQuery;
   const [width, setWidth] = useState(0);
-  // Categoría y texto de búsqueda de cada producto se calculan una sola vez (no en cada tecla o toque).
+  const [brand, setBrand] = useState("");
+  // Categoría, marca y texto de búsqueda de cada producto se calculan una sola vez.
   const index = useMemo(() => {
     const seg = new Map<string, string>();
+    const br = new Map<string, string>();
     const hay = new Map<string, string>();
     const counts = new Map<string, number>();
     for (const p of products) {
       const g = saleSegment(p);
+      const bName = productBrand(p);
       seg.set(p.id, g);
+      br.set(p.id, bName);
       counts.set(g, (counts.get(g) ?? 0) + 1);
       hay.set(
         p.id,
         fold(
-          `${p.name} ${p.brand || ""} ${p.category || ""} ${productCodes(p).join(" ")}`,
+          `${p.name} ${p.brand || ""} ${bName} ${p.category || ""} ${productCodes(p).join(" ")}`,
         ),
       );
     }
-    return { seg, hay, counts, segments: segmentsOf(products) };
+    return { seg, br, hay, counts, segments: segmentsOf(products), brands: brandsOf(products) };
   }, [products]);
   const segments = index.segments;
+  const activeBrand = index.brands.includes(brand) ? brand : "";
   const current =
     segments.includes(segment) || segment === "Todos"
       ? segment
       : segments[0] || "Todos";
   const q = fold(query.trim());
-  const shown = useMemo(
-    () =>
-      products.filter((p) =>
-        q
-          ? (index.hay.get(p.id) || "").includes(q)
-          : current === "Todos" || index.seg.get(p.id) === current,
-      ),
-    [products, index, q, current],
-  );
+  const shown = useMemo(() => {
+    if (q) return products.filter((p) => (index.hay.get(p.id) || "").includes(q));
+    const bySeg = products.filter((p) => current === "Todos" || index.seg.get(p.id) === current);
+    if (!activeBrand) return bySeg;
+    const both = bySeg.filter((p) => index.br.get(p.id) === activeBrand);
+    return both.length ? both : products.filter((p) => index.br.get(p.id) === activeBrand);
+  }, [products, index, q, current, activeBrand]);
   // 2.8: los sabores de un mismo producto se muestran como una sola tarjeta.
   type Entry = { kind: "one"; p: GridProduct } | { kind: "family"; key: string; name: string; members: GridProduct[] };
   const entries = useMemo<Entry[]>(() => {
@@ -1031,13 +1036,48 @@ export function ProductGrid({
                 accessibilityRole="button"
                 accessibilityState={{ selected: on }}
                 accessibilityLabel={`Categoría ${name}`}
-                onPress={() => onSegment(name)}
+                onPress={() => {
+                  setBrand("");
+                  onSegment(name);
+                }}
                 style={[s.chip, on && s.chipOn]}
               >
                 <Text style={[s.chipText, on && s.chipTextOn]}>
                   {name === "Todos"
                     ? `Todos (${products.length})`
                     : `${name} (${count(name)})`}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
+      {!q && index.brands.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 6, paddingBottom: 4 }}
+          style={{ marginBottom: 8 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {["Todas las marcas", ...index.brands].map((bName) => {
+            const val = bName === "Todas las marcas" ? "" : bName;
+            const on = activeBrand === val;
+            return (
+              <Pressable
+                key={`brand-${bName}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+                accessibilityLabel={`Marca ${bName}`}
+                onPress={() => setBrand(on ? "" : val)}
+                style={[
+                  s.chip,
+                  on && s.chipOn,
+                  { paddingVertical: 5, paddingHorizontal: 11 },
+                ]}
+              >
+                <Text style={[s.chipText, on && s.chipTextOn, { fontSize: 12.5 }]}>
+                  {bName === "Todas las marcas" ? "🏷️ Todas las marcas" : bName}
                 </Text>
               </Pressable>
             );

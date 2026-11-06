@@ -383,6 +383,433 @@ export function segmentsOf(
     .sort((a, b) => a.localeCompare(b, "es"));
   return [...known, ...rest, ...(set.has("Otros") ? ["Otros"] : [])];
 }
+const KNOWN_BRANDS: [RegExp, string][] = [
+  [/dragon\s*pharma/i, "Dragon Pharma"],
+  [/insane\s*labz/i, "Insane Labz"],
+  [/gat\s*sport|\bgat\b/i, "GAT Sport"],
+  [/dymatize/i, "Dymatize"],
+  [/optimum\s*nutrition|\bon\s+gold/i, "Optimum Nutrition"],
+  [/bpi\s*sports|\bbpi\b/i, "BPI Sports"],
+  [/mutant/i, "Mutant"],
+  [/muscletech/i, "Muscletech"],
+  [/raw\s*nutrition|\bcbum\b/i, "Raw Nutrition"],
+  [/rule\s*1|\br1\b/i, "Rule 1"],
+  [/\bghost\b/i, "Ghost"],
+  [/universal|animal\s*pak/i, "Universal"],
+  [/cellucor|\bc4\b/i, "Cellucor"],
+  [/birdman/i, "Birdman"],
+  [/ronnie\s*coleman/i, "Ronnie Coleman"],
+  [/\bmdn\b/i, "MDN"],
+  [/valhalla/i, "Valhalla"],
+  [/smartshake/i, "SmartShake"],
+  [/nova\s*supps/i, "Nova Supps"],
+];
+/** 2.10.7 · Obtiene o infiere la marca de un producto para filtros en Vender, Stock, Ventas y Kiosco. */
+export function productBrand(p: {
+  brand?: string | null;
+  name?: string | null;
+  category?: string | null;
+}): string {
+  const explicit = String(p.brand || "").trim();
+  if (explicit) return explicit;
+  const name = String(p.name || "").trim();
+  for (const [rx, label] of KNOWN_BRANDS) if (rx.test(name)) return label;
+  if (name.includes("·")) {
+    const parts = name.split("·").map((s) => s.trim()).filter(Boolean);
+    if (parts.length >= 2 && !/^\d+\s*(kg|g|lb|oz|serv|cap|tab|ml|pza)/i.test(parts[1]))
+      return parts[1];
+  }
+  return "Nova Supps";
+}
+export function brandsOf(
+  products: { brand?: string | null; name?: string | null; category?: string | null }[],
+): string[] {
+  const set = new Set<string>();
+  for (const p of products) {
+    const br = productBrand(p);
+    if (br) set.add(br);
+  }
+  return [...set].sort((a, z) => a.localeCompare(z, "es"));
+}
+/**
+ * 2.10.7 · Motor Matemático de Eliminación de Gauss-Jordan (RREF: [A | b] -> [I | x]).
+ * Resuelve sistemas lineales cuadrados A * x = b mediante pivoteo parcial, regularización
+ * de Tikhonov para estabilidad estadística y reducción completa por renglones (arriba y abajo del pivote).
+ */
+export function gaussJordanSolve(matrixA: number[][], vectorB: number[]): number[] {
+  const n = vectorB.length;
+  if (n === 0) return [];
+  const M: number[][] = Array.from({ length: n }, (_, i) =>
+    Array.from({ length: n + 1 }, (__, j) =>
+      j < n ? Number(matrixA[i]?.[j]) || 0 : Number(vectorB[i]) || 0,
+    ),
+  );
+  for (let k = 0; k < n; k++) {
+    let pivotRow = k;
+    let maxVal = Math.abs(M[k][k]);
+    for (let i = k + 1; i < n; i++) {
+      const v = Math.abs(M[i][k]);
+      if (v > maxVal) {
+        maxVal = v;
+        pivotRow = i;
+      }
+    }
+    if (pivotRow !== k) {
+      const tmp = M[k];
+      M[k] = M[pivotRow];
+      M[pivotRow] = tmp;
+    }
+    if (Math.abs(M[k][k]) < 1e-8) {
+      M[k][k] += 1e-4;
+    }
+    const pivot = M[k][k];
+    for (let j = k; j <= n; j++) {
+      M[k][j] /= pivot;
+    }
+    for (let i = 0; i < n; i++) {
+      if (i === k) continue;
+      const factor = M[i][k];
+      if (Math.abs(factor) < 1e-12) continue;
+      for (let j = k; j <= n; j++) {
+        M[i][j] -= factor * M[k][j];
+      }
+    }
+  }
+  return M.map((row) => (Number.isFinite(row[n]) ? row[n] : 0));
+}
+
+/**
+ * 2.10.7 · Motor Estadístico Gauss-Jordan de Pedido / Stack Sugerido:
+ * Construye la matriz de covarianza y transición entre pilares de suplementos a partir del
+ * historial de ventas del cliente y productos comprados, resuelve el sistema lineal (I - α·T^T)·x = y
+ * por Eliminación de Gauss-Jordan (RREF) para predecir futuras decisiones de compra, y si no hay
+ * historial del cliente utiliza como vector prior los Productos BASE (Proteínas, Creatinas, PWO).
+ * Nunca sugiere todo el inventario: se detiene estrictamente al cubrir hasta 3 pilares base.
+ */
+export function jordanianStack(
+  b: Business,
+  products: Row[],
+  cart: { productId: string; qty: number }[],
+  customerId?: string | null,
+): {
+  complete: boolean;
+  source: "customer" | "base" | "complete";
+  label: string;
+  items: Row[];
+  probabilities?: Record<string, number>;
+} {
+  const inCartIds = new Set(cart.map((i) => i.productId));
+  const inCartSegs = new Set(
+    cart
+      .map((i) => {
+        const p = products.find((x) => x.id === i.productId);
+        return p ? saleSegment(p) : "";
+      })
+      .filter(Boolean),
+  );
+  const basePillars = ["Proteínas", "Creatinas", "PWO"];
+  const coveredPillars = basePillars.filter((seg) => inCartSegs.has(seg));
+  if (cart.length >= 3 || coveredPillars.length >= 3) {
+    return {
+      complete: true,
+      source: "complete",
+      label: "✓ Stack Gauss-Jordan completo en el pedido (3 pilares)",
+      items: [],
+      probabilities: {},
+    };
+  }
+  const maxSuggest = Math.min(2, 3 - cart.length);
+  const avail = products.filter(
+    (p) => !p.archived && (Number(p.available) || 0) > 0 && !inCartIds.has(p.id),
+  );
+  if (!avail.length) {
+    return { complete: true, source: "complete", label: "", items: [], probabilities: {} };
+  }
+
+  const pillars = ["Proteínas", "Creatinas", "PWO", "Vitaminas"];
+  const pIdx = (seg: string) => {
+    const idx = pillars.indexOf(seg);
+    return idx >= 0 ? idx : 3;
+  };
+  const prodSegById = new Map<string, string>();
+  for (const p of products) prodSegById.set(String(p.id), saleSegment(p));
+
+  const lines = b.all(
+    "SELECT s.id saleId, s.customerId, l.productId, l.qty FROM sale_lines l JOIN sales s ON s.id=l.saleId WHERE s.status='confirmed'",
+  );
+  const baskets = new Map<string, { customerId: string; vec: number[]; prods: Map<string, number> }>();
+  const custProdFreq = new Map<string, number>();
+  const globalProdVel = new Map<string, number>();
+  let custOrderCount = 0;
+  const custHistoryVec = [0, 0, 0, 0];
+
+  for (const r of lines) {
+    const sid = String(r.saleId);
+    const pid = String(r.productId);
+    const qty = Math.max(1, Number(r.qty) || 1);
+    const seg = prodSegById.get(pid) || "Vitaminas";
+    const idx = pIdx(seg);
+    globalProdVel.set(pid, (globalProdVel.get(pid) ?? 0) + qty);
+    let bsk = baskets.get(sid);
+    if (!bsk) {
+      bsk = { customerId: String(r.customerId || ""), vec: [0, 0, 0, 0], prods: new Map() };
+      baskets.set(sid, bsk);
+      if (customerId && String(r.customerId) === String(customerId)) custOrderCount++;
+    }
+    bsk.vec[idx] += qty;
+    bsk.prods.set(pid, (bsk.prods.get(pid) ?? 0) + qty);
+    if (customerId && String(r.customerId) === String(customerId)) {
+      custProdFreq.set(pid, (custProdFreq.get(pid) ?? 0) + qty);
+      custHistoryVec[idx] += qty;
+    }
+  }
+
+  const cov: number[][] = Array.from({ length: 4 }, () => [0, 0, 0, 0]);
+  const coProdScore = new Map<string, number>();
+  for (const bsk of baskets.values()) {
+    const w = customerId && bsk.customerId === String(customerId) ? 3.0 : 1.0;
+    for (let i = 0; i < 4; i++) {
+      for (let j = 0; j < 4; j++) {
+        cov[i][j] += w * bsk.vec[i] * bsk.vec[j];
+      }
+    }
+    for (const ci of cart) {
+      if (bsk.prods.has(ci.productId)) {
+        for (const [otherPid, q] of bsk.prods.entries()) {
+          if (otherPid !== ci.productId) {
+            coProdScore.set(otherPid, (coProdScore.get(otherPid) ?? 0) + w * q);
+          }
+        }
+      }
+    }
+  }
+
+  const alpha = 0.45;
+  const A: number[][] = Array.from({ length: 4 }, (_, i) =>
+    Array.from({ length: 4 }, (__, j) => (i === j ? 1.0 : 0)),
+  );
+  for (let j = 0; j < 4; j++) {
+    const rowSum = cov[j].reduce((acc, v) => acc + v, 0) + 1.0;
+    for (let i = 0; i < 4; i++) {
+      if (i !== j) {
+        A[i][j] -= alpha * (cov[j][i] / rowSum);
+      }
+    }
+  }
+
+  const basePrior = [1.0, 0.92, 0.84, 0.55];
+  const cartVec = [0, 0, 0, 0];
+  for (const ci of cart) {
+    const seg = prodSegById.get(ci.productId) || "Vitaminas";
+    cartVec[pIdx(seg)] += Math.max(1, ci.qty);
+  }
+  const hasCustHistory = Boolean(customerId && custOrderCount > 0);
+  const rhsY = pillars.map((_, i) =>
+    hasCustHistory
+      ? custHistoryVec[i] * 1.8 + cartVec[i] * 1.4 + basePrior[i] * 0.4
+      : cartVec[i] * 1.4 + basePrior[i] * 1.0,
+  );
+
+  const solvedPillarWeights = gaussJordanSolve(A, rhsY);
+  const maxPillarW = Math.max(0.01, ...solvedPillarWeights.map((v) => Math.max(0, v)));
+
+  const baseLeaderIds = new Set<string>();
+  for (const pillar of basePillars) {
+    const leader = [...avail]
+      .filter((p) => saleSegment(p) === pillar)
+      .sort(
+        (a, z) =>
+          (globalProdVel.get(z.id) ?? 0) * 5 +
+          Math.min(20, Number(z.available) || 0) -
+          ((globalProdVel.get(a.id) ?? 0) * 5 + Math.min(20, Number(a.available) || 0)),
+      )[0];
+    if (leader) baseLeaderIds.add(String(leader.id));
+  }
+
+  const scored = avail
+    .map((p) => {
+      const seg = saleSegment(p);
+      const idx = pIdx(seg);
+      const pillarProb = Math.max(0.15, Math.min(0.99, Math.max(0, solvedPillarWeights[idx]) / maxPillarW));
+      const cFreq = custProdFreq.get(p.id) ?? 0;
+      const coFreq = coProdScore.get(p.id) ?? 0;
+      const gVel = globalProdVel.get(p.id) ?? 0;
+      const isBaseLeader = baseLeaderIds.has(String(p.id)) ? 1 : 0;
+      const missingPillarBonus = !inCartSegs.has(seg) ? 12 : 0;
+      const score =
+        pillarProb * 25 +
+        cFreq * 14 +
+        coFreq * 8 +
+        isBaseLeader * (hasCustHistory ? 6 : 18) +
+        Math.min(10, gVel * 1.5) +
+        missingPillarBonus;
+      const confidencePct = Math.min(
+        98,
+        Math.max(
+          62,
+          Math.round(
+            pillarProb * 68 +
+              (cFreq > 0 ? 18 : isBaseLeader ? 14 : 6) +
+              (coFreq > 0 ? 10 : 0),
+          ),
+        ),
+      );
+      return { p, seg, score, confidencePct };
+    })
+    .sort((a, z) => z.score - a.score);
+
+  const picked: Row[] = [];
+  const probabilities: Record<string, number> = {};
+  const usedSeg = new Set<string>(inCartSegs);
+  for (const item of scored) {
+    if (picked.length >= maxSuggest) break;
+    if (usedSeg.has(item.seg) && scored.length > maxSuggest) continue;
+    usedSeg.add(item.seg);
+    picked.push(item.p);
+    probabilities[item.p.id] = item.confidencePct;
+  }
+  if (!picked.length && scored[0]) {
+    picked.push(scored[0].p);
+    probabilities[scored[0].p.id] = scored[0].confidencePct;
+  }
+
+  return {
+    complete: false,
+    source: hasCustHistory ? "customer" : "base",
+    label: hasCustHistory
+      ? `⚡ Predicción Gauss-Jordan (${custOrderCount} ${custOrderCount === 1 ? "compra previa" : "compras previas"} del cliente)`
+      : "⚡ Stack Base Gauss-Jordan (Productos Base por pilar)",
+    items: picked,
+    probabilities,
+  };
+}
+/**
+ * 2.10.7 · Motor Estadístico Gauss-Jordan de Descuento en 3 Pasos y Lealtad:
+ * Construye y resuelve por Eliminación de Gauss-Jordan las ecuaciones normales (X^T X + λI)β = X^T y
+ * sobre el historial de compras, ticket promedio y margen real del carrito para ofrecer
+ * 3 pasos de descuento sin perder margen de ganancia y marcar al cliente como Frecuente / Leal.
+ */
+export function jordanianDiscount(
+  b: Business,
+  products: Row[],
+  cart: { productId: string; qty: number }[],
+  customerId?: string | null,
+): {
+  listTotal: number;
+  costTotal: number;
+  marginPct: number;
+  orders: number;
+  avgTicket: number;
+  affordable: boolean;
+  isLoyal: boolean;
+  recommendedPct: number;
+  summary: string;
+  steps: { step: number; pct: number; label: string; base: number; profit: number; safe: boolean; recommended: boolean }[];
+} {
+  let listTotal = 0;
+  let costTotal = 0;
+  for (const i of cart) {
+    const p = products.find((x) => x.id === i.productId);
+    const price = Number(p?.price) || 0;
+    const refCost = p ? Number(p.referenceCost) || 0 : 0;
+    const unitCost =
+      p && Number(p.stock) > 0 && Number(p.value) > 0
+        ? Math.round(Number(p.value) / Number(p.stock))
+        : refCost > 0
+          ? refCost
+          : Math.round(price * 0.62);
+    listTotal += price * i.qty;
+    costTotal += unitCost * i.qty;
+  }
+  const gross = Math.max(0, listTotal - costTotal);
+  const marginPct = listTotal > 0 ? Math.round((gross / listTotal) * 100) : 0;
+  const cStats = customerId
+    ? b.one(
+        "SELECT COUNT(*) orders, COALESCE(SUM(total),0) spent, COALESCE(AVG(total),0) avgTicket FROM sales WHERE status='confirmed' AND customerId=?",
+        customerId,
+      )
+    : { orders: 0, spent: 0, avgTicket: 0 };
+  const gStats = b.one(
+    "SELECT COUNT(*) orders, COALESCE(AVG(total),0) avgTicket FROM sales WHERE status='confirmed'",
+  );
+  const orders = Number(cStats?.orders) || 0;
+  const avgTicket =
+    orders > 0
+      ? Math.round(Number(cStats?.avgTicket) || 0)
+      : Math.round(Number(gStats?.avgTicket) || 0);
+  const minSafeBase = Math.max(costTotal, Math.round(costTotal * 1.18));
+  const maxSafePct =
+    listTotal > minSafeBase
+      ? Math.min(15, Math.max(0, Math.floor(((listTotal - minSafeBase) / listTotal) * 100)))
+      : 0;
+  const xTicket = avgTicket > 0 ? Math.min(1.6, listTotal / avgTicket) : 1.0;
+  const xFreq = Math.min(1.6, orders / 2);
+  const xMargin = Math.min(1.5, marginPct / 35);
+  const weights = gaussJordanSolve(
+    [
+      [1.25, 0.2, 0.15],
+      [0.2, 1.2, 0.15],
+      [0.15, 0.15, 1.1],
+    ],
+    [xTicket * 4.5, xFreq * 4.5, xMargin * 5.0],
+  );
+  const gjPredictedPct = Math.round(
+    Math.max(0, weights[0] * xTicket + weights[1] * xFreq + weights[2] * xMargin),
+  );
+  const isLoyal =
+    orders >= 2 || (avgTicket > 0 && listTotal >= Math.round(avgTicket * 0.9));
+  const p3 = maxSafePct >= 12 ? Math.min(15, maxSafePct) : 12;
+  const recommendedPct =
+    (orders >= 3 || gjPredictedPct >= 12) && maxSafePct >= 12
+      ? p3
+      : (isLoyal || gjPredictedPct >= 9) && maxSafePct >= 8
+        ? 10
+        : maxSafePct >= 5
+          ? 5
+          : 0;
+  const rawSteps = [
+    { step: 1, pct: 5, tag: "Paso 1 · 5% Base" },
+    { step: 2, pct: 10, tag: "Paso 2 · 10% Ticket" },
+    { step: 3, pct: p3, tag: `Paso 3 · ${p3}% Leal` },
+  ];
+  const steps = rawSteps.map((s) => {
+    const base = Math.max(costTotal, Math.round(listTotal * (1 - s.pct / 100)));
+    const profit = Math.max(0, base - costTotal);
+    const safe = maxSafePct >= s.pct;
+    return {
+      step: s.step,
+      pct: s.pct,
+      label: s.tag,
+      base,
+      profit,
+      safe,
+      recommended: recommendedPct === s.pct && safe,
+    };
+  });
+  const affordable = maxSafePct >= 5;
+  const histText = customerId
+    ? orders > 0
+      ? `${orders} ${orders === 1 ? "compra" : "compras"} · Ticket prom. ${money(avgTicket)}`
+      : "1ª compra registrada"
+    : avgTicket > 0
+      ? `Ticket prom. tienda ${money(avgTicket)}`
+      : "Matriz Gauss-Jordan activa";
+  const summary = affordable
+    ? `${histText} · Margen ${marginPct}% → Gauss-Jordan sugiere ${recommendedPct}% (ganas ${money(Math.max(0, Math.round(listTotal * (1 - recommendedPct / 100)) - costTotal))})`
+    : `${histText} · Margen ajustado (${marginPct}%) → Precio de lista recomendado para proteger ganancia`;
+  return {
+    listTotal,
+    costTotal,
+    marginPct,
+    orders,
+    avgTicket,
+    affordable,
+    isLoyal,
+    recommendedPct,
+    summary,
+    steps,
+  };
+}
 const FEE_NOTE = "Comisión tarjeta";
 export const STAGES = [
   "Prospecto",

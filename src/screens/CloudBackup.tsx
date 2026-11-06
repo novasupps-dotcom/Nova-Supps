@@ -135,6 +135,22 @@ export function CloudBackupCard({
           })
         }
       />
+      <Button
+        icon="cloud-upload"
+        title={busy === "rt" ? "Generando…" : "⚡ Generar respaldo BD + Realtime"}
+        secondary
+        small
+        disabled={!!busy}
+        onPress={() =>
+          void run("rt", async () => {
+            await cloud.rpc("save_realtime_snapshot", {
+              p_payload: JSON.parse(b.backup()),
+              p_version: appVersion,
+            });
+            setMsg({ text: "Respaldo BD + Realtime guardado en Supabase", tone: "ok" });
+          })
+        }
+      />
       {!!msg && (
         <Note color={msg.tone === "bad" ? C.red : C.green}>{msg.text}</Note>
       )}

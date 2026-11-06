@@ -2,7 +2,7 @@ import React from "react";
 import { STORE_NAME, TILE } from "../theme";
 import { Alert, Share, View } from "react-native";
 import { Text } from "../text";
-import { localDay, money, saleSegment, today, type Row } from "../business";
+import { localDay, money, productBrand, saleSegment, today, type Row } from "../business";
 import { cardLabel, terminalPayments } from "../receipt";
 import {
   Button,
@@ -521,8 +521,8 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
       const prods = new Set<string>();
       for (const l of ls) {
         const p = productById.get(l.productId);
-        const t = String(p?.category || (p ? saleSegment(p) : "") || "").trim();
-        const br = String(p?.brand || "").trim();
+        const t = String(p ? saleSegment(p) : "").trim();
+        const br = productBrand(p || { name: l.name });
         const pr = String(p?.familyName || p?.name || l.name || "").trim();
         if (t) types.add(t);
         if (br) brands.add(br);
@@ -533,6 +533,13 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
     const allTypes = new Set<string>();
     const allBrands = new Set<string>();
     const allProds = new Set<string>();
+    for (const p of d.products || []) {
+      if (p.archived) continue;
+      const seg = saleSegment(p);
+      const br = productBrand(p);
+      if (seg) allTypes.add(seg);
+      if (br) allBrands.add(br);
+    }
     for (const v of sales) {
       if (v.status === "cancelled" && filter !== "Canceladas") continue;
       const info = saleCatalogInfo(v);

@@ -1,7 +1,7 @@
 import React from "react";
-import { Alert, Linking, View } from "react-native";
+import { Alert, Linking, Pressable, ScrollView, View } from "react-native";
 import { Text } from "../text";
-import { grossUp, localDay, money, today } from "../business";
+import { brandsOf, grossUp, jordanianStack, localDay, money, productBrand, today } from "../business";
 import { catalogueImages } from "../catalogueImages";
 import {
   Button,
@@ -65,6 +65,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
     emptyBasket,
     openCheckout,
     filters,
+    setFilters,
     matching,
     searchBox,
     filterChips,
@@ -150,18 +151,92 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
     const basketCustomer = basketCustomerId
       ? customers.find((c) => c.id === basketCustomerId)
       : null;
+    const kioskMode = filters.ModoVenta === "Kiosco";
+    const jStack = jordanianStack(b!, gridProducts as any, basket, basketCustomerId || null);
+    const totalPieces = basket.reduce((n: number, i: any) => n + i.qty, 0);
     return {
       scroll: (
         <>
-          {!!d.mpPending && (
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              gap: 6,
+              marginBottom: 10,
+              backgroundColor: C.paper,
+              borderRadius: 16,
+              padding: 6,
+            }}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Modo Punto de venta"
+              onPress={() => setFilters((old) => ({ ...old, ModoVenta: "POS" }))}
+              style={[
+                s.chip,
+                !kioskMode && s.chipOn,
+                { flex: 1, alignItems: "center", paddingVertical: 7, paddingHorizontal: 8 },
+              ]}
+            >
+              <Text style={[s.chipText, !kioskMode && s.chipTextOn, { fontSize: 12.5, fontWeight: "600" }]} numberOfLines={1}>
+                🛍️ Punto de venta
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Modo Kiosco"
+              onPress={() =>
+                setFilters((old) => ({ ...old, ModoVenta: kioskMode ? "POS" : "Kiosco" }))
+              }
+              style={[
+                s.chip,
+                kioskMode && s.chipOn,
+                { flex: 1, alignItems: "center", paddingVertical: 7, paddingHorizontal: 8 },
+              ]}
+            >
+              <Text style={[s.chipText, kioskMode && s.chipTextOn, { fontSize: 12.5, fontWeight: "600" }]} numberOfLines={1}>
+                📱 Modo Kiosco
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Enviar catálogo PDF o WhatsApp"
+              onPress={() => go("Catálogo para clientes")}
+              style={[
+                s.chip,
+                { alignItems: "center", paddingVertical: 7, paddingHorizontal: 10, backgroundColor: C.soft },
+              ]}
+            >
+              <Text style={[s.chipText, { fontSize: 12.5, color: C.brand, fontWeight: "600" }]} numberOfLines={1}>
+                📤 Catálogo PDF/WA
+              </Text>
+            </Pressable>
+          </View>
+          {kioskMode && (
+            <Card tone="ok">
+              <View style={s.between}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.subtitle, { marginBottom: 2 }]}>
+                    📱 Catálogo Interactivo · Modo Kiosco
+                  </Text>
+                  <Note>
+                    Filtra por categoría o marca, toca cualquier suplemento para ver sabores y arma tu pedido.
+                  </Note>
+                </View>
+                <Button
+                  title="Salir de Kiosco"
+                  secondary
+                  small
+                  onPress={() => setFilters((old) => ({ ...old, ModoVenta: "POS" }))}
+                />
+              </View>
+            </Card>
+          )}
+          {!kioskMode && !!d.mpPending && (
             <Card tone="warn">
               <Text style={s.subtitle}>
                 Cobro en terminal sin confirmar · {money(d.mpPending.amount)}
               </Text>
-              <Note>
-                La app se cerró mientras se cobraba. Revísalo: la venta se
-                registra solo si Mercado Pago lo aprobó.
-              </Note>
               <Button
                 title="Revisar cobro"
                 small
@@ -177,7 +252,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               />
             </Card>
           )}
-          {!!cloudStatus?.conflicts && (
+          {!kioskMode && !!cloudStatus?.conflicts && (
             <Card tone="warn">
               <Text
                 style={s.subtitle}
@@ -185,7 +260,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               <Button title="Revisar" small onPress={() => go("Equipo")} />
             </Card>
           )}
-          {(!!soon.length || lastDays === null || lastDays >= 7) && (
+          {!kioskMode && (!!soon.length || lastDays === null || lastDays >= 7) && (
             <MenuList
               items={[
                 ...(soon.length
@@ -221,7 +296,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               ]}
             />
           )}
-          {!!parkedCart && (
+          {!kioskMode && !!parkedCart && (
             <View
               style={[
                 s.between,
@@ -254,7 +329,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                   borderRadius: 18,
                   paddingHorizontal: 14,
                   paddingVertical: 10,
-                  marginBottom: 10,
+                  marginBottom: 8,
                 },
               ]}
             >
@@ -265,6 +340,77 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                 </Text>
               </View>
               <TextButton title="Quitar" color={C.muted} onPress={clearBasketCustomer} />
+            </View>
+          )}
+          {(jStack.items.length > 0 || jStack.complete) && (
+            <View
+              style={{
+                backgroundColor: C.paper,
+                borderRadius: 18,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                marginBottom: 10,
+                gap: 6,
+              }}
+            >
+              <View style={s.between}>
+                <Text style={[s.label, { marginBottom: 0, color: C.brand }]}>
+                  {jStack.complete ? jStack.label : jStack.label}
+                </Text>
+                {!kioskMode && !basketCustomer && customers.length > 0 && (
+                  <TextButton
+                    title="👤 Elegir cliente"
+                    color={C.brand}
+                    onPress={() => go("Clientes")}
+                  />
+                )}
+              </View>
+              {!jStack.complete && (
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                  {jStack.items.map((sug: any) => (
+                    <Pressable
+                      key={sug.id}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Stack sugerido ${sug.name}`}
+                      onPress={() => addToBasket(sug.id, 1, true)}
+                      style={[
+                        s.chip,
+                        {
+                          backgroundColor: C.brandSoft,
+                          paddingVertical: 6,
+                          paddingHorizontal: 11,
+                          maxWidth: "100%",
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[s.chipText, { color: C.brand, fontSize: 12.5, fontWeight: "600" }]}
+                        numberOfLines={1}
+                      >
+                        {`＋ ${sug.name} (${money(sug.price)})`}
+                      </Text>
+                    </Pressable>
+                  ))}
+                  {jStack.items.length > 1 && (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Armar Stack Base Jordiano"
+                      onPress={() => {
+                        for (const sug of jStack.items) addToBasket(sug.id, 1, true);
+                      }}
+                      style={[
+                        s.chip,
+                        s.chipOn,
+                        { paddingVertical: 6, paddingHorizontal: 11 },
+                      ]}
+                    >
+                      <Text style={[s.chipText, s.chipTextOn, { fontSize: 12.5, fontWeight: "600" }]}>
+                        {`⚡ Armar Stack (${jStack.items.length})`}
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+              )}
             </View>
           )}
           <ProductGrid
@@ -279,26 +425,43 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
             onRemove={removeFromBasket}
             segment={saleSeg}
             onSegment={setSaleSeg}
-            onInventoryCode={(barcode) =>
-              open("Inventario por código", { barcode, autoSell: "1" })
+            onInventoryCode={
+              kioskMode
+                ? undefined
+                : (barcode) => open("Inventario por código", { barcode, autoSell: "1" })
             }
-            cartCount={basket.reduce((n: number, i: any) => n + i.qty, 0)}
+            cartCount={totalPieces}
             onCheckout={openCheckout}
             expiringIds={d.expiringIds}
           />
-          <View style={[s.between, { marginTop: 8, paddingHorizontal: 4 }]}>
-            <TextButton
-              title="＋ Producto nuevo"
-              onPress={() => open("Producto", { toBasket: "1" })}
-            />
-            {!!basket.length && (
+          {kioskMode ? (
+            totalPieces > 0 ? (
+              <View style={{ marginTop: 12 }}>
+                <Button
+                  icon="shopping-cart"
+                  title={`Pasar a caja · Cobrar pedido (${totalPieces} ${totalPieces === 1 ? "pieza" : "piezas"})`}
+                  onPress={() => {
+                    setFilters((old) => ({ ...old, ModoVenta: "POS" }));
+                    openCheckout();
+                  }}
+                />
+              </View>
+            ) : null
+          ) : (
+            <View style={[s.between, { marginTop: 8, paddingHorizontal: 4 }]}>
               <TextButton
-                title="Vaciar carrito"
-                color={C.red}
-                onPress={emptyBasket}
+                title="＋ Producto nuevo"
+                onPress={() => open("Producto", { toBasket: "1" })}
               />
-            )}
-          </View>
+              {!!basket.length && (
+                <TextButton
+                  title="Vaciar carrito"
+                  color={C.red}
+                  onPress={emptyBasket}
+                />
+              )}
+            </View>
+          )}
         </>
       ),
     };
@@ -306,15 +469,18 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
 
   if (page === "Stock" || page === "Catálogo") {
     const filter = filters[page] || "Todos";
+    const stockBrands = brandsOf(products.filter((p) => !p.archived));
+    const activeBrand = stockBrands.includes(filters.StockMarca) ? filters.StockMarca : "";
     const list = matching(products).filter((p) =>
-      filter === "Archivados"
+      (filter === "Archivados"
         ? p.archived
         : !p.archived &&
           (filter === "Bajo mínimo"
             ? p.inventoryKnown && p.available <= p.minimum
             : filter === "Sin stock"
               ? p.available < 1
-              : true),
+              : true)) &&
+      (!activeBrand || productBrand(p) === activeBrand),
     );
     return {
       list: {
@@ -354,6 +520,34 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               "Sin stock",
               "Archivados",
             ])}
+            {stockBrands.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 6, paddingBottom: 6 }}
+                style={{ marginBottom: 6 }}
+                keyboardShouldPersistTaps="handled"
+              >
+                {["Todas las marcas", ...stockBrands].map((bName) => {
+                  const val = bName === "Todas las marcas" ? "" : bName;
+                  const on = activeBrand === val;
+                  return (
+                    <Pressable
+                      key={`sbrand-${bName}`}
+                      accessibilityRole="button"
+                      onPress={() =>
+                        setFilters((old) => ({ ...old, StockMarca: on ? "" : val }))
+                      }
+                      style={[s.chip, on && s.chipOn, { paddingVertical: 5, paddingHorizontal: 10 }]}
+                    >
+                      <Text style={[s.chipText, on && s.chipTextOn, { fontSize: 12.5 }]}>
+                        {bName === "Todas las marcas" ? "🏷️ Todas las marcas" : bName}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            )}
           </>
         ),
         item: (p) => {
