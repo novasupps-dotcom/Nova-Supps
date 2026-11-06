@@ -1,6 +1,13 @@
-# Nova Negocio · 2.9.0
+# Nova Negocio · 2.10.0
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
+
+**2.10.0 · Reporte financiero ejecutivo, renglón por producto, reporte de stock y animación del carrito (versionCode 62, solo JavaScript):**
+
+- **Excel de ventas · Resumen ejecutivo**: indicadores clave (ventas, utilidad y margen, ticket promedio, piezas, cobrado, por cobrar, canceladas), estado de resultados, flujo de dinero, top 5 productos y participación (%) por forma de cobro, vendedor y categoría, con títulos y secciones en negritas.
+- **Excel de ventas · hoja Ventas**: un renglón por producto de cada folio (columna «Renglón», p. ej. «1 de 3») con piezas, precio, importe, costo y utilidad del producto. Lo que es de toda la venta (total, cobros, comisiones, utilidad) va solo en el primer renglón del folio para que los totales cuadren. Se quita la hoja «Productos vendidos» (ya está en Ventas). «Por producto» y «Por vendedor» ahora salen en pesos (antes en centavos).
+- **Stock → «Reporte de stock (Excel)»**: resumen (valor a costo y a precio, utilidad potencial, alertas de sin stock / bajo mínimo / caducidad, por categoría, top 10 por valor), hoja Stock por producto (disponibles, apartadas, estado, costo promedio, margen, vendidas en 30 días, días de inventario, caducidad más próxima), «Por reabastecer» y «Lotes» (`src/stockExcel.ts`).
+- **Carrito animado**: botón del carrito con contador junto al engrane de Ajustes (y junto a Cuenta en la app del vendedor). Al agregar un producto, el carrito vuela desde donde tocaste hasta el botón, que rebota.
 
 **2.9.0 · Teclado, regresar al mismo lugar, ficha del producto y cobro directo (versionCode 61, solo JavaScript):**
 

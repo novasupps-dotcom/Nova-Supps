@@ -1,4 +1,10 @@
-# Nova Negocio 2.9.0 · 4-nov-2026
+# Nova Negocio 2.10.0 · 6-nov-2026
+
+Hecho en 2.10.0: Excel de ventas con resumen ejecutivo y un renglón por producto de cada folio; reporte de stock en Excel
+desde Stock; botón del carrito junto al engrane con animación al agregar.
+Probar en el teléfono: Ventas → Excel (abrir Resumen y Ventas); Stock → «Reporte de stock (Excel)»; Vender → agregar productos
+(ver el vuelo al carrito en Android y iPhone).
+
 
 Hecho en 2.9.0: teclado que acomoda la pantalla al campo; regresar deja la pantalla donde estaba; Vender con ficha del
 producto (imagen grande) y botón Agregar; cobro directo a la forma de pago; menos texto en Ventas, Stock, Clientes y Ajustes.

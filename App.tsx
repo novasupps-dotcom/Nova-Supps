@@ -96,6 +96,7 @@ import {
   type ExportPeriod,
 } from "./src/salesExcel";
 import { base64 } from "./src/xlsx";
+import { stockWorkbook } from "./src/stockExcel";
 import {
   MercadoPago,
   MpError,
@@ -133,6 +134,9 @@ import {
   TabBar,
   Icon,
   IconButton,
+  CartButton,
+  CartFlyLayer,
+  noteTouch,
   TextButton,
   BottomDock,
   PayOptions,
@@ -1974,6 +1978,37 @@ function AppContent({ business }: { business?: Business }) {
       setExcel({ period, busy: false });
     }
   }
+  /** 2.10 · Reporte de stock (Excel) desde la pantalla Stock. */
+  const stockBusy = useRef(false);
+  async function exportStock() {
+    if (!b || stockBusy.current) return;
+    stockBusy.current = true;
+    try {
+      const { bytes, count, fileName } = stockWorkbook(b);
+      assert(count > 0, "Aún no hay productos en Stock.");
+      const uri = FS.documentDirectory + fileName;
+      await FS.writeAsStringAsync(uri, base64(bytes), {
+        encoding: FS.EncodingType.Base64,
+      });
+      assert(
+        await Sharing.isAvailableAsync(),
+        "No se pudo abrir el menú para compartir.",
+      );
+      await Sharing.shareAsync(uri, {
+        mimeType: XLSX_MIME,
+        dialogTitle: "Guardar reporte de stock",
+        UTI: "org.openxmlformats.spreadsheetml.sheet",
+      });
+      await pruneFiles("Stock_Nova_", 3, (name) =>
+        name.replace(/^.*_(\d{4}-\d{2}-\d{2}_\d{4})\.xlsx$/, "$1"),
+      );
+      notify(`Reporte de stock listo · ${count} ${count === 1 ? "producto" : "productos"}`);
+    } catch (e) {
+      Alert.alert("Reporte de stock", errText(e));
+    } finally {
+      stockBusy.current = false;
+    }
+  }
   async function exportBackup() {
     if (!b) return;
     try {
@@ -2385,6 +2420,7 @@ function AppContent({ business }: { business?: Business }) {
       setPay,
       cloudStatus,
       exportBackup,
+      exportStock,
       gridProducts,
       basket,
       productById,
@@ -3551,7 +3587,7 @@ function AppContent({ business }: { business?: Business }) {
     "";
 
   return (
-    <SafeAreaView style={s.safe} edges={["top", "left", "right"]}>
+    <SafeAreaView style={s.safe} edges={["top", "left", "right"]} onTouchStart={noteTouch}>
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
       <UpdateNotice
         b={b}
@@ -3590,12 +3626,21 @@ function AppContent({ business }: { business?: Business }) {
               }
         }
         right={
-          isTabRoot ? (
-            <IconButton
-              icon="settings"
-              label="Ajustes"
-              onPress={() => go("Parámetros")}
-            />
+          isTabRoot || basket.length ? (
+            <>
+              {/* 2.10: carrito junto al engrane; recibe la animación al agregar un producto. */}
+              <CartButton
+                count={basketPieces}
+                onPress={() => (basket.length ? openCheckout() : go("Vender"))}
+              />
+              {isTabRoot && (
+                <IconButton
+                  icon="settings"
+                  label="Ajustes"
+                  onPress={() => go("Parámetros")}
+                />
+              )}
+            </>
           ) : undefined
         }
       />
@@ -3685,6 +3730,7 @@ function AppContent({ business }: { business?: Business }) {
           )}
         />
       </BottomDock>
+      <CartFlyLayer />
       {!form && payOverlay}
       <Modal
         visible={!!form}
