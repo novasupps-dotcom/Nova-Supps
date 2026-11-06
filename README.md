@@ -1,6 +1,12 @@
-# Nova Negocio · 2.10.4
+# Nova Negocio · 2.10.5
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
+
+**2.10.5 · Aplicación de hallazgos de mercado: calculadora de cambio, descuento directo, venta en espera, recompra automática, días de inventario, Kardex y comparativa de periodo (versionCode 67, solo JavaScript):**
+
+- **Calculadora de cambio rápido en efectivo y descuento directo**: botones rápidos de billete recibido (`Exacto`, `$100`, `$200`, `$500`, `$1,000`) con cálculo instantáneo de cambio al cobrar en efectivo, y chips de descuento directo (`5% desc.`, `10% desc.`, `$50 desc.`, `$100 desc.`) en la hoja de cobro.
+- **Venta en espera y recordatorio inteligente de recompra**: botón `Poner en espera` dentro del carrito para pausar una venta y retomarla después en `Vender`; selector rápido de recordatorio de recompra (`Recompra 25d / 45d`, `15 días`, `30 días`) al vender a un cliente.
+- **Días de inventario (velocidad 30d), Kardex por producto y comparativa de ventas**: indicador de ritmo de venta de los últimos 30 días y días de cobertura en `Stock`; tarjeta auditable `Kardex · Historial de movimientos` en `Detalle producto`; comparativa porcentual contra el periodo previo (`% vs. periodo previo`) en `Ventas → Resumen de ventas`.
 
 **2.10.4 · Carrito unificado sin barra negra, sabores agotados ocultos en tarjeta, filtros en Ventas, pop-up de seguimientos y diseño responsive (versionCode 66, solo JavaScript):**
 

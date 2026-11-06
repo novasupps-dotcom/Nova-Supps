@@ -250,6 +250,7 @@ function AppContent({ business }: { business?: Business }) {
     [search, setSearch] = useState("");
   const [barcodeScanner, setBarcodeScanner] = useState(false);
   const [followPopup, setFollowPopup] = useState(false);
+  const [parkedCart, setParkedCart] = useState<{ items: Cart; f: Record<string, string>; at: string } | null>(null);
   // 2.9: en el cobro, «Recibes / ganas» se abre con un toque.
   const [privateOpen, setPrivateOpen] = useState(false);
   // 2.9: el formulario abierto (o, si no hay, la pantalla) se desplaza al campo con teclado.
@@ -835,6 +836,16 @@ function AppContent({ business }: { business?: Business }) {
       const id = b!.sell(...x.args);
       saleId = id;
       b!.updateSaleDetails(id, { ...d.f, channel: d.f.channel });
+      if (d.f.customerId && Number(d.f.autoFollow) > 0) {
+        const cust = data?.customers.find((c) => c.id === d.f.customerId);
+        if (cust) {
+          b!.saveCustomer({
+            ...strings(cust),
+            id: cust.id,
+            nextDate: addDays(today(), Number(d.f.autoFollow)),
+          });
+        }
+      }
       const extra: Row = {};
       if (mpInfo)
         Object.assign(extra, {
@@ -2457,6 +2468,18 @@ function AppContent({ business }: { business?: Business }) {
       clearBasketCustomer: () =>
         setBasketF((old) => ({ ...old, customerId: "" })),
       openFollowPopup: () => setFollowPopup(true),
+      parkedCart,
+      resumeParkedCart: () => {
+        if (!parkedCart) return;
+        setBasket(parkedCart.items);
+        setBasketF(parkedCart.f);
+        setParkedCart(null);
+        notify("Venta en espera retomada");
+      },
+      discardParkedCart: () => {
+        setParkedCart(null);
+        notify("Venta en espera descartada");
+      },
       productById,
       addToBasket,
       removeFromBasket,
@@ -2577,6 +2600,7 @@ function AppContent({ business }: { business?: Business }) {
       excel,
       basket,
       basketF.customerId,
+      parkedCart,
       saleSeg,
     ],
   );
@@ -3355,7 +3379,25 @@ function AppContent({ business }: { business?: Business }) {
         </View>
       )}
       {form === "Venta" && checkoutFromBasket.current && !!cart.length && (
-        <View style={{ alignItems: "center", marginTop: -4, marginBottom: 4 }}>
+        <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 18, marginTop: -4, marginBottom: 4 }}>
+          <TextButton
+            title="Poner en espera"
+            color={C.brand}
+            onPress={() => {
+              setParkedCart({
+                items: cart,
+                f: { ...f },
+                at: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              });
+              setBasket([]);
+              setBasketF({});
+              setCart([]);
+              checkoutFromBasket.current = false;
+              close();
+              go("Vender");
+              notify("Venta puesta en espera");
+            }}
+          />
           <TextButton title="Vaciar carrito" color={C.red} onPress={emptyBasket} />
         </View>
       )}
@@ -4475,8 +4517,80 @@ function AppContent({ business }: { business?: Business }) {
                           {salePaid !== null &&
                             salePaid !== saleTotal &&
                             row("Queda a crédito", money(Math.max(0, saleTotal - salePaid)), { color: C.amber })}
+                          {listTotal > 0 && (
+                            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                              {[
+                                { label: "5% desc.", val: amount(Math.max(100, Math.round(listTotal * 0.95))) },
+                                { label: "10% desc.", val: amount(Math.max(100, Math.round(listTotal * 0.90))) },
+                                ...(listTotal > 5000 ? [{ label: "$50 desc.", val: amount(listTotal - 5000) }] : []),
+                                ...(listTotal > 10000 ? [{ label: "$100 desc.", val: amount(listTotal - 10000) }] : []),
+                              ].map((dOpt) => {
+                                const active = val("total") === dOpt.val;
+                                return (
+                                  <Pressable
+                                    key={dOpt.label}
+                                    accessibilityRole="button"
+                                    onPress={() => set("total", active ? "" : dOpt.val)}
+                                    style={[s.chip, active && s.chipOn, { paddingVertical: 5, paddingHorizontal: 10 }]}
+                                  >
+                                    <Text style={[s.chipText, active && s.chipTextOn, { fontSize: 12 }]}>{dOpt.label}</Text>
+                                  </Pressable>
+                                );
+                              })}
+                              {!!val("total") && (
+                                <Pressable
+                                  accessibilityRole="button"
+                                  onPress={() => set("total", "")}
+                                  style={[s.chip, { paddingVertical: 5, paddingHorizontal: 10 }]}
+                                >
+                                  <Text style={[s.chipText, { fontSize: 12, color: C.red }]}>Precio normal</Text>
+                                </Pressable>
+                              )}
+                            </View>
+                          )}
                         </Card>
                         {accountField("accountId", "Forma de pago *", saleAccounts)}
+                        {accounts.find((a) => a.id === val("accountId"))?.kind === "Efectivo" && (salePaid ?? saleTotal) > 0 && (() => {
+                          const dueAmt = salePaid ?? saleTotal;
+                          const givenCents = tryCents(val("cashGiven"));
+                          const changeCents = givenCents !== null ? givenCents - dueAmt : null;
+                          const bills = [10000, 20000, 50000, 100000].filter((bAmt) => bAmt >= dueAmt);
+                          return (
+                            <View style={{ backgroundColor: C.paper, borderRadius: 16, padding: 10, marginBottom: 10, gap: 6 }}>
+                              <View style={[s.between, { flexWrap: "wrap", gap: 6 }]}>
+                                <Text style={[s.label, { marginBottom: 0 }]}>Calculadora de cambio (efectivo)</Text>
+                                {changeCents !== null && (
+                                  <Text style={[s.body, { fontWeight: "700", color: changeCents >= 0 ? C.green : C.amber }]}>
+                                    {changeCents >= 0 ? `Cambio: ${money(changeCents)}` : `Faltan: ${money(-changeCents)}`}
+                                  </Text>
+                                )}
+                              </View>
+                              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                                <Pressable
+                                  accessibilityRole="button"
+                                  onPress={() => set("cashGiven", "")}
+                                  style={[s.chip, !val("cashGiven") && s.chipOn, { paddingVertical: 5, paddingHorizontal: 10 }]}
+                                >
+                                  <Text style={[s.chipText, !val("cashGiven") && s.chipTextOn, { fontSize: 12 }]}>Exacto</Text>
+                                </Pressable>
+                                {bills.map((bAmt) => {
+                                  const strAmt = amount(bAmt);
+                                  const on = val("cashGiven") === strAmt;
+                                  return (
+                                    <Pressable
+                                      key={bAmt}
+                                      accessibilityRole="button"
+                                      onPress={() => set("cashGiven", on ? "" : strAmt)}
+                                      style={[s.chip, on && s.chipOn, { paddingVertical: 5, paddingHorizontal: 10 }]}
+                                    >
+                                      <Text style={[s.chipText, on && s.chipTextOn, { fontSize: 12 }]}>{`Recibí ${money(bAmt)}`}</Text>
+                                    </Pressable>
+                                  );
+                                })}
+                              </View>
+                            </View>
+                          );
+                        })()}
                         {["Banco", "Billetera"].includes(accounts.find((a) => a.id === val("accountId"))?.kind || "") && (
                           <TransferInfo
                             list={((all: TransferAccount[]) =>
@@ -4497,6 +4611,41 @@ function AppContent({ business }: { business?: Business }) {
                             true,
                             "Cliente",
                           )}
+                        {!!val("customerId") && (() => {
+                          const sugDays = cart.some((i) =>
+                            /60\s*serv|2\s*kg|5\s*lb/i.test(
+                              (productById.get(i.productId)?.presentation || "") + " " + (productById.get(i.productId)?.name || ""),
+                            ),
+                          )
+                            ? 45
+                            : 25;
+                          const curFollow = val("autoFollow");
+                          return (
+                            <View style={{ marginBottom: 8 }}>
+                              <Text style={s.label}>Recordatorio de recompra (seguimiento)</Text>
+                              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                                {[
+                                  { id: String(sugDays), label: `Recompra ${sugDays}d` },
+                                  { id: "15", label: "15 días" },
+                                  { id: "30", label: "30 días" },
+                                  { id: "", label: "Sin agendar" },
+                                ].map((opt) => {
+                                  const on = curFollow === opt.id;
+                                  return (
+                                    <Pressable
+                                      key={opt.id || "none"}
+                                      accessibilityRole="button"
+                                      onPress={() => set("autoFollow", opt.id)}
+                                      style={[s.chip, on && s.chipOn, { paddingVertical: 5, paddingHorizontal: 10 }]}
+                                    >
+                                      <Text style={[s.chipText, on && s.chipTextOn, { fontSize: 12 }]}>{opt.label}</Text>
+                                    </Pressable>
+                                  );
+                                })}
+                              </View>
+                            </View>
+                          );
+                        })()}
                         {more("＋ Cliente y más opciones")}
                         {advanced && (
                           <>

@@ -54,6 +54,9 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
     basketCustomerId,
     clearBasketCustomer,
     openFollowPopup,
+    parkedCart,
+    resumeParkedCart,
+    discardParkedCart,
     productById,
     addToBasket,
     removeFromBasket,
@@ -108,6 +111,19 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
     let v = DUP_CACHE.get(d);
     if (!v) DUP_CACHE.set(d, (v = duplicateGroups(b!)));
     return v;
+  })();
+  const sold30 = (() => {
+    let m = SOLD30_CACHE.get(d);
+    if (!m) {
+      const since = new Date(Date.now() - 30 * 86400000).toISOString();
+      const rows = b!.all(
+        "SELECT l.productId, COALESCE(SUM(l.qty),0) n FROM sale_lines l JOIN sales s ON s.id=l.saleId WHERE s.status='confirmed' AND s.created>=? GROUP BY l.productId",
+        since,
+      );
+      m = new Map(rows.map((r: any) => [String(r.productId), Number(r.n) || 0]));
+      SOLD30_CACHE.set(d, m);
+    }
+    return m;
   })();
   const askMerge = (g: DuplicateGroup, keep: any) => {
     const others = g.products.filter((p) => p.id !== keep.id);
@@ -204,6 +220,30 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                   : []),
               ]}
             />
+          )}
+          {!!parkedCart && (
+            <View
+              style={[
+                s.between,
+                {
+                  backgroundColor: C.amberSoft,
+                  borderRadius: 18,
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  marginBottom: 10,
+                },
+              ]}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={[s.body, { fontWeight: "600", color: C.ink }]}>
+                  {`Venta en espera · ${parkedCart.items.reduce((n, i) => n + i.qty, 0)} pzas (${parkedCart.at})`}
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <TextButton title="Retomar" bold color={C.brand} onPress={resumeParkedCart} />
+                <TextButton title="Descartar" color={C.red} onPress={discardParkedCart} />
+              </View>
+            </View>
           )}
           {!!basketCustomer && (
             <View
@@ -350,6 +390,17 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                     ) : (
                       <Pill text="Existencias por confirmar" tone="warn" />
                     )}
+                    {(() => {
+                      const s30 = sold30.get(p.id) ?? 0;
+                      if (s30 <= 0) return null;
+                      const daysLeft = p.available > 0 ? Math.max(1, Math.round((p.available * 30) / s30)) : 0;
+                      const sugOrder = Math.max(0, s30 - p.available);
+                      return (
+                        <Text style={[s.muted, { fontSize: 12, marginTop: 4 }]}>
+                          {`Ventas 30d: ${s30} pzas${p.available > 0 ? ` · alcanza ~${daysLeft}d` : ""}${sugOrder > 0 && p.available <= p.minimum ? ` · sugerido pedir ${sugOrder}` : ""}`}
+                        </Text>
+                      );
+                    })()}
                   </View>
                 </View>
                 <Icon name="chevron-right" size={18} color={C.faint} />
@@ -569,6 +620,64 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                 </View>
               ))}
           </Card>
+          {(() => {
+            const moves = b!.all(
+              "SELECT m.id, m.created, m.qty, m.kind, m.note, l.label, l.cost FROM stock_moves m JOIN lots l ON l.id = m.lotId WHERE l.productId = ? ORDER BY m.created DESC, m.rowid DESC LIMIT 20",
+              p.id,
+            );
+            if (!moves.length) return null;
+            const kindLabel: Record<string, string> = {
+              initial: "Inventario inicial",
+              purchase: "Compra",
+              receive: "Entrada",
+              sale: "Venta",
+              cancel: "Cancelación",
+              return: "Devolución",
+              adjust: "Ajuste conteo",
+              correction: "Corrección",
+              merge: "Unificación",
+            };
+            return (
+              <Card>
+                <Text style={s.subtitle}>Kardex · Historial de movimientos</Text>
+                {moves.map((mv: any, idx: number) => {
+                  const q = Number(mv.qty) || 0;
+                  return (
+                    <View
+                      key={mv.id || idx}
+                      style={[
+                        s.between,
+                        {
+                          paddingVertical: 6,
+                          borderTopWidth: idx ? 1 : 0,
+                          borderColor: C.line,
+                        },
+                      ]}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={[s.body, { fontWeight: "500" }]}>
+                          {kindLabel[mv.kind] || mv.kind} · {fmtDay(localDay(mv.created))}
+                        </Text>
+                        {!!mv.note && <Note>{mv.note}</Note>}
+                      </View>
+                      <Text
+                        style={[
+                          s.body,
+                          {
+                            fontWeight: "700",
+                            color: q >= 0 ? C.green : C.red,
+                            fontVariant: ["tabular-nums"],
+                          },
+                        ]}
+                      >
+                        {q > 0 ? `+${q}` : String(q)}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </Card>
+            );
+          })()}
         </>
       ),
     };
@@ -642,3 +751,4 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
 }
 
 const DUP_CACHE = new WeakMap<object, DuplicateGroup[]>();
+const SOLD30_CACHE = new WeakMap<object, Map<string, number>>();

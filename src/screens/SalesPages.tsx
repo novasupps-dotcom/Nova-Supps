@@ -105,7 +105,33 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
           </View>
           {excelCard("Descargar Excel de ventas")}
           <Card>
-            <Text style={s.subtitle}>Ventas totales</Text>
+            <View style={s.between}>
+              <Text style={[s.subtitle, { marginBottom: 0 }]}>Ventas totales</Text>
+              {(() => {
+                if (!fromIso) return null;
+                const now = new Date();
+                const prevFromIso =
+                  currentPeriod === "Hoy"
+                    ? new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toISOString()
+                    : currentPeriod === "7 días"
+                      ? new Date(now.getFullYear(), now.getMonth(), now.getDate() - 13).toISOString()
+                      : new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+                const prevRow = b!.one(
+                  "SELECT COALESCE(SUM(total),0) rev FROM sales WHERE status='confirmed' AND created>=? AND created<?",
+                  prevFromIso,
+                  fromIso,
+                );
+                const prevRev = Number(prevRow?.rev) || 0;
+                if (prevRev <= 0) return null;
+                const pct = Math.round(((ps.revenue - prevRev) * 100) / prevRev);
+                return (
+                  <Pill
+                    text={`${pct >= 0 ? "+" : ""}${pct}% vs. periodo previo`}
+                    tone={pct >= 0 ? "ok" : "warn"}
+                  />
+                );
+              })()}
+            </View>
             <Text style={s.price}>{money(ps.revenue)}</Text>
             <Note>
               {ps.orders} ventas confirmadas · ticket promedio{" "}

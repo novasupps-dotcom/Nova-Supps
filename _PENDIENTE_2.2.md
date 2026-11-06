@@ -1,4 +1,8 @@
-# Nova Negocio 2.10.4 · 6-nov-2026
+# Nova Negocio 2.10.5 · 6-nov-2026
+
+Hecho en 2.10.5: implementación completa de los hallazgos de mercado (calculadora de cambio en efectivo, descuento directo en carrito, venta en espera, recordatorio inteligente de recompra por duración del suplemento, días de inventario por ritmo de 30 días en Stock, Kardex de movimientos en Detalle producto y comparativa contra periodo previo en Resumen de ventas), más análisis FODA y estrategia de posicionamiento (`ANALISIS_FODA_Y_POSICIONAMIENTO_NOVA_SUPPS.md`).
+
+Hecho en 2.10.4 · 6-nov-2026
 
 Hecho en 2.10.4: eliminación total de la barra negra inferior de cobro (unificada en el botón superior del carrito); ocultación de sabores sin existencias al abrir la tarjeta de producto; ocultación de botones inactivos o sin uso; filtros en Ventas por producto, tipo de suplemento y marca; pop-up interactivo de seguimientos con acciones y botón para eliminar notificación; diseño responsive adaptable a cualquier pantalla y documento de hallazgos y mercado (`HALLAZGOS_Y_MERCADO_ERP.md`).
 

@@ -82,6 +82,9 @@ export type OwnerPageContext = {
   basketCustomerId: string;
   clearBasketCustomer: () => void;
   openFollowPopup: () => void;
+  parkedCart: { items: Cart; f: Record<string, string>; at: string } | null;
+  resumeParkedCart: () => void;
+  discardParkedCart: () => void;
   productById: Map<string, Row>;
   addToBasket: (productId: string, qty?: number, quiet?: boolean) => boolean;
   removeFromBasket: (productId: string) => void;
