@@ -126,6 +126,7 @@ import {
   QUICK_FOLLOWUP,
   QUICK_EXPIRY,
   addDays,
+  daysBetween,
   fmtDay,
   tryCents,
   followUpsDue,
@@ -183,6 +184,7 @@ function load(b: Business) {
       byCustomer.set(v.customerId, x);
     }
   let _lots: Row[] | undefined;
+  let _expiringIds: Set<string> | undefined;
   let _lines: Map<string, Row[]> | undefined;
   let _payByAccount: Map<string, Record<string, number>> | undefined;
   let _m: Row | undefined;
@@ -193,6 +195,17 @@ function load(b: Business) {
     sales,
     get lots() {
       return (_lots ??= b.lots());
+    },
+    get expiringIds() {
+      if (!_expiringIds) {
+        const day = today();
+        _expiringIds = new Set(
+          this.lots
+            .filter((l) => l.qty > 0 && l.expires && daysBetween(day, String(l.expires)) <= 45)
+            .map((l) => String(l.productId)),
+        );
+      }
+      return _expiringIds;
     },
     get lines() {
       return (_lines ??= b.saleLinesBySale());
@@ -2344,44 +2357,35 @@ function AppContent({ business }: { business?: Business }) {
           money(ps.commissions),
           { indent: true },
         )}
-      <Note>El cliente absorbe la comisión con cualquier forma de pago; Mercado Pago solo cobra la suya con tarjeta.</Note>
     </Card>
   );
   /** Disponible = ventas netas (la comisión ya se descontó solo de tarjeta) − gastos operativos. */
-  const resultCard = (ps: Row) => {
-    const card = ps.byMethod.find((x: Row) => x.method === "Tarjeta");
-    return (
-      <Card>
-        <Text style={s.subtitle}>Resultado</Text>
-        {ps.byMethod.map((x: Row) =>
-          line(
-            x.method === "Tarjeta" ? "Tarjeta (neta de comisión)" : x.method,
-            money(x.net),
-          ),
-        )}
-        {ps.receivable > 0 &&
-          line("Por cobrar (a crédito)", money(ps.receivable), {
-            color: C.amber,
-          })}
-        {divider()}
-        {line("Ventas netas", money(ps.netSales), { bold: true })}
-        {line("Gastos operativos", minus(ps.expenses), {
-          color: C.red,
-          onPress: () => go("Control Operativo"),
+  const resultCard = (ps: Row) => (
+    <Card>
+      <Text style={s.subtitle}>Resultado</Text>
+      {ps.byMethod.map((x: Row) =>
+        line(
+          x.method === "Tarjeta" ? "Tarjeta (neta de comisión)" : x.method,
+          money(x.net),
+        ),
+      )}
+      {ps.receivable > 0 &&
+        line("Por cobrar (a crédito)", money(ps.receivable), {
+          color: C.amber,
         })}
-        {divider()}
-        {line("Disponible", money(ps.available), {
-          bold: true,
-          color: C.green,
-        })}
-        <Note>
-          {card?.fee
-            ? `La comisión de tarjeta (${money(card.fee)}) solo se descontó de los ${money(card.gross)} cobrados con tarjeta; transferencia y efectivo no pagan comisión. Ventas totales − gastos operativos, sin descontar esa comisión, serían ${money(ps.afterExpenses)}.`
-            : "Transferencia y efectivo no pagan comisión."}
-        </Note>
-      </Card>
-    );
-  };
+      {divider()}
+      {line("Ventas netas", money(ps.netSales), { bold: true })}
+      {line("Gastos operativos", minus(ps.expenses), {
+        color: C.red,
+        onPress: () => go("Control Operativo"),
+      })}
+      {divider()}
+      {line("Disponible", money(ps.available), {
+        bold: true,
+        color: C.green,
+      })}
+    </Card>
+  );
   const DELETE_NOTE =
     "La venta desaparece por completo: renglones, cobro, devolución y, si fue con tarjeta, también su comisión. Las unidades ya regresaron al inventario al cancelarla. No se puede deshacer (salvo restaurando un respaldo).";
   const confirmDeleteSale = (v: Row, after?: () => void) =>
@@ -3378,6 +3382,55 @@ function AppContent({ business }: { business?: Business }) {
           })}
         </View>
       )}
+      {form === "Venta" && !!cart.length && (() => {
+        const inCartIds = new Set(cart.map((i) => i.productId));
+        const inCartSegs = new Set(
+          cart.map((i) => {
+            const p = productById.get(i.productId);
+            return p ? saleSegment(p) : "";
+          }),
+        );
+        const targetSegs = inCartSegs.has("Proteínas")
+          ? ["Creatinas", "PWO", "Salud"]
+          : inCartSegs.has("Creatinas") || inCartSegs.has("PWO")
+            ? ["Proteínas", "Salud"]
+            : ["Proteínas", "Creatinas"];
+        const sug =
+          gridProducts.find(
+            (p: any) =>
+              !inCartIds.has(p.id) &&
+              p.available > 0 &&
+              targetSegs.includes(saleSegment(p)),
+          ) ||
+          gridProducts.find(
+            (p: any) => !inCartIds.has(p.id) && p.available > 0,
+          );
+        if (!sug) return null;
+        return (
+          <View style={{ alignItems: "flex-start", marginBottom: 6 }}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => addOne(sug.id)}
+              style={[
+                s.chip,
+                {
+                  backgroundColor: C.brandSoft,
+                  paddingVertical: 6,
+                  paddingHorizontal: 12,
+                  maxWidth: "100%",
+                },
+              ]}
+            >
+              <Text
+                style={[s.chipText, { color: C.brand, fontSize: 12.5, fontWeight: "600" }]}
+                numberOfLines={1}
+              >
+                {`⚡ Stack sugerido: ＋ ${sug.name} (${money(sug.price)})`}
+              </Text>
+            </Pressable>
+          </View>
+        );
+      })()}
       {form === "Venta" && checkoutFromBasket.current && !!cart.length && (
         <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 18, marginTop: -4, marginBottom: 4 }}>
           <TextButton
@@ -4225,7 +4278,7 @@ function AppContent({ business }: { business?: Business }) {
                         return { text: "Código guardado en el producto", detail: code, done: true };
                       }}
                     />
-                    <Note>Con este código, el lector reconoce el producto. El SKU se genera solo.</Note>
+
                     {moneyField("price", "Precio de venta MXN *")}
                     {(() => {
                       const base = tryCents(val("price"));
@@ -4355,10 +4408,6 @@ function AppContent({ business }: { business?: Business }) {
                       options(["Efectivo", "Banco", "Tarjeta", "Billetera"]),
                     )}
                     {moneyField("opening", "Saldo inicial MXN")}
-                    <Note>
-                      Las cuentas de tipo Tarjeta descuentan la comisión
-                      configurada al cobrar.
-                    </Note>
                   </>
                 )}
                 {form === "Entrada" && (
@@ -4443,10 +4492,6 @@ function AppContent({ business }: { business?: Business }) {
                     {dateField("expires", "Caducidad", QUICK_EXPIRY)}
                     {more()}
                     {advanced && field("label", "Nombre de lote")}
-                    <Note>
-                      Inventario inicial no mueve dinero. Compra pagada
-                      descuenta de la cuenta seleccionada.
-                    </Note>
                   </>
                 )}
                 {form === "Movimiento" && (
@@ -4710,10 +4755,6 @@ function AppContent({ business }: { business?: Business }) {
                     )}
                     {chips("channel", "Canal *", options(channels))}
                     {field("notes", "Notas", false, "", true)}
-                    <Note>
-                      Solo cambia el seguimiento comercial. Importes, fecha,
-                      cobros y lotes entregados se conservan.
-                    </Note>
                   </>
                 )}
                 {form === "Abono" && (
@@ -4914,12 +4955,6 @@ function AppContent({ business }: { business?: Business }) {
                 {form === "Renombrar cuenta" && (
                   <>
                     {field("name", "Nombre *")}
-                    <Note>
-                      Solo cambia el nombre que ves. El tipo ({val("kind")}) y
-                      todo su historial se conservan; la comisión de tarjeta (
-                      {feePct}) sigue aplicando únicamente a cuentas de tipo
-                      Tarjeta.
-                    </Note>
                   </>
                 )}
                 {form === "Configuración" && (

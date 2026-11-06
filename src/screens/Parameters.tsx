@@ -105,21 +105,17 @@ export function renderParameters(ctx: OwnerPageContext): Body | null {
       scroll: (
         <>
           <Card>
-            <Text style={s.subtitle}>Tus datos viven en este teléfono</Text>
-            <Note>
-              Guarda una copia fuera de la app (Drive, correo o WhatsApp) antes
-              de cambiar de teléfono o desinstalar.
-            </Note>
-            <View style={{ height: 8 }} />
-            <Pill
-              text={
-                d.lastBackup
-                  ? "Último respaldo: " + fmtDay(localDay(d.lastBackup))
-                  : "Sin respaldos todavía"
-              }
-              tone={d.lastBackup ? "ok" : "warn"}
-            />
-            <View style={{ height: 8 }} />
+            <View style={[s.between, { marginBottom: 8 }]}>
+              <Text style={[s.subtitle, { marginBottom: 0 }]}>Respaldo local</Text>
+              <Pill
+                text={
+                  d.lastBackup
+                    ? "Último respaldo: " + fmtDay(localDay(d.lastBackup))
+                    : "Sin respaldos todavía"
+                }
+                tone={d.lastBackup ? "ok" : "warn"}
+              />
+            </View>
             <Button
               title="Guardar / compartir respaldo"
               onPress={exportBackup}
@@ -127,18 +123,16 @@ export function renderParameters(ctx: OwnerPageContext): Body | null {
             <Button
               title="Restaurar archivo JSON"
               secondary
+              small
               onPress={importBackup}
             />
             <Button
               title="Compartir copia previa a restauración"
               secondary
+              small
               onPress={previousBackup}
             />
-            <Note>
-              La app conserva internamente solo las últimas 3 copias para no
-              llenar el teléfono.
-            </Note>
-            <View style={{ height: 8 }} />
+            <View style={{ height: 6 }} />
             {excelCard("Descargar Excel de ventas")}
           </Card>
           <CloudBackupCard
@@ -267,7 +261,6 @@ export function renderParameters(ctx: OwnerPageContext): Body | null {
             {
               key: "adv",
               title: "Funciones avanzadas",
-              desc: "Lotes, cuentas bancarias y gastos.",
               icon: "sliders-horizontal",
               tint: TILE.graphite,
               right: (

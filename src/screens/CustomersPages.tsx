@@ -301,10 +301,6 @@ export function renderCustomersPages(ctx: OwnerPageContext): Body | null {
                 </>
               );
             })()}
-            <Note>
-              Estas cifras describen solo lo que se importó del Excel. El
-              Resumen de ventas muestra los totales con todas tus operaciones.
-            </Note>
           </Card>
           <Card>
             <Text style={s.subtitle}>Pendientes por confirmar</Text>
@@ -313,9 +309,6 @@ export function renderCustomersPages(ctx: OwnerPageContext): Body | null {
                 • {w}
               </Text>
             ))}
-            <Note>
-              Los bancos reales no venían en las fuentes y requieren captura.
-            </Note>
           </Card>
           <Card>
             <Text style={s.subtitle}>Fuentes</Text>

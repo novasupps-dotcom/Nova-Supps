@@ -284,19 +284,17 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
             }
             cartCount={basket.reduce((n: number, i: any) => n + i.qty, 0)}
             onCheckout={openCheckout}
+            expiringIds={d.expiringIds}
           />
-          <View style={s.wrap}>
-            <Button
+          <View style={[s.between, { marginTop: 8, paddingHorizontal: 4 }]}>
+            <TextButton
               title="＋ Producto nuevo"
-              secondary
-              small
               onPress={() => open("Producto", { toBasket: "1" })}
             />
             {!!basket.length && (
-              <Button
-                icon="trash-2" title="Vaciar carrito"
-                secondary
-                small
+              <TextButton
+                title="Vaciar carrito"
+                color={C.red}
                 onPress={emptyBasket}
               />
             )}
@@ -369,19 +367,19 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               onLongPress={() => (p.archived ? undefined : askDelete(p))}
             >
               <View style={s.productRow}>
-                <ProductPhoto product={p} style={{ width: 72, height: 88 }} />
+                <ProductPhoto product={p} style={{ width: 68, height: 84 }} />
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.body, { fontWeight: "600" }]} numberOfLines={2}>
-                    {p.name}
-                  </Text>
-                  <Text style={[s.muted, { fontSize: 13 }]} numberOfLines={1}>
+                  <View style={[s.between, { alignItems: "flex-start", gap: 8 }]}>
+                    <Text style={[s.body, { fontWeight: "600", flex: 1 }]} numberOfLines={2}>
+                      {p.name}
+                    </Text>
+                    <Text style={[s.price, { fontSize: 18, marginVertical: 0 }]}>{money(p.price)}</Text>
+                  </View>
+                  <Text style={[s.muted, { fontSize: 12.5, marginTop: 2 }]} numberOfLines={1}>
                     {p.brand || p.category} · {p.sku}
+                    {grossUp(p.price, d.feeBps) !== p.price ? ` · Cliente paga ${money(grossUp(p.price, d.feeBps))}` : ""}
                   </Text>
-                  <Text style={[s.price, { marginTop: 6, marginBottom: 0 }]}>{money(p.price)}</Text>
-                  {grossUp(p.price, d.feeBps) !== p.price && (
-                    <Text style={[s.muted, { fontSize: 12.5 }]}>{`Cliente paga ${money(grossUp(p.price, d.feeBps))}`}</Text>
-                  )}
-                  <View style={{ marginTop: 6 }}>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 6 }}>
                     {p.inventoryKnown ? (
                       <Pill
                         text={p.available === p.stock ? `${p.available} disponibles` : `${p.available} disponibles · ${p.stock} físicas`}
@@ -396,8 +394,8 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                       const daysLeft = p.available > 0 ? Math.max(1, Math.round((p.available * 30) / s30)) : 0;
                       const sugOrder = Math.max(0, s30 - p.available);
                       return (
-                        <Text style={[s.muted, { fontSize: 12, marginTop: 4 }]}>
-                          {`Ventas 30d: ${s30} pzas${p.available > 0 ? ` · alcanza ~${daysLeft}d` : ""}${sugOrder > 0 && p.available <= p.minimum ? ` · sugerido pedir ${sugOrder}` : ""}`}
+                        <Text style={[s.muted, { fontSize: 12 }]}>
+                          {`30d: ${s30} pzas${p.available > 0 ? ` (~${daysLeft}d)` : ""}${sugOrder > 0 && p.available <= p.minimum ? ` · pedir ${sugOrder}` : ""}`}
                         </Text>
                       );
                     })()}
@@ -521,11 +519,19 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               }
               tone={p.available < 1 ? "bad" : "ok"}
             />
-            {!!p.description && <Text style={[s.body, { marginTop: 10 }]}>{p.description}</Text>}
-            <Note>
-              {[p.flavor, p.presentation].filter(Boolean).join(" · ") ||
-                "Presentación por confirmar"}
-            </Note>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+              {[
+                p.category ? `Categoría: ${p.category}` : "",
+                p.brand ? `Marca: ${p.brand}` : "",
+                p.flavor ? `Sabor: ${p.flavor}` : "",
+                p.presentation ? `Presentación: ${p.presentation}` : "",
+              ]
+                .filter(Boolean)
+                .map((tag) => (
+                  <Pill key={tag} text={tag} tone="neutral" />
+                ))}
+            </View>
+            {!!p.description && <Text style={[s.body, { marginTop: 8, color: C.muted }]}>{p.description}</Text>}
             {!!p.lookupSource && (
               <>
                 <Note>

@@ -1,4 +1,8 @@
-# Nova Negocio 2.10.5 · 6-nov-2026
+# Nova Negocio 2.10.6 · 6-nov-2026
+
+Hecho en 2.10.6: aplicación integral del análisis FODA y rediseño minimalista (semáforo FEFO de prioridad en selector de sabores y cuadrícula, sugerencia de venta cruzada 1-toque «Stacks Nova Supps» en el carrito, tablero de meta diaria y ticket promedio en la app del vendedor, eliminación de descripciones y notas largas en Ajustes, Ventas, Stock, Respaldo y formularios, y agrupación jerárquica en tarjetas de Stock y Detalle producto).
+
+Hecho en 2.10.5 · 6-nov-2026
 
 Hecho en 2.10.5: implementación completa de los hallazgos de mercado (calculadora de cambio en efectivo, descuento directo en carrito, venta en espera, recordatorio inteligente de recompra por duración del suplemento, días de inventario por ritmo de 30 días en Stock, Kardex de movimientos en Detalle producto y comparativa contra periodo previo en Resumen de ventas), más análisis FODA y estrategia de posicionamiento (`ANALISIS_FODA_Y_POSICIONAMIENTO_NOVA_SUPPS.md`).
 

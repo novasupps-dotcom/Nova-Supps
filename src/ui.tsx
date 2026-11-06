@@ -682,6 +682,7 @@ export function ProductGrid({
   onPhotoResolved,
   onCheckout,
   cartCount = 0,
+  expiringIds,
 }: {
   products: GridProduct[];
   qtyOf: (id: string) => number;
@@ -705,6 +706,8 @@ export function ProductGrid({
   onCheckout?: () => void;
   /** Piezas en el carrito (para mostrar «Cobrar» en la ficha). */
   cartCount?: number;
+  /** 2.10.6: productos con lote próximo a caducar (prioridad FEFO). */
+  expiringIds?: Set<string>;
 }) {
   const [ownQuery, setOwnQuery] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -923,7 +926,10 @@ export function ProductGrid({
     ? (() => {
         const all = products.filter((p) => p.family === openFamily);
         const inStock = all.filter((p) => limitOf(p.id) > 0 || qtyOf(p.id) > 0);
-        return inStock.length ? inStock : all;
+        const list = inStock.length ? inStock : all;
+        return expiringIds
+          ? [...list].sort((a, z) => (expiringIds.has(z.id) ? 1 : 0) - (expiringIds.has(a.id) ? 1 : 0))
+          : list;
       })()
     : openOne
       ? products.filter((p) => p.id === openOne)
@@ -1071,6 +1077,11 @@ export function ProductGrid({
                     {entry.name}
                   </Text>
                   <Text style={s.tilePrice}>{(prices.some((x) => x !== low) ? "desde " : "") + money(low)}</Text>
+                  {avail > 0 && entry.members.some((m) => expiringIds?.has(m.id) && limitOf(m.id) > 0) && (
+                    <Text style={[s.tileTag, { color: C.amber }]} numberOfLines={1}>
+                      Prioridad · vence pronto
+                    </Text>
+                  )}
                   <Text style={[s.tileStock, { color: avail < 1 ? C.red : C.muted }]}>
                     {`${entry.members.length} sabores · ${avail < 1 ? "sin existencias" : `${left} disponibles`}`}
                   </Text>
@@ -1116,11 +1127,15 @@ export function ProductGrid({
                   {p.name}
                 </Text>
                 <Text style={s.tilePrice}>{money(p.price)}</Text>
-                {!!p.tag && (
+                {!!p.tag ? (
                   <Text style={s.tileTag} numberOfLines={1}>
                     {p.tag}
                   </Text>
-                )}
+                ) : max > 0 && expiringIds?.has(p.id) ? (
+                  <Text style={[s.tileTag, { color: C.amber }]} numberOfLines={1}>
+                    Prioridad · vence pronto
+                  </Text>
+                ) : null}
                 <Text
                   style={[
                     s.tileStock,
@@ -1193,6 +1208,7 @@ export function ProductGrid({
           onClose={closeSheet}
           cartCount={cartCount}
           onCheckout={onCheckout ? () => (closeSheet(), onCheckout()) : undefined}
+          expiringIds={expiringIds}
         />
       )}
     </View>
@@ -1212,6 +1228,7 @@ function ProductSheet({
   onClose,
   cartCount,
   onCheckout,
+  expiringIds,
 }: {
   members: GridProduct[];
   family: boolean;
@@ -1222,6 +1239,7 @@ function ProductSheet({
   onClose: () => void;
   cartCount: number;
   onCheckout?: () => void;
+  expiringIds?: Set<string>;
 }) {
   const { height } = useWindowDimensions();
   const first = members[0];
@@ -1247,9 +1265,14 @@ function ProductSheet({
           disabled={full}
           onPress={() => onAdd(m.id)}
         >
-          <Text style={[s.body, { fontWeight: "600" }]} numberOfLines={1}>
-            {family ? m.flavor || m.name : qty ? "En el carrito" : "Agregar al carrito"}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <Text style={[s.body, { fontWeight: "600" }]} numberOfLines={1}>
+              {family ? m.flavor || m.name : qty ? "En el carrito" : "Agregar al carrito"}
+            </Text>
+            {max > 0 && expiringIds?.has(m.id) && (
+              <Pill text="Prioridad · vence pronto" tone="warn" />
+            )}
+          </View>
           <Text style={s.muted}>{family ? `${money(m.price)} · ${stockText(max)}` : stockText(max)}</Text>
         </Pressable>
         {qty > 0 && (

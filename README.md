@@ -1,6 +1,13 @@
-# Nova Negocio · 2.10.5
+# Nova Negocio · 2.10.6
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
+
+**2.10.6 · Rediseño minimalista FODA: semáforo FEFO en sabores, venta cruzada «Stacks Nova Supps», tablero de meta en vendedor y jerarquía visual limpia (versionCode 68, solo JavaScript):**
+
+- **Semáforo FEFO en selector de sabores y cuadrícula**: los productos o sabores con lotes que vencen en $\le 45$ días muestran la insignia `Prioridad · vence pronto` y se ordenan primero al abrir la familia de sabores en `Vender`.
+- **«Stacks Nova Supps» (venta cruzada 1-toque en carrito)**: al cobrar en `Venta`, sugiere en una píldora compacta un suplemento complementario con existencias (`⚡ Stack sugerido: ＋ ...`) para agregarlo con un toque.
+- **Tablero minimalista de meta diaria para el vendedor**: en `Mis ventas` de la app del vendedor se muestra el avance porcentual hacia la meta diaria con barra de progreso, piezas vendidas y ticket promedio.
+- **Rediseño minimalista con orden y jerarquía**: eliminación de descripciones largas en `Ajustes`, textos redundantes (`<Note>`) en formularios, `Resumen de ventas`, `Corte de caja`, `Gastos operativos`, `Respaldo` y `Formas de pago`; barra inferior de acciones en `Vender` convertida a botones de texto ligeros; tarjetas de `Stock` y `Detalle producto` agrupadas por jerarquía visual.
 
 **2.10.5 · Aplicación de hallazgos de mercado: calculadora de cambio, descuento directo, venta en espera, recompra automática, días de inventario, Kardex y comparativa de periodo (versionCode 67, solo JavaScript):**
 

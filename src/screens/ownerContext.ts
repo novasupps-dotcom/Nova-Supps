@@ -22,6 +22,7 @@ export type OwnerPageContext = {
     accounts: Row[];
     sales: any[];
     lots: Row[];
+    expiringIds: Set<string>;
     lines: Map<string, Row[]>;
     payByAccount: Map<string, Record<string, number>>;
     byCustomer: Map<string, { count: number; total: number }>;

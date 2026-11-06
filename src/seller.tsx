@@ -1638,15 +1638,29 @@ export function SellerApp({
       ...bad,
       ...today,
     ];
-    const sum = all
-      .filter((x: Row) => x.status !== "rechazada")
-      .reduce((n, x) => n + x.total, 0);
+    const activeSales = all.filter((x: Row) => x.status !== "rechazada");
+    const sum = activeSales.reduce((n, x) => n + x.total, 0);
+    const ticketAvg = activeSales.length ? Math.round(sum / activeSales.length) : 0;
+    const unitsToday = activeSales.reduce(
+      (n, x: Row) => n + ((x.items as Row[]) || []).reduce((k, i) => k + (Number(i.qty) || 0), 0),
+      0,
+    );
+    const dailyGoal = 500000; // $5,000 MXN referencia diaria por turno
+    const goalPct = Math.min(100, Math.round((sum * 100) / dailyGoal));
     body = (
       <>
         <Card>
-          <Text style={s.subtitle}>Tus ventas de hoy</Text>
+          <View style={s.between}>
+            <Text style={[s.subtitle, { marginBottom: 0 }]}>Tus ventas de hoy</Text>
+            <Pill text={`${goalPct}% meta diaria`} tone={goalPct >= 100 ? "ok" : "neutral"} />
+          </View>
           <Text style={s.price}>{money(sum)}</Text>
-          <Note>{`${all.length} ${all.length === 1 ? "venta" : "ventas"}${pending.length ? ` · ${pending.length} sin enviar` : ""}`}</Note>
+          <View style={{ height: 6, borderRadius: 3, backgroundColor: C.soft, overflow: "hidden", marginVertical: 6 }}>
+            <View style={{ width: `${goalPct}%`, height: "100%", backgroundColor: goalPct >= 100 ? C.green : C.brand }} />
+          </View>
+          <Note>
+            {`${all.length} ${all.length === 1 ? "venta" : "ventas"} · ${unitsToday} pzas${ticketAvg ? ` · ticket prom. ${money(ticketAvg)}` : ""}${pending.length ? ` · ${pending.length} sin enviar` : ""}`}
+          </Note>
         </Card>
         {all.map((v: Row) => (
           <Card key={v.id}>
@@ -1853,7 +1867,6 @@ export function SellerApp({
           onChanged={() => setVersion((v) => v + 1)}
         />
         <UpdatesCard b={b} version={VERSION} notify={notify} />
-        <Note>Vende, revisa existencias y tus ventas del día. Sin internet, tus ventas se guardan y se envían solas.</Note>
         <View style={{ height: 10 }} />
         <Button title="Cerrar sesión" secondary small onPress={signOut} />
       </>

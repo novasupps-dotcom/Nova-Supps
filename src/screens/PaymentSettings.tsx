@@ -106,7 +106,6 @@ export function renderPaymentSettings(ctx: OwnerPageContext): Body | null {
     return {
       scroll: (
         <>
-          <Note>Cómo te pagan tus clientes. Edita o elimina cada cuenta y elige quién la usa: tú y cada vendedor.</Note>
           {!!teamMsg && <Note color={teamMsg.tone === "bad" ? C.red : C.green}>{teamMsg.text}</Note>}
           <Text style={s.section}>Cuentas para transferencia</Text>
           {list.map((a) => {
@@ -363,14 +362,9 @@ export function renderPaymentSettings(ctx: OwnerPageContext): Body | null {
               );
             })}
           </View>
-          <Note>
-            {`Toca una forma para quitarla o ponerla al cobrar. Tus ventas y saldos anteriores no cambian. `}
-            {teamData
-              ? sellers.length
-                ? "Los cambios llegan a tus vendedores en cuanto se conectan."
-                : "Cuando tengas vendedores, aquí eliges con qué puede cobrar cada uno."
-              : "Conecta la base en línea (Ajustes → Vendedores) para elegir con qué cobra cada vendedor."}
-          </Note>
+          {!teamData && (
+            <Note>Conecta la base en línea (Ajustes → Vendedores) para elegir con qué cobra cada vendedor.</Note>
+          )}
         </>
       ),
     };

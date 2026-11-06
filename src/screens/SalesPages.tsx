@@ -165,7 +165,6 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
               bold: true,
               color: ps.profit >= 0 ? C.green : C.red,
             })}
-            <Note>Las mermas se valúan a su costo: no mueven dinero, pero sí bajan tu utilidad.</Note>
           </Card>
           <MarginProjectionCard b={b!} />
           <ReportsPage
@@ -192,9 +191,6 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
           <Card>
             <Text style={s.subtitle}>Gastos operativos</Text>
             <Text style={s.price}>{money(m.operatingOutflows)}</Text>
-            <Note>
-              Registros de inversión local y gastos capturados en la app.
-            </Note>
           </Card>
           <Button
             title="＋ Registrar gasto"
@@ -219,7 +215,6 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
           <Card>
             <Text style={s.subtitle}>Comisiones de tarjeta</Text>
             <Text style={s.price}>{money(m.fees)}</Text>
-            <Note>Se muestran aparte de la inversión local.</Note>
           </Card>
         </>
       ),
@@ -417,7 +412,6 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                 small
                 onPress={() => confirmDeleteSale(v, back)}
               />
-              <Note>Si fue de prueba o un error, elimínala de los reportes.</Note>
             </Card>
           )}
           <Card>
@@ -999,7 +993,6 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
             {line("Caja esperada al cierre", money(cash.closing), {
               bold: true,
             })}
-            <Note>Si el efectivo físico no cuadra, registra el ajuste en Cuentas.</Note>
           </Card>
           {!!items.length && (
             <Card>

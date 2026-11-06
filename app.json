@@ -2,7 +2,7 @@
   "expo": {
     "name": "Nova Negocio",
     "slug": "nova-negocio",
-    "version": "2.10.5",
+    "version": "2.10.6",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "ios": {
@@ -20,7 +20,7 @@
     "android": {
       "package": "com.novasupps.negocio",
       "allowBackup": false,
-      "versionCode": 67,
+      "versionCode": 68,
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.RECORD_AUDIO"

@@ -3,7 +3,7 @@ import { type Outcome, type TerminalPayment } from "../mercadopago";
 import type { IconName } from "../icons";
 import { TILE } from "../theme";
 
-export const VERSION = "2.10.5";
+export const VERSION = "2.10.6";
 export const HOME = "Vender";
 
 export const PAGES = [
@@ -72,21 +72,21 @@ export const SETTINGS_MENU: { section: string; items: MenuItem[] }[] = [
         icon: "credit-card",
         tint: TILE.red,
         title: "Terminal Mercado Pago",
-        desc: "Cobra con tu Point desde la app",
+        desc: "",
       },
       {
         page: "Cobros",
         icon: "banknote",
         tint: TILE.green,
         title: "Tabla de cobros",
-        desc: "Pagos, abonos y devoluciones",
+        desc: "",
       },
       {
         page: "Transferencias",
         icon: "landmark",
         tint: TILE.blue,
         title: "Formas de pago",
-        desc: "Cuentas, efectivo y tarjeta; quién usa cada una",
+        desc: "",
       },
     ],
   },
@@ -98,35 +98,35 @@ export const SETTINGS_MENU: { section: string; items: MenuItem[] }[] = [
         icon: "tag",
         tint: TILE.red,
         title: "Promociones",
-        desc: "2x1, por volumen o % de descuento",
+        desc: "",
       },
       {
         page: "Reportes",
         icon: "chart-column",
         tint: TILE.gold,
         title: "Reportes",
-        desc: "Por producto y por vendedor",
+        desc: "",
       },
       {
         page: "Cargar pedido",
         icon: "file-text",
         tint: TILE.gold,
         title: "Cargar pedido (PDF)",
-        desc: "Inventario, costos y precios desde el pedido del proveedor",
+        desc: "",
       },
       {
         page: "Actualizar catálogo",
         icon: "file-spreadsheet",
         tint: TILE.green,
         title: "Actualizar catálogo",
-        desc: "Precios y productos desde Excel o CSV",
+        desc: "",
       },
       {
         page: "Catálogo para clientes",
         icon: "book-open",
         tint: TILE.blue,
         title: "Catálogo para clientes",
-        desc: "PDF o WhatsApp con tus precios",
+        desc: "",
       },
     ],
   },
@@ -150,7 +150,7 @@ export const SETTINGS_MENU: { section: string; items: MenuItem[] }[] = [
         icon: "hard-drive",
         tint: TILE.graphite,
         title: "Respaldo y Excel",
-        desc: "Copia de tus datos y Excel de ventas",
+        desc: "",
       },
     ],
   },
@@ -162,28 +162,28 @@ export const ADVANCED_MENU: MenuItem[] = [
     icon: "layers",
     tint: TILE.gold,
     title: "Lotes y caducidades",
-    desc: "Costos y caducidad de cada lote",
+    desc: "",
   },
   {
     page: "Cuentas",
     icon: "wallet",
     tint: TILE.green,
     title: "Cuentas y movimientos",
-    desc: "Saldos, aportaciones y traspasos",
+    desc: "",
   },
   {
     page: "Control Operativo",
     icon: "receipt-text",
     tint: TILE.red,
     title: "Gastos operativos",
-    desc: "Terminal, publicidad y demás gastos",
+    desc: "",
   },
   {
     page: "Datos importados",
     icon: "file-spreadsheet",
     tint: TILE.graphite,
     title: "Datos importados",
-    desc: "Carga inicial desde Excel",
+    desc: "",
   },
 ];
 
