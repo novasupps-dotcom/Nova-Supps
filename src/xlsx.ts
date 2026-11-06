@@ -4,12 +4,53 @@
 // LibreOffice lo abren igual).
 
 export type ColumnType = "text" | "money" | "int" | "date" | "day" | "pct";
-export type Column = { header: string; type?: ColumnType; width?: number };
+/** `sum: false`: sin total al pie (precios unitarios, promedios). */
+export type Column = { header: string; type?: ColumnType; width?: number; sum?: boolean };
 export type CellValue = string | number | Date | null | undefined;
-export type Sheet = { name: string; columns: Column[]; rows: CellValue[][]; totals?: boolean };
+/** 2.10 · Estilo de un renglón completo (hojas tipo reporte: título, sección o renglón en negritas). */
+export type RowStyle = "title" | "section" | "strong" | null | undefined;
+export type Sheet = {
+  name: string;
+  columns: Column[];
+  rows: CellValue[][];
+  totals?: boolean;
+  /** Estilo por renglón (mismo índice que `rows`). */
+  rowStyles?: RowStyle[];
+  /** 2.10: hoja tipo reporte: sin encabezado de columnas ni filtros (los renglones empiezan en la fila 1). */
+  report?: boolean;
+};
 
 // Índices de estilo (deben coincidir con cellXfs de styles.xml).
-const STYLE: Record<ColumnType | "header" | "total", number> = { text: 0, header: 1, money: 2, date: 3, int: 4, pct: 5, day: 6, total: 7 };
+const STYLE: Record<ColumnType | "header" | "total" | "title" | "section" | "strong" | "strongMoney" | "strongInt" | "strongPct", number> = {
+  text: 0,
+  header: 1,
+  money: 2,
+  date: 3,
+  int: 4,
+  pct: 5,
+  day: 6,
+  total: 7,
+  title: 8,
+  section: 9,
+  strong: 10,
+  strongMoney: 11,
+  strongInt: 12,
+  strongPct: 13,
+};
+const rowStyle = (kind: RowStyle, type: ColumnType): number | undefined =>
+  kind === "title"
+    ? STYLE.title
+    : kind === "section"
+      ? STYLE.section
+      : kind === "strong"
+        ? type === "money"
+          ? STYLE.strongMoney
+          : type === "int"
+            ? STYLE.strongInt
+            : type === "pct"
+              ? STYLE.strongPct
+              : STYLE.strong
+        : undefined;
 
 /** Texto UTF-8 → bytes (Hermes no siempre trae TextEncoder). */
 export function utf8(text: string): Uint8Array {
@@ -155,25 +196,27 @@ function cell(ref: string, value: CellValue, type: ColumnType, style?: number): 
     return `<c r="${ref}" s="${s}"><v>${value}</v></c>`;
   }
   const text = esc(String(value)).slice(0, 32000);
-  return `<c r="${ref}" t="inlineStr" s="${type === "text" ? s : STYLE.text}"><is><t xml:space="preserve">${text}</t></is></c>`;
+  return `<c r="${ref}" t="inlineStr" s="${style ?? (type === "text" ? s : STYLE.text)}"><is><t xml:space="preserve">${text}</t></is></c>`;
 }
 
 function sheetXml(sheet: Sheet): string {
   const cols = sheet.columns;
   const last = colName(Math.max(0, cols.length - 1));
   const rows: string[] = [];
-  rows.push(`<row r="1">${cols.map((c, i) => cell(colName(i) + "1", c.header, "text", STYLE.header)).join("")}</row>`);
+  const first = sheet.report ? 1 : 2;
+  if (!sheet.report) rows.push(`<row r="1">${cols.map((c, i) => cell(colName(i) + "1", c.header, "text", STYLE.header)).join("")}</row>`);
   sheet.rows.forEach((r, ri) => {
-    const n = ri + 2;
-    rows.push(`<row r="${n}">${cols.map((c, i) => cell(colName(i) + n, r[i], c.type || "text")).join("")}</row>`);
+    const n = ri + first;
+    const kind = sheet.rowStyles?.[ri];
+    rows.push(`<row r="${n}"${kind === "title" ? ' ht="22" customHeight="1"' : ""}>${cols.map((c, i) => cell(colName(i) + n, r[i], c.type || "text", rowStyle(kind, c.type || "text"))).join("")}</row>`);
   });
-  const lastRow = sheet.rows.length + 1;
+  const lastRow = sheet.rows.length + first - 1;
   if (sheet.totals && sheet.rows.length) {
     const n = lastRow + 1;
     const cells = cols.map((c, i) => {
       const ref = colName(i) + n;
       if (i === 0) return cell(ref, "Total", "text", STYLE.header);
-      if (c.type === "money" || c.type === "int") return `<c r="${ref}" s="${STYLE.total}"><f>SUBTOTAL(9,${colName(i)}2:${colName(i)}${lastRow})</f></c>`;
+      if ((c.type === "money" || c.type === "int") && c.sum !== false) return `<c r="${ref}" s="${STYLE.total}"><f>SUBTOTAL(9,${colName(i)}2:${colName(i)}${lastRow})</f></c>`;
       return "";
     });
     rows.push(`<row r="${n}">${cells.join("")}</row>`);
@@ -183,11 +226,13 @@ function sheetXml(sheet: Sheet): string {
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
     `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
     `<dimension ref="A1:${last}${Math.max(1, lastRow + (sheet.totals && sheet.rows.length ? 1 : 0))}"/>` +
-    `<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>` +
+    (sheet.report
+      ? `<sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews>`
+      : `<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`) +
     `<sheetFormatPr defaultRowHeight="15"/>` +
     `<cols>${widths}</cols>` +
     `<sheetData>${rows.join("")}</sheetData>` +
-    (sheet.rows.length ? `<autoFilter ref="A1:${last}${lastRow}"/>` : "") +
+    (sheet.rows.length && !sheet.report ? `<autoFilter ref="A1:${last}${lastRow}"/>` : "") +
     `<pageMargins left="0.5" right="0.5" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>` +
     `</worksheet>`
   );
@@ -197,11 +242,11 @@ const STYLES =
   `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
   `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
   `<numFmts count="4"><numFmt numFmtId="164" formatCode="&quot;$&quot;#,##0.00"/><numFmt numFmtId="165" formatCode="dd/mm/yyyy hh:mm"/><numFmt numFmtId="166" formatCode="0.00%"/><numFmt numFmtId="167" formatCode="dd/mm/yyyy"/></numFmts>` +
-  `<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>` +
-  `<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F2937"/><bgColor indexed="64"/></patternFill></fill></fills>` +
+  `<fonts count="4"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="15"/><name val="Calibri"/></font></fonts>` +
+  `<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F2937"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE5E7EB"/><bgColor indexed="64"/></patternFill></fill></fills>` +
   `<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>` +
   `<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>` +
-  `<cellXfs count="8">` +
+  `<cellXfs count="14">` +
   `<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>` +
   `<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>` +
   `<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>` +
@@ -210,6 +255,13 @@ const STYLES =
   `<xf numFmtId="166" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>` +
   `<xf numFmtId="167" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>` +
   `<xf numFmtId="164" fontId="1" fillId="2" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1"/>` +
+  // 2.10 · Reporte: título, sección, negritas (texto, moneda, entero, porcentaje).
+  `<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>` +
+  `<xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1"/>` +
+  `<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>` +
+  `<xf numFmtId="164" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/>` +
+  `<xf numFmtId="1" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/>` +
+  `<xf numFmtId="166" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/>` +
   `</cellXfs>` +
   `<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>` +
   `</styleSheet>`;
@@ -224,7 +276,7 @@ const sheetName = (s: string, used: Set<string>) => {
 };
 
 /** Arma el libro de Excel y regresa sus bytes. */
-export function buildXlsx(sheets: Sheet[], when = new Date()): Uint8Array {
+export function buildXlsx(sheets: Sheet[], when = new Date(), title = "Ventas GNS · Nova Supps"): Uint8Array {
   const used = new Set<string>();
   const names = sheets.map((s) => sheetName(s.name, used));
   const files: { name: string; data: Uint8Array }[] = [];
@@ -242,11 +294,11 @@ export function buildXlsx(sheets: Sheet[], when = new Date()): Uint8Array {
   const iso = when.toISOString().replace(/\.\d{3}Z$/, "Z");
   add(
     "docProps/core.xml",
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>Ventas GNS · Nova Supps</dc:title><dc:creator>Nova Negocio</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${iso}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${iso}</dcterms:modified></cp:coreProperties>`,
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${esc(title)}</dc:title><dc:creator>Nova Negocio</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${iso}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${iso}</dcterms:modified></cp:coreProperties>`,
   );
   add("docProps/app.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Nova Negocio</Application></Properties>`);
   const filters = sheets
-    .map((s, i) => (s.rows.length ? `<definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">'${names[i].replace(/'/g, "''")}'!$A$1:$${colName(Math.max(0, s.columns.length - 1))}$${s.rows.length + 1}</definedName>` : ""))
+    .map((s, i) => (s.rows.length && !s.report ? `<definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">'${names[i].replace(/'/g, "''")}'!$A$1:$${colName(Math.max(0, s.columns.length - 1))}$${s.rows.length + 1}</definedName>` : ""))
     .join("");
   add(
     "xl/workbook.xml",

@@ -144,16 +144,17 @@ import json,sys,openpyxl
 wb=openpyxl.load_workbook(sys.argv[1])
 v=wb['Ventas'];hdr=[c.value for c in v[1]]
 rows=[[c.value for c in r] for r in v.iter_rows(min_row=2,max_row=v.max_row-1)]
-print(json.dumps({'sheets':wb.sheetnames,'hdr':hdr,'n':len(rows),'last':[str(x) if x is not None else None for x in rows[-1]],'prod':wb['Productos vendidos'].max_row,'cobros':wb['Cobros y comisiones'].max_row,'res':[[str(c) for c in r] for r in wb['Resumen'].iter_rows(min_row=1,max_row=20,values_only=True)]}))
+print(json.dumps({'sheets':wb.sheetnames,'hdr':hdr,'n':len(rows),'last':[str(x) if x is not None else None for x in rows[-1]],'cobros':wb['Cobros y comisiones'].max_row,'res':[[str(c) for c in r] for r in wb['Resumen'].iter_rows(min_row=1,max_row=60,values_only=True)]}))
 `, tmp]).toString());
   fs.unlinkSync(tmp);
-  assert.deepEqual(out.sheets, ["Resumen", "Ventas", "Productos vendidos", "Cobros y comisiones", "Por producto", "Por vendedor"]);
-  assert.equal(out.n, b.sales().length, "una fila por venta");
-  for (const h of ["Fecha", "Folio", "Cliente", "Productos", "Tu precio", "Comisión absorbida por el cliente", "Total venta", "Forma de cobro", "¿Comisión Mercado Pago?", "Comisión Mercado Pago", "Neto recibido", "Utilidad"]) assert(out.hdr.includes(h), h);
+  assert.deepEqual(out.sheets, ["Resumen", "Ventas", "Cobros y comisiones", "Por producto", "Por vendedor"]);
+  // 2.10: un renglón por producto de cada folio.
+  assert.equal(out.n, b.all("SELECT COUNT(*) n FROM sale_lines")[0].n, "una fila por producto vendido");
+  for (const h of ["Fecha", "Folio", "Renglón", "Cliente", "Producto", "Tu precio (venta)", "Comisión absorbida por el cliente", "Total venta", "Forma de cobro", "¿Comisión Mercado Pago?", "Comisión Mercado Pago", "Neto recibido", "Utilidad (venta)"]) assert(out.hdr.includes(h), h);
   const last = Object.fromEntries(out.hdr.map((h, i) => [h, out.last[i]]));
   assert.equal(last["Forma de cobro"], "Tarjeta (terminal)");
   assert.equal(last["¿Comisión Mercado Pago?"], "Sí");
-  assert.equal(Number(last["Tu precio"]), p.price / 100, "precio de catálogo");
+  assert.equal(Number(last["Tu precio (venta)"]), p.price / 100, "precio de catálogo");
   assert.equal(Number(last["Comisión absorbida por el cliente"]), (pTotal - p.price) / 100, "comisión que absorbió el cliente");
   assert.equal(Number(last["Total venta"]), pTotal / 100, "lo que pagó el cliente");
   assert.equal(Number(last["Comisión Mercado Pago"]), Math.round((pTotal * 406) / 10000) / 100);
@@ -164,6 +165,12 @@ print(json.dumps({'sheets':wb.sheetnames,'hdr':hdr,'n':len(rows),'last':[str(x) 
 
   // ---------- 5. 1.8 · Carrito de compras ----------
   await tab("Stock");
+  // 2.10 · Reporte de stock (Excel) desde la pantalla Stock.
+  await press("Reporte de stock (Excel)");
+  for (let i = 0; i < 5; i++) await flush(30);
+  assert.equal(Object.keys(written).filter((u) => /Stock_Nova_.*\.xlsx$/.test(u)).length, 1, "Excel de stock: " + Object.keys(written).join(","));
+  assert(all().includes("Reporte de stock listo"), "aviso del reporte de stock");
+  console.log("  ✓ 2.10: reporte de stock en Excel desde Stock");
   const inCart = () => pressables((n) => text(n).trim() === "Al carrito" && !n.props.disabled);
   const s0 = b.sales().length;
   await act(async () => inCart()[0].props.onPress());

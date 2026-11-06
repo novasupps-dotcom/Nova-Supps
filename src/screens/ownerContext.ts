@@ -74,6 +74,8 @@ export type OwnerPageContext = {
     at?: string;
   } | null;
   exportBackup: () => Promise<void>;
+  /** 2.10 · Excel con el reporte de stock actual. */
+  exportStock: () => Promise<void>;
   gridProducts: any[];
   basket: Cart;
   productById: Map<string, Row>;

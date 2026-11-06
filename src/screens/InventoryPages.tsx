@@ -46,6 +46,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
     setPay,
     cloudStatus,
     exportBackup,
+    exportStock,
     gridProducts,
     basket,
     productById,
@@ -263,7 +264,12 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                 { label: "Conteo", icon: "list-checks", onPress: () => open("Ajuste de inventario") },
               ]}
             />
-            <Button title="Cargar pedido del proveedor (PDF)" icon="file-text" secondary small onPress={() => go("Cargar pedido")} />
+            <View style={[s.wrap, { gap: 8 }]}>
+              <Button title="Cargar pedido del proveedor (PDF)" icon="file-text" secondary small onPress={() => go("Cargar pedido")} />
+              {page === "Stock" && (
+                <Button title="Reporte de stock (Excel)" icon="file-spreadsheet" secondary small onPress={() => void exportStock()} />
+              )}
+            </View>
             {!!dups.length && (
               <TextButton
                 title={`${dups.length} ${dups.length === 1 ? "producto repetido" : "productos repetidos"} · Revisar`}
