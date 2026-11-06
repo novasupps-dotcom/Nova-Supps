@@ -986,12 +986,8 @@ export function SellerApp({
         setError(
           `La venta no se registró: ${rejectedSales(b).find((x) => x.id === draft.id)?.error || "revisa con el dueño"}.`,
         );
-      else
-        notify(
-          r === "sent"
-            ? `Venta registrada · ${money(draft.total)}`
-            : "Venta guardada; se enviará al tener internet",
-        );
+      // 2.10.1: sin barra de aviso cuando la venta se registra; solo si quedó pendiente de enviar.
+      else if (r !== "sent") notify("Venta guardada; se enviará al tener internet");
       void syncNow();
     } finally {
       setBusy(false);
