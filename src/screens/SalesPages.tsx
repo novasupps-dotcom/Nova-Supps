@@ -88,10 +88,8 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
     m,
   } = d;
   if (page === "Resumen de ventas") {
-    const ps = b!.periodSummary(periodFrom(currentPeriod));
-    const top = b!.all(
-      "SELECT p.name,SUM(l.qty) qty FROM sale_lines l JOIN sales s ON s.id=l.saleId JOIN products p ON p.id=l.productId WHERE s.status='confirmed' GROUP BY p.id ORDER BY qty DESC LIMIT 5",
-    );
+    const fromIso = periodFrom(currentPeriod);
+    const ps = b!.periodSummary(fromIso);
     return {
       scroll: (
         <>
@@ -142,21 +140,13 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
             <Note>Las mermas se valúan a su costo: no mueven dinero, pero sí bajan tu utilidad.</Note>
           </Card>
           <MarginProjectionCard b={b!} />
-          {!!top.length && (
-            <Card>
-              <Text style={s.subtitle}>Productos más vendidos</Text>
-              {top.map((t, i) => (
-                <View key={i} style={s.between}>
-                  <Text style={[s.body, { flex: 1 }]} numberOfLines={1}>
-                    {i + 1}. {t.name}
-                  </Text>
-                  <Text style={[s.body, { fontWeight: "700" }]}>
-                    {units(t.qty)}
-                  </Text>
-                </View>
-              ))}
-            </Card>
-          )}
+          <ReportsPage
+            b={b!}
+            version={revision}
+            embedded
+            externalFrom={fromIso}
+            externalLabel={currentPeriod}
+          />
           <Button
             title="Ver ventas y su desglose"
             onPress={() => go("Ventas")}
@@ -501,7 +491,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
       filters.Ventas === "Todas" ? "Activas" : filters.Ventas || "Activas";
     const day = today();
     const cancelled = sales.filter((v) => v.status === "cancelled");
-    const list = matching(sales).filter((v) =>
+    let list = matching(sales).filter((v) =>
       filter === "Canceladas"
         ? v.status === "cancelled"
         : v.status === "confirmed" &&
@@ -553,7 +543,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
               ([id, amt]) => inGroup(id) && (amt as number) !== 0,
             ),
           );
-    list.splice(0, list.length, ...shown);
+    list = shown;
     const totalShown = list
       .filter((v) => v.status === "confirmed")
       .reduce((n, v) => n + v.total, 0);
@@ -871,7 +861,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
             {line("Caja esperada al cierre", money(cash.closing), {
               bold: true,
             })}
-            <Note>Aportaciones, retiros y traspasos van aparte: no son ventas. Si el efectivo no cuadra, registra la diferencia en Cuentas.</Note>
+            <Note>Si el efectivo físico no cuadra, registra el ajuste en Cuentas.</Note>
           </Card>
           {!!items.length && (
             <Card>

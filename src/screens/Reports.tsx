@@ -44,13 +44,31 @@ export function reportText(r: SalesReport, period: string): string {
   return out.join("\n");
 }
 
-export function ReportsPage({ b, version }: { b: Business; version: number }) {
+export function ReportsPage({
+  b,
+  version,
+  embedded = false,
+  externalFrom,
+  externalLabel,
+}: {
+  b: Business;
+  version: number;
+  embedded?: boolean;
+  externalFrom?: string | null;
+  externalLabel?: string;
+}) {
   const [period, setPeriod] = useState<ExportPeriod>("Este mes");
   const [sort, setSort] = useState<Sort>("revenue");
   const [all, setAll] = useState(false);
   const report = useMemo(
-    () => salesReport(b, exportRange(period)),
-    [b, period, version],
+    () =>
+      salesReport(
+        b,
+        externalFrom !== undefined
+          ? { from: externalFrom, to: null }
+          : exportRange(period),
+      ),
+    [b, period, externalFrom, version],
   );
   const products = useMemo(
     () =>
@@ -74,38 +92,42 @@ export function ReportsPage({ b, version }: { b: Business; version: number }) {
   );
   return (
     <>
-      <Chips
-        row
-        options={EXPORT_PERIODS.map((p) => ({ id: p, name: p }))}
-        value={period}
-        onChange={(v) => setPeriod(v as ExportPeriod)}
-      />
-      <Card tone="ok">
-        <Text
-          style={s.subtitle}
-        >{`${t.sales} ${t.sales === 1 ? "venta" : "ventas"} · ${t.units} piezas`}</Text>
-        {row("Tus ventas (tu precio)", money(t.revenue))}
-        {row(
-          "Cobrado a clientes",
-          money(t.charged),
-          "Incluye la comisión que absorbe el cliente",
-        )}
-        {row("Costo de la mercancía", money(t.cost))}
-        {row(
-          "Ganancia estimada",
-          money(t.profit),
-          `Margen ${pct(t.profit, t.revenue)}`,
-          t.profit >= 0 ? C.green : C.red,
-        )}
-        {t.discount > 0 &&
-          row(
-            "Descuentos por promociones",
-            "−" + money(t.discount),
-            undefined,
-            C.red,
-          )}
-      </Card>
-      {!t.sales && <Note color={C.amber}>No hay ventas en este periodo.</Note>}
+      {!embedded && (
+        <>
+          <Chips
+            row
+            options={EXPORT_PERIODS.map((p) => ({ id: p, name: p }))}
+            value={period}
+            onChange={(v) => setPeriod(v as ExportPeriod)}
+          />
+          <Card tone="ok">
+            <Text
+              style={s.subtitle}
+            >{`${t.sales} ${t.sales === 1 ? "venta" : "ventas"} · ${t.units} piezas`}</Text>
+            {row("Tus ventas (tu precio)", money(t.revenue))}
+            {row(
+              "Cobrado a clientes",
+              money(t.charged),
+              "Incluye la comisión que absorbe el cliente",
+            )}
+            {row("Costo de la mercancía", money(t.cost))}
+            {row(
+              "Ganancia estimada",
+              money(t.profit),
+              `Margen ${pct(t.profit, t.revenue)}`,
+              t.profit >= 0 ? C.green : C.red,
+            )}
+            {t.discount > 0 &&
+              row(
+                "Descuentos por promociones",
+                "−" + money(t.discount),
+                undefined,
+                C.red,
+              )}
+          </Card>
+          {!t.sales && <Note color={C.amber}>No hay ventas en este periodo.</Note>}
+        </>
+      )}
       {!!t.sales && (
         <>
           <Text style={s.section}>Por producto</Text>
@@ -167,12 +189,14 @@ export function ReportsPage({ b, version }: { b: Business; version: number }) {
             icon="share-2" title="Compartir reporte"
             secondary
             onPress={() =>
-              void Share.share({ message: reportText(report, period) }).catch(
+              void Share.share({ message: reportText(report, externalLabel || period) }).catch(
                 () => {},
               )
             }
           />
-          <Note>El detalle venta por venta está en el Excel (Ajustes → Respaldo y Excel).</Note>
+          {!embedded && (
+            <Note>El detalle venta por venta está en el Excel (Ajustes → Respaldo y Excel).</Note>
+          )}
         </>
       )}
     </>

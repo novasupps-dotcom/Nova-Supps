@@ -117,7 +117,7 @@ import type { IconName } from "./icons";
 import { autoRegisterPush, setupNotifications, detachPush } from "./push";
 import { PushCard } from "./screens/PushCard";
 import { UpdateNotice, UpdatesCard } from "./screens/UpdateNotice";
-import { VERSION } from "./screens/ownerShared";
+import { VERSION, normalize } from "./screens/ownerShared";
 
 /** 2.3: cuatro pestañas; Cuenta se abre con el ícono de persona de arriba. */
 const TABS: { name: string; icon: IconName }[] = [
@@ -204,6 +204,10 @@ export function SellerApp({
   const [cart, setCart] = useState<{ productId: string; qty: number }[]>([]);
   const cartRef = useRef(cart);
   cartRef.current = cart;
+  const cartQtyMap = useMemo(
+    () => new Map(cart.map((i) => [i.productId, i.qty] as [string, number])),
+    [cart],
+  );
   const [customer, setCustomer] = useState<Row | null>(null);
   const [newCustomer, setNewCustomer] = useState<{
     name: string;
@@ -1345,8 +1349,9 @@ export function SellerApp({
       </SafeAreaView>
     );
 
-  const visible = products.filter((p) =>
-    `${p.name} ${p.sku} ${p.brand}`.toLowerCase().includes(query.toLowerCase()),
+  const qNorm = normalize(query);
+  const visible = products.filter(
+    (p) => !qNorm || normalize(`${p.name} ${p.sku} ${p.brand}`).includes(qNorm),
   );
   const productCard = (p: Row) => {
     const max = limit(p.product_id);
@@ -1401,7 +1406,6 @@ export function SellerApp({
             {money(total)}
           </Text>
         </View>
-        <Note>Mismo precio con cualquier forma de pago. Descuentos o crédito: pídeselos al dueño.</Note>
       </View>
       <Text style={s.section}>Forma de pago</Text>
       <PayOptions
@@ -1596,7 +1600,7 @@ export function SellerApp({
             <ProductGrid
               products={gridProducts}
               lookupStore={b}
-              qtyOf={(id) => cart.find((i) => i.productId === id)?.qty ?? 0}
+              qtyOf={(id) => cartQtyMap.get(id) ?? 0}
               limitOf={limit}
               onAdd={(id) => add(id)}
               onRemove={(id) => add(id, -1)}

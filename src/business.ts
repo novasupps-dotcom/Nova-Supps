@@ -1925,8 +1925,6 @@ export class Business {
       .filter((x) => x.kind === "sale")
       .reduce((n, x) => n + x.amount, 0);
     const cost = lines.reduce((n, x) => n + x.cost, 0);
-    for (const line of lines)
-      Object.assign(line, this.setting("line:" + line.id, {}));
     const gross = sale.status === "cancelled" ? 0 : sale.total - cost;
     return {
       ...sale,

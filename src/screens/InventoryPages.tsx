@@ -50,6 +50,9 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
     exportStock,
     gridProducts,
     basket,
+    basketQtyMap,
+    basketCustomerId,
+    clearBasketCustomer,
     productById,
     addToBasket,
     removeFromBasket,
@@ -127,6 +130,9 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
     const lastDays = d.lastBackup
       ? daysBetween(localDay(d.lastBackup), today())
       : null;
+    const basketCustomer = basketCustomerId
+      ? customers.find((c) => c.id === basketCustomerId)
+      : null;
     return {
       scroll: (
         <>
@@ -197,9 +203,31 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               ]}
             />
           )}
+          {!!basketCustomer && (
+            <View
+              style={[
+                s.between,
+                {
+                  backgroundColor: C.paper,
+                  borderRadius: 18,
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  marginBottom: 10,
+                },
+              ]}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+                <Icon name="user" size={16} color={C.brand} />
+                <Text style={[s.body, { fontWeight: "600", flex: 1 }]} numberOfLines={1}>
+                  {`Cliente: ${basketCustomer.name}`}
+                </Text>
+              </View>
+              <TextButton title="Quitar" color={C.muted} onPress={clearBasketCustomer} />
+            </View>
+          )}
           <ProductGrid
             products={gridProducts as any}
-            qtyOf={(id) => basket.find((i) => i.productId === id)?.qty ?? 0}
+            qtyOf={(id) => basketQtyMap.get(id) ?? 0}
             limitOf={(id) => Math.max(0, productById.get(id)?.available ?? 0)}
             onAdd={(id) => addToBasket(id, 1, true)}
             lookupStore={b!}
@@ -537,16 +565,36 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
     };
   }
 
-  if (page === "Lotes")
+  if (page === "Lotes") {
+    const defaultLotFilter = lots.some((l) => l.qty > 0)
+      ? "Con existencias"
+      : "Todos";
+    const lotFilter = filters.Lotes || defaultLotFilter;
+    const shownLots = lots.filter((l) => {
+      if (!normalize(l.product + " " + l.sku).includes(normalize(query)))
+        return false;
+      if (lotFilter === "Con existencias") return l.qty > 0;
+      if (lotFilter === "Agotados") return l.qty < 1;
+      if (lotFilter === "Próximos 60 días") {
+        const days = l.expires ? daysBetween(today(), l.expires) : null;
+        return l.qty > 0 && days !== null && days <= 60;
+      }
+      return true;
+    });
     return {
       scroll: (
         <>
           {searchBox("Buscar producto o SKU")}
-          {lots
-            .filter((l) =>
-              normalize(l.product + " " + l.sku).includes(normalize(query)),
-            )
-            .map((l) => {
+          {filterChips("Lotes", [
+            "Con existencias",
+            "Próximos 60 días",
+            "Agotados",
+            "Todos",
+          ])}
+          {!shownLots.length && (
+            <Note>No hay lotes con este filtro.</Note>
+          )}
+          {shownLots.map((l) => {
               const days = l.expires ? daysBetween(today(), l.expires) : null;
               return (
                 <Card key={l.id}>
@@ -579,6 +627,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
         </>
       ),
     };
+  }
 
   return null;
 }

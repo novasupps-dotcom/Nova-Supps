@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from "react";
-import { Pressable, ScrollView, Share, View } from "react-native";
+import { Pressable, Share, View } from "react-native";
 import { Text } from "../text";
 import { localDay, money, today, type Business } from "../business";
 import { paymentRows } from "../payments";
 import { Button, C, Card, Chips, Note, SearchBox, s } from "../ui";
+import { normalize } from "./ownerShared";
 
 export function PaymentsPage({
   b,
@@ -29,15 +30,15 @@ export function PaymentsPage({
         : period === "Mes"
           ? day.slice(0, 7) + "-01"
           : "";
+  const qNorm = normalize(query);
   const shown = rows.filter(
     (r) =>
       localDay(r.created) >= from &&
       (method === "Todos" || r.method === method) &&
-      (!query.trim() ||
-        [r.folio, r.customer, r.account, r.method, r.kind]
-          .join(" ")
-          .toLowerCase()
-          .includes(query.trim().toLowerCase())),
+      (!qNorm ||
+        normalize(
+          [r.folio, r.customer, r.account, r.method, r.kind].join(" "),
+        ).includes(qNorm)),
   );
   const received = shown
       .filter((r) => r.amount > 0)
@@ -45,23 +46,6 @@ export function PaymentsPage({
     returned = -shown
       .filter((r) => r.amount < 0)
       .reduce((sum, r) => sum + r.amount, 0);
-  const widths = [150, 115, 170, 130, 145, 110, 110];
-  const cell = (value: string, index: number, header = false) => (
-    <Text
-      key={index}
-      style={[
-        s.body,
-        {
-          width: widths[index],
-          padding: 10,
-          fontWeight: header ? "700" : "400",
-          color: header ? C.ink : C.muted,
-        },
-      ]}
-    >
-      {value}
-    </Text>
-  );
   const heading = [
     "Fecha",
     "Folio",
@@ -101,40 +85,44 @@ export function PaymentsPage({
         <Text style={s.price}>{`Neto: ${money(received - returned)}`}</Text>
         <Note>Neto = cobros menos devoluciones. Comisiones y gastos están en Reportes y Corte de caja.</Note>
       </Card>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator
-        keyboardShouldPersistTaps="handled"
-      >
-        <View>
-          <View style={{ flexDirection: "row", backgroundColor: C.soft }}>
-            {heading.map((h, i) => cell(h, i, true))}
-          </View>
-          {shown.map((r) => (
+      {!!shown.length && (
+        <View style={s.list}>
+          {shown.map((r, i) => (
             <Pressable
               key={r.id}
               accessibilityRole="button"
               accessibilityLabel={"Ver venta " + r.folio}
               onPress={() => onSale(r.saleId)}
-              style={{
-                flexDirection: "row",
-                borderBottomWidth: 1,
-                borderBottomColor: C.line,
-              }}
+              style={({ pressed }) => [
+                s.cartRow,
+                {
+                  paddingHorizontal: 16,
+                  borderBottomWidth: i === shown.length - 1 ? 0 : 1,
+                },
+                pressed && { backgroundColor: C.soft },
+              ]}
             >
-              {[
-                new Date(r.created).toLocaleString("es-MX"),
-                r.folio,
-                r.customer,
-                r.method,
-                r.account,
-                r.kind,
-                money(r.amount),
-              ].map((v, i) => cell(v, i))}
+              <View style={{ flex: 1 }}>
+                <Text style={[s.body, { fontWeight: "600" }]} numberOfLines={1}>
+                  {`${r.folio} · ${r.customer}`}
+                </Text>
+                <Text style={[s.muted, { fontSize: 13 }]} numberOfLines={1}>
+                  {`${new Date(r.created).toLocaleString("es-MX")} · ${r.method} · ${r.account} · ${r.kind}`}
+                </Text>
+              </View>
+              <Text
+                style={[
+                  s.price,
+                  { fontSize: 16, marginVertical: 0 },
+                  r.amount < 0 && { color: C.red },
+                ]}
+              >
+                {money(r.amount)}
+              </Text>
             </Pressable>
           ))}
         </View>
-      </ScrollView>
+      )}
       {!shown.length && <Note>No hay cobros en este periodo.</Note>}
       <Button
         title="Compartir tabla de cobros"

@@ -149,7 +149,7 @@ export function renderCustomersPages(ctx: OwnerPageContext): Body | null {
             .join("")
             .toUpperCase();
           return (
-            <Card>
+            <Card onPress={() => open("Cliente", strings(c))}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
                 <View
                   style={{

@@ -78,6 +78,9 @@ export type OwnerPageContext = {
   exportStock: () => Promise<void>;
   gridProducts: any[];
   basket: Cart;
+  basketQtyMap: Map<string, number>;
+  basketCustomerId: string;
+  clearBasketCustomer: () => void;
   productById: Map<string, Row>;
   addToBasket: (productId: string, qty?: number, quiet?: boolean) => boolean;
   removeFromBasket: (productId: string) => void;

@@ -1127,10 +1127,17 @@ export function ProductGrid({
                 accessibilityRole="button"
                 accessibilityLabel={`Ver ${p.name}`}
                 hitSlop={8}
-                style={s.tileInfo}
+                style={[
+                  s.tileInfo,
+                  !!p.description && { backgroundColor: C.brandSoft },
+                ]}
                 onPress={() => setOpenOne(p.id)}
               >
-                <Icon name="info" size={14} color={C.muted} />
+                <Icon
+                  name="info"
+                  size={14}
+                  color={p.description ? C.brand : C.muted}
+                />
               </Pressable>
               {qty > 0 && (
                 <View style={s.tileActions}>
@@ -2236,21 +2243,6 @@ export const s = StyleSheet.create({
   navOn: {},
   navIcon: { fontSize: 19 },
   navText: { fontSize: 11, color: C.tab, fontWeight: "500" },
-  fab: {
-    alignSelf: "flex-end",
-    marginRight: 18,
-    marginBottom: 12,
-    backgroundColor: C.brand,
-    borderRadius: 28,
-    paddingHorizontal: 22,
-    minHeight: 54,
-    flexDirection: "row",
-    gap: 6,
-    alignItems: "center",
-    justifyContent: "center",
-    ...FLOAT,
-  },
-  fabText: { color: "#fff", fontWeight: "600", fontSize: 16 },
   toast: {
     alignSelf: "center",
     maxWidth: "88%",
@@ -2357,17 +2349,6 @@ export const s = StyleSheet.create({
   },
   tileTag: { fontSize: 12, fontWeight: "600", color: C.brand, marginTop: 1 },
   tileStock: { fontSize: 12.5, marginTop: 1 },
-  tileAdd: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    marginTop: 10,
-    backgroundColor: C.soft,
-    borderRadius: 20,
-    paddingVertical: 9,
-  },
-  tileAddText: { color: C.brand, fontWeight: "700", fontSize: 14 },
   tileActions: {
     flexDirection: "row",
     alignItems: "center",

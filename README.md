@@ -1,6 +1,12 @@
-# Nova Negocio · 2.10.2
+# Nova Negocio · 2.10.3
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
+
+**2.10.3 · Auditoría integral del mini-ERP: motor SQLite perezoso, reportes integrados, cobros nativos y UX intuitiva (versionCode 65, solo JavaScript):**
+
+- **Motor y rendimiento**: carga perezosa (`lazy getters`) en `load(b)` para lotes, renglones de ventas, pagos por cuenta y métricas; eliminación de lectura duplicada de metadatos en `saleDetail()`; mapas $O(1)$ (`basketQtyMap` / `cartQtyMap`) para cantidades del carrito; eliminación de estilos muertos y llamadas redundantes a `b.stock()`.
+- **Módulos y UX**: indicador de cliente activo en `Vender` al iniciar venta desde `Clientes`; integración de reportes completos (por producto con orden por ` / piezas / ganancia, por vendedor y promociones) directo en `Ventas → Resumen de ventas`; redirección directa de `Catálogo` a `Stock`; filtros en `Lotes` (`Con existencias`, `Próximos 60 días`, `Agotados`, `Todos`); tarjetas de `Clientes` táctiles en toda su área; vista móvil nativa sin desplazamiento horizontal de 930px en `Cobros`; ícono «i» resaltado en productos con descripción; búsqueda sin acentos en `Stock` del vendedor.
+- **Textos y microcopia**: reducción de notas redundantes en formularios de producto, corte de caja, ajustes y carrito del vendedor.
 
 **2.10.2 · Píldoras flotantes, cuadrícula directa sin botón «Agregar» inicial y optimización general (versionCode 64, solo JavaScript):**
 

@@ -181,16 +181,28 @@ function load(b: Business) {
       x.total += v.total;
       byCustomer.set(v.customerId, x);
     }
+  let _lots: Row[] | undefined;
+  let _lines: Map<string, Row[]> | undefined;
+  let _payByAccount: Map<string, Record<string, number>> | undefined;
+  let _m: Row | undefined;
   return {
     products,
     customers: b.customers(),
     accounts: b.accounts(),
     sales,
-    lots: b.lots(),
-    lines: b.saleLinesBySale(),
-    payByAccount: b.salePaymentsByAccount(),
+    get lots() {
+      return (_lots ??= b.lots());
+    },
+    get lines() {
+      return (_lines ??= b.saleLinesBySale());
+    },
+    get payByAccount() {
+      return (_payByAccount ??= b.salePaymentsByAccount());
+    },
     byCustomer,
-    m: b.metrics(),
+    get m() {
+      return (_m ??= b.metrics());
+    },
     lastBackup: b.setting("lastBackupAt", null) as string | null,
     mp: b.setting("mpConfig", null) as MpConfig | null,
     mpPending: b.setting("mpPending", null) as Row | null,
@@ -332,7 +344,8 @@ function AppContent({ business }: { business?: Business }) {
       const saved = db.setting("uiSession", null);
       if (saved && saved.version === 1) {
         const valid = new Set(PAGES);
-        setPage(valid.has(saved.page) ? saved.page : HOME);
+        const savedPage = saved.page === "Catálogo" ? "Stock" : saved.page;
+        setPage(valid.has(savedPage) ? savedPage : HOME);
         setHistory(
           Array.isArray(saved.history)
             ? saved.history.filter((x: any) => valid.has(x))
@@ -470,6 +483,10 @@ function AppContent({ business }: { business?: Business }) {
     () =>
       new Map((data?.products ?? []).map((p) => [p.id, p] as [string, Row])),
     [data],
+  );
+  const basketQtyMap = useMemo(
+    () => new Map(basket.map((i) => [i.productId, i.qty] as [string, number])),
+    [basket],
   );
   const gridProducts = useMemo(() => {
     if (!data || !b) return [];
@@ -1816,7 +1833,8 @@ function AppContent({ business }: { business?: Business }) {
     }
     flushSession();
   }
-  const go = (p: string, filter?: string) => {
+  const go = (raw: string, filter?: string) => {
+    const p = raw === "Catálogo" ? "Stock" : raw;
     if (filter !== undefined) setFilters((old) => ({ ...old, [p]: filter }));
     if (p === page) return;
     setHistory((old) => (TABS.some((t) => t.name === p) ? [] : [...old, page]));
@@ -2182,7 +2200,7 @@ function AppContent({ business }: { business?: Business }) {
     </View>
   );
   const sellButton = (p: Row) => {
-    const n = basket.find((i) => i.productId === p.id)?.qty ?? 0;
+    const n = basketQtyMap.get(p.id) ?? 0;
     return (
       <Button
         icon="shopping-cart" title={n ? `En el carrito: ${n} · ＋1` : "Al carrito"}
@@ -2430,6 +2448,10 @@ function AppContent({ business }: { business?: Business }) {
       exportStock,
       gridProducts,
       basket,
+      basketQtyMap,
+      basketCustomerId: basketF.customerId || "",
+      clearBasketCustomer: () =>
+        setBasketF((old) => ({ ...old, customerId: "" })),
       productById,
       addToBasket,
       removeFromBasket,
@@ -2549,6 +2571,7 @@ function AppContent({ business }: { business?: Business }) {
       trErr,
       excel,
       basket,
+      basketF.customerId,
       saleSeg,
     ],
   );
@@ -2979,8 +3002,8 @@ function AppContent({ business }: { business?: Business }) {
         case "Producto": {
           // Si otra operación vinculó el código mientras se preparaba el alta, se reutiliza la ficha.
           const existing = !val("id")
-            ? findProductByCode(b.stock(), val("barcode")) ||
-              findProductByCode(b.stock(), val("sku"))
+            ? findProductByCode(products, val("barcode")) ||
+              findProductByCode(products, val("sku"))
             : null;
           if (existing && val("scanOrigin") === "1") {
             setBusy(false);
@@ -3052,12 +3075,10 @@ function AppContent({ business }: { business?: Business }) {
               "Esta entrada corresponde al producto escaneado. Vuelve a leer el código para elegir otro.",
             );
             assert(
-              b
-                .stock()
-                .some(
-                  (product) =>
-                    product.id === val("scanProductId") && !product.archived,
-                ),
+              products.some(
+                (product) =>
+                  product.id === val("scanProductId") && !product.archived,
+              ),
               "El producto ya no está disponible para recibir stock. Vuelve a abrir su ficha.",
             );
           }
@@ -4002,7 +4023,7 @@ function AppContent({ business }: { business?: Business }) {
                     {(() => {
                       const base = tryCents(val("price"));
                       return (
-                        <Note>{data.feeInPrice ? `Precio con la comisión ${feeLabel(data.cardFeeBps)} incluida: el cliente paga este precio.` : `Tu precio: lo que recibes completo.${base ? ` El cliente paga ${money(grossUp(base, data.feeBps))} (absorbe la comisión ${feeLabel(data.feeBps)}).` : ""}`}</Note>
+                        <Note>{data.feeInPrice ? `Precio con comisión ${feeLabel(data.cardFeeBps)} incluida.` : `Recibes este monto completo.${base ? ` Cliente paga ${money(grossUp(base, data.feeBps))} (${feeLabel(data.feeBps)}).` : ""}`}</Note>
                       );
                     })()}
                     {!!val("id") && (
@@ -4010,7 +4031,7 @@ function AppContent({ business }: { business?: Business }) {
                         {field("stockNow", "Existencias (piezas)", true, val("stockWas") || "0")}
                         {val("stockNow").trim() !== "" && val("stockNow") !== val("stockWas") && (
                           <Note color={C.amber}>
-                            {`Existencias ${val("stockWas") || "0"} → ${val("stockNow")}. Se corrige sin mover dinero ni contar como merma. Para registrar merma usa Conteo.`}
+                            {`Existencias ${val("stockWas") || "0"} → ${val("stockNow")} (corrección sin merma).`}
                           </Note>
                         )}
                       </>
@@ -4049,7 +4070,6 @@ function AppContent({ business }: { business?: Business }) {
                           disabled={busy}
                           onPress={photo}
                         />
-                        <Note>La app reduce y endereza las fotos JPG. PNG o WebP de máximo 1 MB.</Note>
                         <View style={{ height: 12 }} />
                         {field("sku", "SKU — automático si lo dejas vacío")}
                         {field("category", "Categoría")}
@@ -4071,11 +4091,6 @@ function AppContent({ business }: { business?: Business }) {
                             QUICK_EXPIRY,
                           )}
                         {field("notes", "Notas", false, "", true)}
-                        <Note>
-                          {val("id")
-                            ? "Los cambios de precio no alteran ventas anteriores. Usa Entrada para agregar unidades."
-                            : "El stock inicial no registra una salida de dinero. Para una compra pagada usa Entrada."}
-                        </Note>
                       </>
                     )}
                     {editingProduct && (

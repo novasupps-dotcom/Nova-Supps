@@ -1,4 +1,8 @@
-# Nova Negocio 2.10.2 · 6-nov-2026
+# Nova Negocio 2.10.3 · 6-nov-2026
+
+Hecho en 2.10.3: implementación completa de la auditoría integral del mini-ERP (motor SQLite con carga perezosa, mapas O(1) de carrito, cliente activo visible en Vender, reportes integrados en Resumen de ventas, filtros de lotes, tarjetas de clientes táctiles, cobros en tarjetas móviles sin tabla horizontal y limpieza de microcopia).
+
+Hecho en 2.10.2 · 6-nov-2026
 
 Hecho en 2.10.2: carrito y avisos como píldoras flotantes (sin barra horizontal fija); tarjetas en Vender sin botón «＋ Agregar» inicial (tocar agrega directo; ícono «i» abre ficha); optimización de cuadrícula y búsquedas.
 

@@ -267,7 +267,7 @@ export function renderParameters(ctx: OwnerPageContext): Body | null {
             {
               key: "adv",
               title: "Funciones avanzadas",
-              desc: "Lotes, cuentas y gastos. Tus datos no se pierden.",
+              desc: "Lotes, cuentas bancarias y gastos.",
               icon: "sliders-horizontal",
               tint: TILE.graphite,
               right: (
