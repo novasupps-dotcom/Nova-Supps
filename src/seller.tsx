@@ -1213,9 +1213,11 @@ export function SellerApp({
         right={
           <>
             {tab !== "Vender" && offline}
-            {/* 2.10: carrito con animación al agregar un producto. */}
+            {/* 2.10.4: carrito unificado en el encabezado (sin barra negra inferior). */}
             <CartButton
               count={cart.reduce((n, i) => n + i.qty, 0)}
+              total={total}
+              seller
               onPress={() => (setTab("Vender"), setCartOpen(!!cart.length), setError(""))}
             />
             <IconButton icon="circle-user" label="Cuenta" onPress={openAccount} />
@@ -1933,20 +1935,6 @@ export function SellerApp({
             >
               <Icon name="circle-check" size={18} color="#fff" />
               <Text style={s.toastText} numberOfLines={2}>{toast}</Text>
-            </Pressable>
-          )}
-          {tab === "Vender" && !cartOpen && !!cart.length && !charge && (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Ver carrito"
-              style={({ pressed }) => [s.cartBar, pressed && { opacity: 0.9 }]}
-              onPress={() => (setCartOpen(true), setError(""))}
-            >
-              <Icon name="shopping-cart" size={18} color="#fff" />
-              <Text style={s.cartBarText} numberOfLines={1}>
-                {`Ver carrito · ${cart.reduce((n, i) => n + i.qty, 0)} ${cart.reduce((n, i) => n + i.qty, 0) === 1 ? "pieza" : "piezas"} · ${money(total)}`}
-              </Text>
-              <Icon name="chevron-right" size={16} color="#fff" />
             </Pressable>
           )}
         <TabBar

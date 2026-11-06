@@ -53,6 +53,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
     basketQtyMap,
     basketCustomerId,
     clearBasketCustomer,
+    openFollowPopup,
     productById,
     addToBasket,
     removeFromBasket,
@@ -181,7 +182,8 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                             : `${soon.length} seguimientos próximos`,
                         icon: "bell" as const,
                         tint: TILE.gold,
-                        onPress: () => go("Clientes", "Próximos 5 días"),
+                        value: "Ver / acciones",
+                        onPress: openFollowPopup,
                       },
                     ]
                   : []),
@@ -293,7 +295,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                 { label: "Conteo", icon: "list-checks", onPress: () => open("Ajuste de inventario") },
               ]}
             />
-            <View style={[s.row, { gap: 8, marginBottom: 4 }]}>
+            <View style={[s.wrap, { gap: 8, marginBottom: 4 }]}>
               <Button title="Cargar pedido del proveedor (PDF)" icon="file-text" secondary small flex onPress={() => go("Cargar pedido")} />
               {page === "Stock" && (
                 <Button title="Reporte de stock (Excel)" icon="file-spreadsheet" secondary small flex onPress={() => void exportStock()} />
@@ -352,18 +354,21 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                 </View>
                 <Icon name="chevron-right" size={18} color={C.faint} />
               </View>
-              <View style={[s.row, { marginTop: 10, marginVertical: 0, alignItems: "center" }]}>
-                <View style={{ flex: 1 }}>{sellButton(p)}</View>
-                {!p.archived && (
-                  // 2.10.1: cambiar la cantidad directo desde la lista de Stock.
+              {!p.archived && (
+                <View style={[s.row, { marginTop: 10, marginVertical: 0, alignItems: "center" }]}>
+                  {(p.available > 0 || (basketQtyMap.get(p.id) ?? 0) > 0) ? (
+                    <View style={{ flex: 1 }}>{sellButton(p)}</View>
+                  ) : (
+                    <View style={{ flex: 1 }} />
+                  )}
                   <IconButton
                     icon="boxes"
                     label={`Cambiar cantidad de ${p.name}`}
                     bg={C.soft}
                     onPress={() => open("Ajuste de inventario", { productId: p.id, reason: "Corrección", counted: String(p.stock) })}
                   />
-                )}
-              </View>
+                </View>
+              )}
             </Card>
           );
         },
@@ -488,8 +493,12 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                 )}
               </>
             )}
-            <View style={{ height: 10 }} />
-            {sellButton(p)}
+            {!p.archived && (p.available > 0 || (basketQtyMap.get(p.id) ?? 0) > 0) && (
+              <>
+                <View style={{ height: 10 }} />
+                {sellButton(p)}
+              </>
+            )}
           </Card>
           <QuickActions
             items={[

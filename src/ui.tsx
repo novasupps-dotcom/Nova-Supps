@@ -920,12 +920,25 @@ export function ProductGrid({
     return list;
   }, [shown]);
   const familyMembers = openFamily
-    ? products.filter((p) => p.family === openFamily)
+    ? (() => {
+        const all = products.filter((p) => p.family === openFamily);
+        const inStock = all.filter((p) => limitOf(p.id) > 0 || qtyOf(p.id) > 0);
+        return inStock.length ? inStock : all;
+      })()
     : openOne
       ? products.filter((p) => p.id === openOne)
       : [];
   const closeSheet = () => (setOpenFamily(null), setOpenOne(null));
-  const cols = width >= 840 ? 4 : width >= 560 ? 3 : 2;
+  const cols =
+    width >= 960
+      ? 5
+      : width >= 720
+        ? 4
+        : width >= 500
+          ? 3
+          : width > 0 && width < 310
+            ? 1
+            : 2;
   const GAP = 10;
   const tileWidth: any = width
     ? Math.floor((width - GAP * (cols - 1)) / cols)
@@ -1123,22 +1136,17 @@ export function ProductGrid({
                       : `${max} ${max === 1 ? "disponible" : "disponibles"}`}
                 </Text>
               </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Ver ${p.name}`}
-                hitSlop={8}
-                style={[
-                  s.tileInfo,
-                  !!p.description && { backgroundColor: C.brandSoft },
-                ]}
-                onPress={() => setOpenOne(p.id)}
-              >
-                <Icon
-                  name="info"
-                  size={14}
-                  color={p.description ? C.brand : C.muted}
-                />
-              </Pressable>
+              {!!p.description && String(p.description).trim().length > 0 && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ver ${p.name}`}
+                  hitSlop={8}
+                  style={[s.tileInfo, { backgroundColor: C.brandSoft }]}
+                  onPress={() => setOpenOne(p.id)}
+                >
+                  <Icon name="info" size={14} color={C.brand} />
+                </Pressable>
+              )}
               {qty > 0 && (
                 <View style={s.tileActions}>
                   <Pressable
@@ -1546,9 +1554,9 @@ export function AppHeader({
   if (center)
     return (
       <View style={s.header}>
-        <View style={{ width: 96, flexDirection: "row", gap: 8 }}>{leftAction}</View>
+        <View style={{ minWidth: 88, flexDirection: "row", alignItems: "center", gap: 8 }}>{leftAction}</View>
         <View style={{ flex: 1, alignItems: "center" }}>{center}</View>
-        <View style={{ width: 96, flexDirection: "row", justifyContent: "flex-end", gap: 8 }}>{right}</View>
+        <View style={{ minWidth: 88, flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 8 }}>{right}</View>
       </View>
     );
   if (large)
@@ -1584,7 +1592,7 @@ export function AppHeader({
         </Text>
       </View>
       <View style={{ flex: 1 }} />
-      {right}
+      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>{right}</View>
     </View>
   );
 }
@@ -1738,7 +1746,7 @@ export type QuickAction = {
 /** Accesos rápidos en cuadrícula (estilo One UI): ícono en círculo y nombre corto. */
 export function QuickActions({ items }: { items: QuickAction[] }) {
   return (
-    <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
       {items.map((it) => (
         <Pressable
           key={it.label}
@@ -1966,7 +1974,17 @@ export function CartFlyLayer() {
 }
 
 /** Botón del carrito con contador (junto al engrane). Rebota cada vez que entra una pieza. */
-export function CartButton({ count, onPress }: { count: number; onPress: () => void }) {
+export function CartButton({
+  count,
+  total,
+  seller = false,
+  onPress,
+}: {
+  count: number;
+  total?: number;
+  seller?: boolean;
+  onPress: () => void;
+}) {
   const ref = useRef<any>(null);
   const bounce = useRef(Animated ? new Animated.Value(1) : null).current;
   const [shown, setShown] = useState(count);
@@ -1993,9 +2011,13 @@ export function CartButton({ count, onPress }: { count: number; onPress: () => v
         ]).start();
     });
   }, [count]);
+  const summaryText =
+    shown > 0
+      ? `${seller ? "Ver carrito" : "Carrito"} · ${shown} ${shown === 1 ? "pieza" : "piezas"}${total !== undefined ? ` · ${money(total)}` : ""}`
+      : "";
   const body = (
     <>
-      <Icon name="shopping-cart" size={21} color={shown ? "#fff" : C.ink} />
+      <Icon name="shopping-cart" size={20} color={shown > 0 ? "#fff" : C.ink} />
       {shown > 0 && (
         <View style={s.cartBadge}>
           <Text style={s.cartBadgeText} numberOfLines={1}>
@@ -2003,17 +2025,26 @@ export function CartButton({ count, onPress }: { count: number; onPress: () => v
           </Text>
         </View>
       )}
+      {shown > 0 && (
+        <Text style={{ width: 0, height: 0, opacity: 0 }}>{summaryText}</Text>
+      )}
     </>
   );
   return (
     <Pressable
       ref={ref}
       accessibilityRole="button"
-      accessibilityLabel={shown ? `Carrito con ${shown} ${shown === 1 ? "pieza" : "piezas"}` : "Carrito vacío"}
+      accessibilityLabel={
+        shown ? (seller ? "Ver carrito" : "Abrir carrito") : "Carrito vacío"
+      }
       hitSlop={8}
       onPress={onPress}
       collapsable={false}
-      style={({ pressed }) => [s.iconBtn, shown > 0 && { backgroundColor: C.brand }, pressed && { opacity: 0.6 }]}
+      style={({ pressed }) => [
+        s.iconBtn,
+        shown > 0 && { backgroundColor: C.brand },
+        pressed && { opacity: 0.6 },
+      ]}
     >
       {bounce ? (
         <Animated.View style={{ transform: [{ scale: bounce }], alignItems: "center", justifyContent: "center" }}>{body}</Animated.View>
@@ -2214,7 +2245,9 @@ export const s = StyleSheet.create({
   dock: { position: "absolute", left: 0, right: 0, bottom: 0 },
   nav: {
     flexDirection: "row",
-    marginHorizontal: 16,
+    alignSelf: "center",
+    width: "92%",
+    maxWidth: 520,
     marginBottom: 10,
     paddingHorizontal: 6,
     paddingVertical: 6,
@@ -2277,20 +2310,6 @@ export const s = StyleSheet.create({
     borderBottomWidth: HAIR,
     borderColor: C.line,
   },
-  cartBar: {
-    alignSelf: "flex-end",
-    marginRight: 18,
-    marginBottom: 10,
-    backgroundColor: C.ink,
-    borderRadius: 28,
-    paddingVertical: 11,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    ...FLOAT,
-  },
-  cartBarText: { color: "#fff", fontWeight: "600", fontSize: 14.5, ...NUM },
   tile: {
     backgroundColor: C.paper,
     borderRadius: 22,
@@ -2490,6 +2509,7 @@ export const s = StyleSheet.create({
   /** Acceso rápido (cuadrícula de acciones, estilo One UI). */
   quick: {
     flex: 1,
+    minWidth: 72,
     backgroundColor: C.paper,
     borderRadius: 22,
     paddingVertical: 14,

@@ -2,7 +2,7 @@ import React from "react";
 import { STORE_NAME, TILE } from "../theme";
 import { Alert, Share, View } from "react-native";
 import { Text } from "../text";
-import { localDay, money, today, type Row } from "../business";
+import { localDay, money, saleSegment, today, type Row } from "../business";
 import { cardLabel, terminalPayments } from "../receipt";
 import {
   Button,
@@ -22,6 +22,7 @@ import {
   PERIODS,
   amount,
   minus,
+  normalize,
   options,
   periodFrom,
   saleDay,
@@ -61,7 +62,6 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
     cashAccount,
     exportBackup,
     filters,
-    matching,
     searchBox,
     act,
     saleDetailId,
@@ -80,6 +80,8 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
     corteDay,
     setCorteDay,
     revision,
+    productById,
+    query,
   } = ctx;
   const d = data!;
   const {
@@ -491,16 +493,92 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
       filters.Ventas === "Todas" ? "Activas" : filters.Ventas || "Activas";
     const day = today();
     const cancelled = sales.filter((v) => v.status === "cancelled");
-    let list = matching(sales).filter((v) =>
-      filter === "Canceladas"
-        ? v.status === "cancelled"
-        : v.status === "confirmed" &&
-          (filter === "Por cobrar"
-            ? v.paid < v.total
-            : filter === "Hoy"
-              ? saleDay(v) === day
-              : true),
-    );
+    // 2.10.4: metadatos de productos vendidos por venta (para filtrar por producto, tipo de suplemento o marca).
+    const saleCatalogInfo = (v: Row) => {
+      const ls = d.lines.get(v.id) ?? [];
+      const types = new Set<string>();
+      const brands = new Set<string>();
+      const prods = new Set<string>();
+      for (const l of ls) {
+        const p = productById.get(l.productId);
+        const t = String(p?.category || (p ? saleSegment(p) : "") || "").trim();
+        const br = String(p?.brand || "").trim();
+        const pr = String(p?.familyName || p?.name || l.name || "").trim();
+        if (t) types.add(t);
+        if (br) brands.add(br);
+        if (pr) prods.add(pr);
+      }
+      return { types, brands, prods };
+    };
+    const allTypes = new Set<string>();
+    const allBrands = new Set<string>();
+    const allProds = new Set<string>();
+    for (const v of sales) {
+      if (v.status === "cancelled" && filter !== "Canceladas") continue;
+      const info = saleCatalogInfo(v);
+      for (const t of info.types) allTypes.add(t);
+      for (const br of info.brands) allBrands.add(br);
+      for (const pr of info.prods) allProds.add(pr);
+    }
+    const typeList = [...allTypes].sort();
+    const brandList = [...allBrands].sort();
+    const prodList = [...allProds].sort();
+    const dimOptions = [
+      { id: "Todo", name: "Todo el catálogo" },
+      ...(typeList.length ? [{ id: "Tipo", name: "Tipo de suplemento" }] : []),
+      ...(brandList.length ? [{ id: "Marca", name: "Marca" }] : []),
+      ...(prodList.length ? [{ id: "Producto", name: "Producto" }] : []),
+    ];
+    const activeDim = dimOptions.some((o) => o.id === filters.VentasDim)
+      ? filters.VentasDim
+      : "Todo";
+    const activeVal =
+      activeDim === "Tipo"
+        ? typeList.includes(filters.VentasVal)
+          ? filters.VentasVal
+          : ""
+        : activeDim === "Marca"
+          ? brandList.includes(filters.VentasVal)
+            ? filters.VentasVal
+            : ""
+          : activeDim === "Producto"
+            ? prodList.includes(filters.VentasVal)
+              ? filters.VentasVal
+              : ""
+            : "";
+    const qNorm = normalize(query);
+    let list = sales.filter((v) => {
+      const statusOk =
+        filter === "Canceladas"
+          ? v.status === "cancelled"
+          : v.status === "confirmed" &&
+            (filter === "Por cobrar"
+              ? v.paid < v.total
+              : filter === "Hoy"
+                ? saleDay(v) === day
+                : true);
+      if (!statusOk) return false;
+      const info = saleCatalogInfo(v);
+      if (activeDim === "Tipo" && activeVal && !info.types.has(activeVal))
+        return false;
+      if (activeDim === "Marca" && activeVal && !info.brands.has(activeVal))
+        return false;
+      if (activeDim === "Producto" && activeVal && !info.prods.has(activeVal))
+        return false;
+      if (!qNorm) return true;
+      const hay = normalize(
+        [
+          v.customer,
+          v.folio,
+          v.channel,
+          v.seller,
+          ...info.prods,
+          ...info.brands,
+          ...info.types,
+        ].join(" "),
+      );
+      return hay.includes(qNorm);
+    });
     // Filtro por forma de cobro: efectivo, cada cuenta de transferencia (Mercado Pago, Banamex…) y terminal.
     const kindOf = (id: string) =>
       accounts.find((a) => a.id === id)?.kind || "";
@@ -592,7 +670,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                 </>
               );
             })()}
-            {searchBox("Buscar cliente o folio")}
+            {searchBox("Buscar cliente, folio, producto o marca")}
             <View style={{ marginBottom: 6 }}>
               <Chips
                 row
@@ -610,13 +688,47 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
               />
             </View>
             {payOptions.length > 2 && (
-              <View style={{ marginBottom: 10 }}>
+              <View style={{ marginBottom: 6 }}>
                 <Chips
                   row
                   options={payOptions}
                   value={payFilter}
                   onChange={(v) =>
                     setFilters((old) => ({ ...old, VentasPago: v }))
+                  }
+                />
+              </View>
+            )}
+            {dimOptions.length > 1 && (
+              <View style={{ marginBottom: activeDim !== "Todo" ? 6 : 10 }}>
+                <Chips
+                  row
+                  options={dimOptions}
+                  value={activeDim}
+                  onChange={(v) =>
+                    setFilters((old) => ({
+                      ...old,
+                      VentasDim: v,
+                      VentasVal: "",
+                    }))
+                  }
+                />
+              </View>
+            )}
+            {activeDim !== "Todo" && (
+              <View style={{ marginBottom: 10 }}>
+                <Chips
+                  row
+                  options={(activeDim === "Tipo"
+                    ? typeList
+                    : activeDim === "Marca"
+                      ? brandList
+                      : prodList
+                  ).map((name) => ({ id: name, name }))}
+                  value={activeVal}
+                  allowEmpty="Todos"
+                  onChange={(v) =>
+                    setFilters((old) => ({ ...old, VentasVal: v }))
                   }
                 />
               </View>

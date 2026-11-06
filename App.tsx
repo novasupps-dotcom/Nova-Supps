@@ -125,6 +125,7 @@ import {
   DateField,
   QUICK_FOLLOWUP,
   QUICK_EXPIRY,
+  addDays,
   fmtDay,
   tryCents,
   followUpsDue,
@@ -248,6 +249,7 @@ function AppContent({ business }: { business?: Business }) {
   const [selector, setSelector] = useState<Selector | null>(null),
     [search, setSearch] = useState("");
   const [barcodeScanner, setBarcodeScanner] = useState(false);
+  const [followPopup, setFollowPopup] = useState(false);
   // 2.9: en el cobro, «Recibes / ganas» se abre con un toque.
   const [privateOpen, setPrivateOpen] = useState(false);
   // 2.9: el formulario abierto (o, si no hay, la pantalla) se desplaza al campo con teclado.
@@ -618,6 +620,8 @@ function AppContent({ business }: { business?: Business }) {
             },
           ],
         );
+        if (!(globalThis as any).IS_REACT_ACT_ENVIRONMENT)
+          setFollowPopup(true);
       } catch {}
     };
     const first = setTimeout(check, 1200);
@@ -2452,6 +2456,7 @@ function AppContent({ business }: { business?: Business }) {
       basketCustomerId: basketF.customerId || "",
       clearBasketCustomer: () =>
         setBasketF((old) => ({ ...old, customerId: "" })),
+      openFollowPopup: () => setFollowPopup(true),
       productById,
       addToBasket,
       removeFromBasket,
@@ -3605,7 +3610,6 @@ function AppContent({ business }: { business?: Business }) {
     basket,
     basketF.total ? tryCents(basketF.total) : null,
   ).total;
-  const showBasket = !form && basket.length > 0 && (page === "Vender" || page === "Stock");
   const isTabRoot = TABS.some((t) => t.name === page);
   const tabOf = (p: string) =>
     TABS.some((t) => t.name === p)
@@ -3662,9 +3666,10 @@ function AppContent({ business }: { business?: Business }) {
         right={
           isTabRoot || basket.length ? (
             <>
-              {/* 2.10: carrito junto al engrane; recibe la animación al agregar un producto. */}
+              {/* 2.10.4: carrito unificado en el encabezado (sin barra negra inferior). */}
               <CartButton
                 count={basketPieces}
+                total={basketTotal}
                 onPress={() => (basket.length ? openCheckout() : go("Vender"))}
               />
               {isTabRoot && (
@@ -3723,20 +3728,6 @@ function AppContent({ business }: { business?: Business }) {
             <Text style={s.toastText} numberOfLines={2}>{toast.text}</Text>
           </Pressable>
         )}
-        {showBasket && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Abrir carrito"
-            onPress={openCheckout}
-            style={({ pressed }) => [s.cartBar, pressed && { opacity: 0.9 }]}
-          >
-            <Icon name="shopping-cart" size={18} color="#fff" />
-            <Text style={s.cartBarText} numberOfLines={1}>
-              {`Carrito · ${basketPieces} ${basketPieces === 1 ? "pieza" : "piezas"} · ${money(basketTotal)}`}
-            </Text>
-            <Icon name="chevron-right" size={16} color="#fff" />
-          </Pressable>
-        )}
         <TabBar
           tabs={TABS}
           active={activeTab}
@@ -3744,7 +3735,7 @@ function AppContent({ business }: { business?: Business }) {
             setFilters((old) => ({
               ...old,
               [name]: "",
-              ...(name === "Ventas" ? { VentasPago: "" } : {}),
+              ...(name === "Ventas" ? { VentasPago: "", VentasDim: "", VentasVal: "" } : {}),
             })),
             go(name)
           )}
@@ -3752,6 +3743,180 @@ function AppContent({ business }: { business?: Business }) {
       </BottomDock>
       <CartFlyLayer />
       {!form && payOverlay}
+      {followPopup && (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setFollowPopup(false)}
+        >
+          <View style={s.payOverlay}>
+            <View style={[s.payCard, { maxWidth: 480, maxHeight: "86%" }]}>
+              <View style={[s.between, { marginBottom: 8 }]}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+                  <Icon name="bell" size={20} color={C.amber} />
+                  <Text style={[s.subtitle, { marginBottom: 0 }]}>
+                    Seguimientos pendientes
+                  </Text>
+                </View>
+                <IconButton
+                  icon="x"
+                  label="Cerrar seguimientos"
+                  bg={C.soft}
+                  onPress={() => setFollowPopup(false)}
+                />
+              </View>
+              <ScrollView style={{ maxHeight: 380 }}>
+                {(() => {
+                  const due = followUpsDue(customers);
+                  if (!due.length)
+                    return <Note>No tienes seguimientos pendientes.</Note>;
+                  return due.map((c) => {
+                    const wa = whatsappNumber(c.phone);
+                    return (
+                      <View
+                        key={c.id}
+                        style={{
+                          paddingVertical: 10,
+                          borderBottomWidth: 1,
+                          borderColor: C.line,
+                        }}
+                      >
+                        <View style={s.between}>
+                          <Text
+                            style={[s.body, { fontWeight: "600", flex: 1 }]}
+                            numberOfLines={1}
+                          >
+                            {c.name}
+                          </Text>
+                          <Text
+                            style={[
+                              s.muted,
+                              {
+                                fontSize: 13,
+                                color: c.daysLeft < 0 ? C.red : C.amber,
+                                fontWeight: "600",
+                              },
+                            ]}
+                          >
+                            {followUpLabel(c.daysLeft, c.nextDate)}
+                          </Text>
+                        </View>
+                        {!!c.notes && (
+                          <Text style={[s.muted, { fontSize: 12.5 }]} numberOfLines={1}>
+                            {c.notes}
+                          </Text>
+                        )}
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            flexWrap: "wrap",
+                            alignItems: "center",
+                            gap: 6,
+                            marginTop: 8,
+                          }}
+                        >
+                          {!!wa && (
+                            <Button
+                              icon="message-circle"
+                              title="WhatsApp"
+                              secondary
+                              small
+                              onPress={() =>
+                                void Linking.openURL("https://wa.me/" + wa).catch(
+                                  () => {},
+                                )
+                              }
+                            />
+                          )}
+                          <Button
+                            title="Vender"
+                            small
+                            onPress={() => {
+                              setFollowPopup(false);
+                              openSale({ customerId: c.id });
+                            }}
+                          />
+                          <Button
+                            title="+7 días"
+                            secondary
+                            small
+                            onPress={() =>
+                              act(
+                                () =>
+                                  b.saveCustomer({
+                                    ...strings(c),
+                                    id: c.id,
+                                    nextDate: addDays(today(), 7),
+                                  }),
+                                "Seguimiento pospuesto 7 días",
+                              )
+                            }
+                          />
+                          <IconButton
+                            icon="trash-2"
+                            label={`Eliminar notificación de ${c.name}`}
+                            bg={C.redSoft}
+                            color={C.red}
+                            onPress={() => {
+                              const left = due.length - 1;
+                              act(
+                                () =>
+                                  b.saveCustomer({
+                                    ...strings(c),
+                                    id: c.id,
+                                    nextDate: "",
+                                  }),
+                                "Notificación de seguimiento eliminada",
+                              );
+                              if (left <= 0) setFollowPopup(false);
+                            }}
+                          />
+                        </View>
+                      </View>
+                    );
+                  });
+                })()}
+              </ScrollView>
+              <View style={{ height: 10 }} />
+              <View style={[s.wrap, { justifyContent: "space-between" }]}>
+                <Button
+                  title="Eliminar todas"
+                  danger
+                  small
+                  onPress={() => {
+                    const due = followUpsDue(customers);
+                    act(() => {
+                      for (const c of due)
+                        b.saveCustomer({
+                          ...strings(c),
+                          id: c.id,
+                          nextDate: "",
+                        });
+                    }, "Notificaciones eliminadas");
+                    setFollowPopup(false);
+                  }}
+                />
+                <Button
+                  title="Ver en Clientes"
+                  secondary
+                  small
+                  onPress={() => {
+                    setFollowPopup(false);
+                    go("Clientes", "Próximos 5 días");
+                  }}
+                />
+                <Button
+                  title="Cerrar"
+                  secondary
+                  small
+                  onPress={() => setFollowPopup(false)}
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
       <Modal
         visible={!!form}
         animationType="slide"

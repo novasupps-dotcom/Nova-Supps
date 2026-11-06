@@ -1,6 +1,15 @@
-# Nova Negocio · 2.10.3
+# Nova Negocio · 2.10.4
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
+
+**2.10.4 · Carrito unificado sin barra negra, sabores agotados ocultos en tarjeta, filtros en Ventas, pop-up de seguimientos y diseño responsive (versionCode 66, solo JavaScript):**
+
+- **Carrito unificado sin barra negra inferior**: se elimina por completo la barra negra inferior (`s.cartBar`) en la app del dueño y del vendedor; todo el acceso al carrito y cobro vive unificado en el botón superior del carrito (`CartButton`).
+- **Sabores agotados ocultos en ficha de producto**: al abrir un producto con varios sabores en `Vender`, se ocultan los sabores sin existencias disponibles para mostrar únicamente los sabores listos para vender.
+- **Limpieza de botones sin uso**: se oculta el botón `i` en productos individuales sin descripción, se oculta `Al carrito` en `Stock` cuando el producto no tiene existencias, y se ocultan acciones de `WhatsApp` / `Catálogo` en clientes sin teléfono válido.
+- **Filtros avanzados en Ventas**: nuevos filtros en `Ventas` por `Tipo de suplemento` (categoría), `Marca` y `Producto`, además de búsqueda directa por producto, marca o categoría.
+- **Pop-up interactivo de seguimientos**: los seguimientos pendientes se abren en un pop-up con acciones directas (`WhatsApp`, `Vender`, `+7 días`) y botón para eliminar/descartar la notificación individualmente o todas a la vez.
+- **Diseño responsive**: cuadrícula adaptable de 1 a 5 columnas según el ancho de pantalla, barra de pestañas centrada con ancho máximo en tablets y tarjetas flexibles en todas las pantallas.
 
 **2.10.3 · Auditoría integral del mini-ERP: motor SQLite perezoso, reportes integrados, cobros nativos y UX intuitiva (versionCode 65, solo JavaScript):**
 

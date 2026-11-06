@@ -1,4 +1,8 @@
-# Nova Negocio 2.10.3 · 6-nov-2026
+# Nova Negocio 2.10.4 · 6-nov-2026
+
+Hecho en 2.10.4: eliminación total de la barra negra inferior de cobro (unificada en el botón superior del carrito); ocultación de sabores sin existencias al abrir la tarjeta de producto; ocultación de botones inactivos o sin uso; filtros en Ventas por producto, tipo de suplemento y marca; pop-up interactivo de seguimientos con acciones y botón para eliminar notificación; diseño responsive adaptable a cualquier pantalla y documento de hallazgos y mercado (`HALLAZGOS_Y_MERCADO_ERP.md`).
+
+Hecho en 2.10.3 · 6-nov-2026
 
 Hecho en 2.10.3: implementación completa de la auditoría integral del mini-ERP (motor SQLite con carga perezosa, mapas O(1) de carrito, cliente activo visible en Vender, reportes integrados en Resumen de ventas, filtros de lotes, tarjetas de clientes táctiles, cobros en tarjetas móviles sin tabla horizontal y limpieza de microcopia).
 

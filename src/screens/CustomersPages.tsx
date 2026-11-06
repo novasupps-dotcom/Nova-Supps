@@ -41,6 +41,8 @@ export function renderCustomersPages(ctx: OwnerPageContext): Body | null {
     query,
     setFilters,
     openSale,
+    openFollowPopup,
+    act,
     go,
   } = ctx;
   const d = data!;
@@ -109,29 +111,40 @@ export function renderCustomersPages(ctx: OwnerPageContext): Body | null {
                     </Text>
                   </View>
                   <TextButton
-                    title={soon.length > 3 ? `Ver los ${soon.length}` : "Ver seguimientos"}
-                    onPress={() =>
-                      setFilters((old) => ({
-                        ...old,
-                        Clientes: "Próximos 5 días",
-                      }))
-                    }
+                    title="Abrir pop-up"
+                    onPress={openFollowPopup}
                   />
                 </View>
                 {soon.slice(0, 3).map((c, i) => (
-                  <Pressable
+                  <View
                     key={c.id}
-                    accessibilityRole="button"
-                    onPress={() => open("Cliente", strings(c))}
                     style={[s.cartRow, i === Math.min(2, soon.length - 1) && { borderBottomWidth: 0 }]}
                   >
-                    <Text style={[s.body, { flex: 1, fontWeight: "500" }]} numberOfLines={1}>
-                      {c.name}
-                    </Text>
-                    <Text style={[s.muted, { color: c.daysLeft < 0 ? C.red : C.amber }]}>
-                      {followUpLabel(c.daysLeft, c.nextDate)}
-                    </Text>
-                  </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={openFollowPopup}
+                      style={{ flex: 1 }}
+                    >
+                      <Text style={[s.body, { fontWeight: "500" }]} numberOfLines={1}>
+                        {c.name}
+                      </Text>
+                      <Text style={[s.muted, { fontSize: 13, color: c.daysLeft < 0 ? C.red : C.amber }]}>
+                        {followUpLabel(c.daysLeft, c.nextDate)}
+                      </Text>
+                    </Pressable>
+                    <IconButton
+                      icon="trash-2"
+                      label={`Eliminar seguimiento de ${c.name}`}
+                      bg={C.soft}
+                      color={C.red}
+                      onPress={() =>
+                        act(
+                          () => b!.saveCustomer({ ...strings(c), id: c.id, nextDate: "" }),
+                          "Notificación de seguimiento eliminada",
+                        )
+                      }
+                    />
+                  </View>
                 ))}
               </View>
             )}
@@ -202,15 +215,7 @@ export function renderCustomersPages(ctx: OwnerPageContext): Body | null {
                     .join(" · ")}
                 </Text>
               )}
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12 }}>
-                {!!c.phone && (
-                  <IconButton
-                    icon="phone"
-                    label="Llamar"
-                    bg={C.soft}
-                    onPress={() => void Linking.openURL("tel:" + c.phone).catch(() => {})}
-                  />
-                )}
+              <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 12 }}>
                 {!!wa && (
                   <IconButton
                     icon="message-circle"
@@ -219,7 +224,6 @@ export function renderCustomersPages(ctx: OwnerPageContext): Body | null {
                     onPress={() => void Linking.openURL("https://wa.me/" + wa).catch(() => {})}
                   />
                 )}
-                <IconButton icon="pencil" label="Editar" bg={C.soft} onPress={() => open("Cliente", strings(c))} />
                 <IconButton
                   icon="book-open"
                   label={`Enviar catálogo a ${c.name}`}
@@ -229,8 +233,22 @@ export function renderCustomersPages(ctx: OwnerPageContext): Body | null {
                     go("Catálogo para clientes")
                   )}
                 />
+                {!!c.nextDate && (
+                  <IconButton
+                    icon="bell"
+                    label={`Eliminar seguimiento de ${c.name}`}
+                    bg={C.amberSoft}
+                    color={C.amber}
+                    onPress={() =>
+                      act(
+                        () => b!.saveCustomer({ ...strings(c), id: c.id, nextDate: "" }),
+                        "Notificación de seguimiento eliminada",
+                      )
+                    }
+                  />
+                )}
+                <IconButton icon="pencil" label="Editar" bg={C.soft} onPress={() => open("Cliente", strings(c))} />
                 <View style={{ flex: 1 }} />
-                {/* 2.5: "Vender" cabe junto a los 4 botones en pantallas de 360 dp. */}
                 <Button title="Vender" label="Nueva venta" small onPress={() => openSale({ customerId: c.id })} />
               </View>
             </Card>
