@@ -317,6 +317,30 @@ print(json.dumps({'sheets':wb.sheetnames,'hdr':hdr,'n':len(rows),'last':[str(x) 
   }
   console.log("  ✓ 2.8.4: Cantidad en el detalle del producto corrige inventario duplicado sin merma");
 
+  // 2.10.1: cambiar la cantidad desde la lista de Stock y al editar el producto.
+  {
+    const p = b.stock().find((x) => !x.archived && x.stock > 0);
+    const shrink = b.periodSummary(null).shrinkage;
+    await tab("Stock");
+    await pressLabel("Cambiar cantidad de " + p.name);
+    const counted = ui.root.findAll((n) => n.type === "TextInput" && n.props.accessibilityLabel === "Unidades que contaste *")[0];
+    await act(async () => counted.props.onChangeText(String(p.stock + 3)));
+    await pressExact("Guardar");
+    assert.equal(Number(b.stock().find((x) => x.id === p.id).stock), p.stock + 3, "desde la lista de Stock");
+    const card = ui.root.findAll((n) => n.type === "Pressable" && typeof n.props.onLongPress === "function" && text(n).includes(p.name))[0];
+    await act(async () => card.props.onPress());
+    await pressExact("Editar");
+    const box = ui.root.findAll((n) => n.type === "TextInput" && n.props.accessibilityLabel === "Existencias (piezas)")[0];
+    assert(box, "campo de existencias al editar");
+    await act(async () => box.props.onChangeText(String(p.stock - 1)));
+    assert(all().includes(`Existencias ${p.stock + 3} → ${p.stock - 1}`), all().slice(0, 800));
+    await pressExact("Guardar");
+    assert.equal(Number(b.stock().find((x) => x.id === p.id).stock), p.stock - 1, "al editar el producto");
+    assert.equal(b.periodSummary(null).shrinkage, shrink, "no es merma");
+    assert(all().includes(`existencias ${p.stock + 3} → ${p.stock - 1}`), "aviso del cambio");
+  }
+  console.log("  ✓ 2.10.1: cambiar la cantidad desde Stock y al editar el producto");
+
   assert.equal(alerts.length, 0, JSON.stringify(alerts));
   await act(async () => ui.unmount());
   console.log("1.7 – 2.0: OK");

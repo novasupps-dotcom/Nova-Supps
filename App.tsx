@@ -729,7 +729,8 @@ function AppContent({ business }: { business?: Business }) {
   const refresh = () => setRevision((v) => v + 1);
   const warn = (text: string) => setToast({ text, key: Date.now(), bad: true });
   const notify = (text: string) => {
-    setToast({ text, key: Date.now() });
+    // 2.10.1: al registrar una venta no se muestra la barra de aviso (solo vibra).
+    if (!/^Venta registrada\b/.test(text)) setToast({ text, key: Date.now() });
     try {
       Vibration.vibrate(15);
     } catch {}
@@ -2138,6 +2139,9 @@ function AppContent({ business }: { business?: Business }) {
     open("Producto", {
       ...strings(rest),
       price: amount(p.price),
+      // 2.10.1: existencias editables desde la ficha del producto.
+      stockNow: String(p.stock ?? 0),
+      stockWas: String(p.stock ?? 0),
       ...(imageUri ? { hasPhoto: "1" } : {}),
     });
   };
@@ -2997,7 +3001,13 @@ function AppContent({ business }: { business?: Business }) {
             Number.isSafeInteger(qty) && qty >= 0,
             "El stock inicial debe ser un número entero.",
           );
-          const { hasPhoto, toBasket, ...input } = f;
+          const { hasPhoto, toBasket, stockNow, stockWas, ...input } = f;
+          // 2.10.1: cambiar las existencias al editar (corrección sin merma ni dinero).
+          const stockTarget = val("id") && (stockNow ?? "").trim() !== "" ? Number(stockNow) : null;
+          const stockChanged = stockTarget !== null && String(stockTarget) !== String(stockWas ?? "");
+          if (stockTarget !== null)
+            assert(Number.isSafeInteger(stockTarget) && stockTarget >= 0, "Las existencias deben ser un número entero (0 o más).");
+          if (stockChanged) b.dryRun(() => b.correctStock(val("id"), stockTarget!, "Editado en Stock"));
           saved = b.quickProduct({
             ...input,
             imageUri: f.imageUri ?? undefined,
@@ -3007,6 +3017,10 @@ function AppContent({ business }: { business?: Business }) {
             cost: cents(val("cost") || "0"),
           });
           done = val("id") ? "Producto actualizado" : "Producto creado";
+          if (stockChanged) {
+            const r = b.correctStock(val("id"), stockTarget!, "Editado en Stock");
+            done = `Producto actualizado · existencias ${r.before} → ${r.after}`;
+          }
           // Dado de alta desde Vender: con existencias, entra directo al carrito.
           if (toBasket === "1" && !val("id") && qty > 0) {
             const id = String(saved);
@@ -3147,7 +3161,7 @@ function AppContent({ business }: { business?: Business }) {
             "Escribe cuántas unidades contaste (número entero).",
           );
           // 2.8.4: «Se duplicó» corrige sin contar como merma (quita primero lo más reciente).
-          if (val("reason") === DUPLICATED) {
+          if (val("reason") === DUPLICATED || val("reason") === CORRECTION) {
             const r = b.correctStock(val("productId"), counted, val("note") || "Inventario duplicado");
             done = `Cantidad corregida: ${r.before} → ${r.after}`;
             break;
@@ -4010,6 +4024,16 @@ function AppContent({ business }: { business?: Business }) {
                         <Note>{data.feeInPrice ? `Precio con la comisión ${feeLabel(data.cardFeeBps)} incluida: el cliente paga este precio.` : `Tu precio: lo que recibes completo.${base ? ` El cliente paga ${money(grossUp(base, data.feeBps))} (absorbe la comisión ${feeLabel(data.feeBps)}).` : ""}`}</Note>
                       );
                     })()}
+                    {!!val("id") && (
+                      <>
+                        {field("stockNow", "Existencias (piezas)", true, val("stockWas") || "0")}
+                        {val("stockNow").trim() !== "" && val("stockNow") !== val("stockWas") && (
+                          <Note color={C.amber}>
+                            {`Existencias ${val("stockWas") || "0"} → ${val("stockNow")}. Se corrige sin mover dinero ni contar como merma. Para registrar merma usa Conteo.`}
+                          </Note>
+                        )}
+                      </>
+                    )}
                     {!val("id") && (
                       <>
                         {field("qty", "Stock inicial (opcional)", true, "0")}
@@ -4546,7 +4570,7 @@ function AppContent({ business }: { business?: Business }) {
                         )}
                         {diff !== null && diff !== 0 && (
                           <Note color={diff < 0 ? C.red : C.green}>
-                            {val("reason") === DUPLICATED
+                            {val("reason") === DUPLICATED || val("reason") === CORRECTION
                               ? diff < 0
                                 ? `Se quitan ${-diff} ${-diff === 1 ? "pieza" : "piezas"} (primero las cargadas más recientemente). No cuenta como merma.`
                                 : `Se agregan ${diff} ${diff === 1 ? "pieza" : "piezas"} con el último costo. No cuenta como merma.`
@@ -4559,6 +4583,7 @@ function AppContent({ business }: { business?: Business }) {
                           "reason",
                           "Motivo *",
                           options([
+                            CORRECTION,
                             DUPLICATED,
                             "Conteo físico",
                             "Merma o caducado",
@@ -4569,7 +4594,7 @@ function AppContent({ business }: { business?: Business }) {
                         )}
                         {field("note", "Nota (opcional)")}
                         <Note>
-                          {val("reason") === DUPLICATED
+                          {val("reason") === DUPLICATED || val("reason") === CORRECTION
                             ? "Corrige la cantidad sin mover dinero ni contar como merma."
                             : "El ajuste no mueve dinero. Las bajas cuentan como merma (a su costo) en tu utilidad; las altas la compensan."}
                         </Note>
@@ -4952,3 +4977,5 @@ export default function App() {
 
 /** 2.8.4 · Motivo de «Cantidad»: corregir inventario que se cargó dos veces (no es merma). */
 const DUPLICATED = "Se duplicó";
+/** 2.10.1 · Cambiar la cantidad desde Stock: corrección sin merma ni dinero. */
+const CORRECTION = "Corrección";

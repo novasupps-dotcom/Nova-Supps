@@ -69,7 +69,7 @@ async function flush(ms=800){await act(async()=>{await new Promise(r=>setTimeout
   assert.equal(sale.total,total,'2.0: el cliente absorbe la comisión');
   const net=sql.prepare("SELECT SUM(amount) n FROM ledger WHERE ref=?").get(sale.id).n;assert.equal(net,price,'2.0: después de Mercado Pago recibes tu precio exacto');}
  assert.equal(alerts.length,0,JSON.stringify(alerts));
- assert(text(ui.root).includes('Venta registrada'),'aviso de venta registrada');
+ assert(!text(ui.root).includes('Venta registrada'),'2.10.1: sin barra de aviso al registrar la venta');
  // 0.9: escribir en un formulario no relee la base en cada tecla.
  const {Business}=require('../src/business.ts');let reads=0;const origStock=Business.prototype.stock;Business.prototype.stock=function(){reads++;return origStock.call(this)};
  await press('Clientes');await pressExact('Nuevo cliente');const before2=reads;

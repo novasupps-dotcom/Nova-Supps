@@ -1,4 +1,9 @@
-# Nova Negocio 2.10.0 · 6-nov-2026
+# Nova Negocio 2.10.1 · 6-nov-2026
+
+Hecho en 2.10.1: sin barra de aviso al registrar una venta; Stock → botón de cajas para cambiar la cantidad; Editar producto
+con campo «Existencias». Probar: vender (no aparece la barra); Stock → cajas → nueva cantidad; Stock → producto → Editar.
+
+Hecho en 2.10.0 (6-nov-2026):
 
 Hecho en 2.10.0: Excel de ventas con resumen ejecutivo y un renglón por producto de cada folio; reporte de stock en Excel
 desde Stock; botón del carrito junto al engrane con animación al agregar.
