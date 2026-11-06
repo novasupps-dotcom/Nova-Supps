@@ -19,6 +19,7 @@ import {
   QuickActions,
   TextButton,
   Icon,
+  IconButton,
 } from "../ui";
 import { TILE } from "../theme";
 import { duplicateGroups, type DuplicateGroup } from "../duplicates";
@@ -323,7 +324,18 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                 </View>
                 <Icon name="chevron-right" size={18} color={C.faint} />
               </View>
-              <View style={{ marginTop: 10 }}>{sellButton(p)}</View>
+              <View style={[s.row, { marginTop: 10, marginVertical: 0, alignItems: "center" }]}>
+                <View style={{ flex: 1 }}>{sellButton(p)}</View>
+                {!p.archived && (
+                  // 2.10.1: cambiar la cantidad directo desde la lista de Stock.
+                  <IconButton
+                    icon="boxes"
+                    label={`Cambiar cantidad de ${p.name}`}
+                    bg={C.soft}
+                    onPress={() => open("Ajuste de inventario", { productId: p.id, reason: "Corrección", counted: String(p.stock) })}
+                  />
+                )}
+              </View>
             </Card>
           );
         },
@@ -458,7 +470,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               {
                 label: "Cantidad",
                 icon: "boxes",
-                onPress: () => open("Ajuste de inventario", { productId: p.id, reason: "Se duplicó", counted: String(p.stock) }),
+                onPress: () => open("Ajuste de inventario", { productId: p.id, reason: "Corrección", counted: String(p.stock) }),
               },
               { label: "Conteo", icon: "list-checks", onPress: () => open("Ajuste de inventario", { productId: p.id }) },
             ]}
