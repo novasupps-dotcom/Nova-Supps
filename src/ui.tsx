@@ -907,8 +907,7 @@ export function ProductGrid({
     if (q) return products.filter((p) => (index.hay.get(p.id) || "").includes(q));
     const bySeg = products.filter((p) => current === "Todos" || index.seg.get(p.id) === current);
     if (!activeBrand) return bySeg;
-    const both = bySeg.filter(
-    p) => index.br.get(p.id) === activeBrand);
+    const both = bySeg.filter((p) => index.br.get(p.id) === activeBrand);
     return both.length ? both : products.filter((p) => index.br.get(p.id) === activeBrand);
   }, [products, index, q, current, activeBrand]);
   // 2.8: los sabores de un mismo producto se muestran como una sola tarjeta.
