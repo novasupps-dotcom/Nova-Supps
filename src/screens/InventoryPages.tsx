@@ -355,7 +355,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
             >
               <View style={s.between}>
                 <Text style={[s.label, { marginBottom: 0, color: C.brand }]}>
-                  {jStack.complete ? jStack.label : jStack.label}
+                  {jStack.label}
                 </Text>
                 {!kioskMode && !basketCustomer && customers.length > 0 && (
                   <TextButton
@@ -376,7 +376,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                       style={[
                         s.chip,
                         {
-                          backgroundColor: C.brandSoft,
+                          backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
                           paddingVertical: 6,
                           paddingHorizontal: 11,
                           maxWidth: "100%",
@@ -538,7 +538,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                       onPress={() =>
                         setFilters((old) => ({ ...old, StockMarca: on ? "" : val }))
                       }
-                      style={[s.chip, on && s.chipOn, { paddingVertical: 5, paddingHorizontal: 10 }]}
+                      style={[s.chip, on && s.chipOn, { paddingVertical: 7, paddingHorizontal: 14 }]}
                     >
                       <Text style={[s.chipText, on && s.chipTextOn, { fontSize: 12.5 }]}>
                         {bName === "Todas las marcas" ? "🏷️ Todas las marcas" : bName}
