@@ -376,7 +376,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                       style={[
                         s.chip,
                         {
-                          backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+                          backgroundColor: C.paper, borderWidth: 1, borderColor: C.line,
                           paddingVertical: 6,
                           paddingHorizontal: 11,
                           maxWidth: "100%",
