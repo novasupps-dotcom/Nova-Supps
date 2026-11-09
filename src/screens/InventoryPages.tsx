@@ -342,7 +342,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               <TextButton title="Quitar" color={C.muted} onPress={clearBasketCustomer} />
             </View>
           )}
-          {(jStack.items.length > 0 || jStack.complete) && (
+          {basket.length > 0 &&( jStack.items.length > 0 || jStack.complete) && (
             <View
               style={{
                 backgroundColor: C.paper,
@@ -367,7 +367,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               </View>
               {!jStack.complete && (
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-                  {jStack.items.map((sug: any) => (
+                  {jStack.items.slice(0, 1).map((sug: any) => (
                     <Pressable
                       key={sug.id}
                       accessibilityRole="button"
@@ -391,24 +391,6 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                       </Text>
                     </Pressable>
                   ))}
-                  {jStack.items.length > 1 && (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Armar Stack Base Jordiano"
-                      onPress={() => {
-                        for (const sug of jStack.items) addToBasket(sug.id, 1, true);
-                      }}
-                      style={[
-                        s.chip,
-                        s.chipOn,
-                        { paddingVertical: 6, paddingHorizontal: 11 },
-                      ]}
-                    >
-                      <Text style={[s.chipText, s.chipTextOn, { fontSize: 12.5, fontWeight: "600" }]}>
-                        {`⚡ Armar Stack (${jStack.items.length})`}
-                      </Text>
-                    </Pressable>
-                  )}
                 </View>
               )}
             </View>
