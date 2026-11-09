@@ -411,7 +411,7 @@ export function productBrand(p: {
   category?: string | null;
 }): string {
   const explicit = String(p.brand || "").trim();
-  if (explicit) return explicit;
+  if (explicit && !/^(prote[ií]nas?|creatinas?|pre|pwo|bcaa|eaa|amino[aá]cidos?|vitaminas?|ganador|gainer)$/i.test(explicit)) return explicit;
   const name = String(p.name || "").trim();
   for (const [rx, label] of KNOWN_BRANDS) if (rx.test(name)) return label;
   if (name.includes("·")) {
@@ -526,7 +526,7 @@ export function jordanianStack(
     return { complete: true, source: "complete", label: "", items: [], probabilities: {} };
   }
 
-  const pillars = ["Proteínas", "Creatinas", "PWO", "Vitaminas"];
+  
   const pIdx = (seg: string) => {
     const idx = pillars.indexOf(seg);
     return idx >= 0 ? idx : 3;
