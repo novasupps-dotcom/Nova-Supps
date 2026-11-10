@@ -564,7 +564,7 @@ export function CodeInput({
     </View>
   );
 }
-export function ProductPhoto({
+export function ProductGrid({
   product,
   index = 0,
   style,
@@ -668,7 +668,7 @@ const fold = (x: string) =>
  * Snacks, Vitaminas…) y cuadrícula con la imagen de cada producto. Tocar la
  * foto agrega una pieza; el número en la esquina es lo que lleva la venta.
  */
-export function ProductGrid({
+export function ProductPhoto({
   products,
   qtyOf,
   limitOf,
@@ -1028,7 +1028,7 @@ export function ProductGrid({
           style={{ marginBottom: 8 }}
           keyboardShouldPersistTaps="handled"
         >
-          {[...segments, "Todos"].map((name) => {
+          {(openBrands ? [...segments, "Todos"] : []).map((name) => {
             const on = name === current;
             return (
               <Pressable
@@ -1075,7 +1075,7 @@ export function ProductGrid({
                 ]}
               >
                 <Text style={[s.chipText, on && s.chipTextOn, { fontSize: 12.5 }]}>
-                 {bName === "Todas las marcas" ? (openBrands ? "🏷️ Todas las marcas" : "🏷️ Filtrar por marca ▾") : (openBrands ? bName : `🏷️ Marca: ${bName} ▾`)}
+                 {bName === "Todas las marcas" ? (openBrands ? "🏷️ Todas las marcas" : "⚙️ Filtrar por tipo o marca ▾)" : (openBrands ? bName : `🏷️ Marca: ${bName} ▾`)}
                 </Text>
               </Pressable>
             );
