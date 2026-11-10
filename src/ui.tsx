@@ -24,8 +24,6 @@ import {
   today,
   saleSegment,
   segmentsOf,
-  productBrand,
-  brandsOf,
   type Row,
   type Business,
 } from "./business";
@@ -874,43 +872,46 @@ export function ProductGrid({
   const query = queryProp ?? ownQuery;
   const setQuery = onQuery ?? setOwnQuery;
   const [width, setWidth] = useState(0);
-  const [brand, setBrand] = useState("");
-  const [openBrands, setOpenBrands] = useState(false);
-  // Categoría, marca y texto de búsqueda de cada producto se calculan una sola vez.
+  const [listOpen, setListOpen] = useState(false);
+  const [listSearch, setListSearch] = useState("");
+  const [pickedProductId, setPickedProductId] = useState("");
+  // Texto de búsqueda y segmento de cada producto se calculan una sola vez.
   const index = useMemo(() => {
     const seg = new Map<string, string>();
-    const br = new Map<string, string>();
     const hay = new Map<string, string>();
     const counts = new Map<string, number>();
     for (const p of products) {
       const g = saleSegment(p);
-      const bName = productBrand(p);
       seg.set(p.id, g);
-      br.set(p.id, bName);
       counts.set(g, (counts.get(g) ?? 0) + 1);
       hay.set(
         p.id,
         fold(
-          `${p.name} ${p.brand || ""} ${bName} ${p.category || ""} ${productCodes(p).join(" ")}`,
+          `${p.name} ${p.brand || ""} ${p.category || ""} ${productCodes(p).join(" ")}`,
         ),
       );
     }
-    return { seg, br, hay, counts, segments: segmentsOf(products), brands: brandsOf(products) };
+    return { seg, hay, counts, segments: segmentsOf(products) };
   }, [products]);
   const segments = index.segments;
-  const activeBrand = index.brands.includes(brand) ? brand : "";
   const current =
     segments.includes(segment) || segment === "Todos"
       ? segment
       : segments[0] || "Todos";
+  const pickedProduct = pickedProductId
+    ? products.find((p) => p.id === pickedProductId || p.family === pickedProductId)
+    : null;
   const q = fold(query.trim());
   const shown = useMemo(() => {
     if (q) return products.filter((p) => (index.hay.get(p.id) || "").includes(q));
-    const bySeg = products.filter((p) => current === "Todos" || index.seg.get(p.id) === current);
-    if (!activeBrand) return bySeg;
-    const both = bySeg.filter((p) => index.br.get(p.id) === activeBrand);
-    return both.length ? both : products.filter((p) => index.br.get(p.id) === activeBrand);
-  }, [products, index, q, current, activeBrand]);
+    if (pickedProductId) {
+      const byPick = products.filter(
+        (p) => p.id === pickedProductId || (p.family && p.family === pickedProductId),
+      );
+      if (byPick.length) return byPick;
+    }
+    return products.filter((p) => current === "Todos" || index.seg.get(p.id) === current);
+  }, [products, index, q, current, pickedProductId]);
   // 2.8: los sabores de un mismo producto se muestran como una sola tarjeta.
   type Entry = { kind: "one"; p: GridProduct } | { kind: "family"; key: string; name: string; members: GridProduct[] };
   const entries = useMemo<Entry[]>(() => {
@@ -1021,66 +1022,180 @@ export function ProductGrid({
         </Card>
       )}
       {!q && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
-          style={{ marginBottom: 8 }}
-          keyboardShouldPersistTaps="handled"
-        >
-          {[...segments, "Todos"].map((name) => {
-            const on = name === current;
-            return (
+        <View style={{ marginBottom: 10 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Abrir lista vertical de filtro"
+              onPress={() => setListOpen((v) => !v)}
+              style={[
+                s.input,
+                s.between,
+                {
+                  flex: 1,
+                  paddingVertical: 10,
+                  paddingHorizontal: 14,
+                  backgroundColor: C.paper,
+                },
+              ]}
+            >
+              <Text style={[s.body, { fontWeight: "600", flex: 1 }]} numberOfLines={1}>
+                {`📋 Mostrar: ${pickedProduct ? (pickedProduct.familyName || pickedProduct.name) : current === "Todos" ? "Todos los suplementos" : current}`}
+              </Text>
+              <Text style={[s.body, { color: C.brand, fontWeight: "700" }]}>
+                {listOpen ? "Cerrar ▴" : "Elegir de la lista ▾"}
+              </Text>
+            </Pressable>
+            {(pickedProductId !== "" || current !== "Todos") && (
               <Pressable
-                key={name}
                 accessibilityRole="button"
-                accessibilityState={{ selected: on }}
-                accessibilityLabel={`Categoría ${name}`}
+                accessibilityLabel="Mostrar todos"
                 onPress={() => {
-                  setBrand("");
-                  onSegment(name);
+                  setPickedProductId("");
+                  onSegment("Todos");
+                  setListOpen(false);
                 }}
-                style={[s.chip, on && s.chipOn]}
+                style={[s.chip, { paddingVertical: 10, paddingHorizontal: 12 }]}
               >
-                <Text style={[s.chipText, on && s.chipTextOn]}>
-                  {name}
-                </Text>
+                <Text style={[s.chipText, { fontSize: 12.5 }]}>Ver todo</Text>
               </Pressable>
-            );
-          })}
-        </ScrollView>
-      )}
-      {!q && index.brands.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 6, paddingBottom: 4 }}
-          style={{ marginBottom: 8 }}
-          keyboardShouldPersistTaps="handled"
-        >
-          {(openBrands ? ["Todas las marcas", ...index.brands] : [activeBrand || "Todas las marcas"]).map((bName) => {
-            const val = bName === "Todas las marcas" ? "" : bName;
-            const on = activeBrand === val;
-            return (
-              <Pressable
-                key={`brand-${bName}`}
-                accessibilityRole="button"
-                accessibilityState={{ selected: on }}
-                accessibilityLabel={`Marca ${bName}`}
-               onPress={() => { if (!openBrands) { setOpenBrands(true); return; } setBrand(on ? "" : val); setOpenBrands(false); }}
-                style={[
-                  s.chip,
-                  on && s.chipOn,
-                  { paddingVertical: 5, paddingHorizontal: 11 },
-                ]}
-              >
-                <Text style={[s.chipText, on && s.chipTextOn, { fontSize: 12.5 }]}>
-                 {bName === "Todas las marcas" ? (openBrands ? "🏷️ Todas las marcas" : "⚙️ Filtrar por marca ▾") : (openBrands ? bName : `🏷️ Marca: ${bName} ▾`)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+            )}
+          </View>
+          <View
+            style={
+              listOpen
+                ? {
+                    marginTop: 8,
+                    backgroundColor: C.paper,
+                    borderRadius: 16,
+                    padding: 10,
+                    gap: 4,
+                    borderWidth: 1,
+                    borderColor: C.line,
+                  }
+                : { display: "none", height: 0, overflow: "hidden" }
+            }
+          >
+            {listOpen && (
+              <TextInput
+                accessibilityLabel="Buscar en la lista vertical"
+                style={[s.input, { marginBottom: 6, paddingVertical: 8 }]}
+                value={listSearch}
+                onChangeText={setListSearch}
+                placeholder="Escribe para buscar en la lista…"
+                placeholderTextColor={C.muted}
+              />
+            )}
+            {[...segments, "Todos"]
+              .filter(
+                (name) =>
+                  !listSearch.trim() ||
+                  fold(name).includes(fold(listSearch.trim())),
+              )
+              .map((name) => {
+                const on = !pickedProductId && name === current;
+                return (
+                  <Pressable
+                    key={name}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                    accessibilityLabel={`Categoría ${name}`}
+                    onPress={() => {
+                      setPickedProductId("");
+                      onSegment(name);
+                      setListOpen(false);
+                    }}
+                    style={[
+                      s.option,
+                      {
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        paddingVertical: 10,
+                        paddingHorizontal: 12,
+                        borderRadius: 12,
+                        backgroundColor: on ? C.brandSoft : "transparent",
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        s.body,
+                        {
+                          fontWeight: on ? "700" : "500",
+                          color: on ? C.brand : C.ink,
+                        },
+                      ]}
+                    >
+                      {name === "Todos" ? "Mostrar todos los suplementos" : name}
+                    </Text>
+                    <Text style={[s.muted, { fontSize: 12 }]}>
+                      {name === "Todos"
+                        ? `${products.length}`
+                        : `${index.counts.get(name) ?? 0}`}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            {listOpen &&
+              (() => {
+                const seenFam = new Set<string>();
+                const lq = fold(listSearch.trim());
+                return products
+                  .filter((p) => {
+                    const key = p.family || p.id;
+                    if (seenFam.has(key)) return false;
+                    seenFam.add(key);
+                    if (!lq) return true;
+                    return (index.hay.get(p.id) || "").includes(lq);
+                  })
+                  .slice(0, 40)
+                  .map((p) => {
+                    const key = p.family || p.id;
+                    const active = pickedProductId === key;
+                    return (
+                      <Pressable
+                        key={`item-${key}`}
+                        accessibilityRole="button"
+                        onPress={() => {
+                          setPickedProductId(key);
+                          setListOpen(false);
+                        }}
+                        style={[
+                          s.option,
+                          {
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            paddingVertical: 10,
+                            paddingHorizontal: 12,
+                            borderRadius: 12,
+                            backgroundColor: active ? C.brandSoft : "transparent",
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            s.body,
+                            {
+                              flex: 1,
+                              fontWeight: active ? "700" : "400",
+                              color: active ? C.brand : C.ink,
+                            },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {`• ${p.familyName || p.name}`}
+                        </Text>
+                        <Text style={[s.muted, { fontSize: 12.5, marginLeft: 8 }]}>
+                          {money(p.price)}
+                        </Text>
+                      </Pressable>
+                    );
+                  });
+              })()}
+          </View>
+        </View>
       )}
       {!!q && (
         <Note>{`${shown.length} ${shown.length === 1 ? "resultado" : "resultados"} en todas las categorías`}</Note>

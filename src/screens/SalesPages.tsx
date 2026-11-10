@@ -1,8 +1,8 @@
 import React from "react";
 import { STORE_NAME, TILE } from "../theme";
-import { Alert, Share, View } from "react-native";
+import { Alert, Pressable, Share, View } from "react-native";
 import { Text } from "../text";
-import { localDay, money, productBrand, saleSegment, today, type Row } from "../business";
+import { localDay, money, today, type Row } from "../business";
 import { cardLabel, terminalPayments } from "../receipt";
 import {
   Button,
@@ -513,66 +513,24 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
       filters.Ventas === "Todas" ? "Activas" : filters.Ventas || "Activas";
     const day = today();
     const cancelled = sales.filter((v) => v.status === "cancelled");
-    // 2.10.4: metadatos de productos vendidos por venta (para filtrar por producto, tipo de suplemento o marca).
-    const saleCatalogInfo = (v: Row) => {
+    const saleProducts = (v: Row) => {
       const ls = d.lines.get(v.id) ?? [];
-      const types = new Set<string>();
-      const brands = new Set<string>();
       const prods = new Set<string>();
       for (const l of ls) {
         const p = productById.get(l.productId);
-        const t = String(p ? saleSegment(p) : "").trim();
-        const br = productBrand(p || { name: l.name });
         const pr = String(p?.familyName || p?.name || l.name || "").trim();
-        if (t) types.add(t);
-        if (br) brands.add(br);
         if (pr) prods.add(pr);
       }
-      return { types, brands, prods };
+      return prods;
     };
-    const allTypes = new Set<string>();
-    const allBrands = new Set<string>();
     const allProds = new Set<string>();
-    for (const p of d.products || []) {
-      if (p.archived) continue;
-      const seg = saleSegment(p);
-      const br = productBrand(p);
-      if (seg) allTypes.add(seg);
-      if (br) allBrands.add(br);
-    }
     for (const v of sales) {
       if (v.status === "cancelled" && filter !== "Canceladas") continue;
-      const info = saleCatalogInfo(v);
-      for (const t of info.types) allTypes.add(t);
-      for (const br of info.brands) allBrands.add(br);
-      for (const pr of info.prods) allProds.add(pr);
+      for (const pr of saleProducts(v)) allProds.add(pr);
     }
-    const typeList = [...allTypes].sort();
-    const brandList = [...allBrands].sort();
     const prodList = [...allProds].sort();
-    const dimOptions = [
-      { id: "Todo", name: "Todo el catálogo" },
-      ...(typeList.length ? [{ id: "Tipo", name: "Tipo de suplemento" }] : []),
-      ...(brandList.length ? [{ id: "Marca", name: "Marca" }] : []),
-      ...(prodList.length ? [{ id: "Producto", name: "Producto" }] : []),
-    ];
-    const activeDim = dimOptions.some((o) => o.id === filters.VentasDim)
-      ? filters.VentasDim
-      : "Todo";
-    const activeVal =
-      activeDim === "Tipo"
-        ? typeList.includes(filters.VentasVal)
-          ? filters.VentasVal
-          : ""
-        : activeDim === "Marca"
-          ? brandList.includes(filters.VentasVal)
-            ? filters.VentasVal
-            : ""
-          : activeDim === "Producto"
-            ? prodList.includes(filters.VentasVal)
-              ? filters.VentasVal
-              : ""
-            : "";
+    const activeProd = prodList.includes(filters.VentasVal) ? filters.VentasVal : "";
+    const ventasListOpen = filters.VentasListaOpen === "1";
     const qNorm = normalize(query);
     let list = sales.filter((v) => {
       const statusOk =
@@ -585,24 +543,11 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                 ? saleDay(v) === day
                 : true);
       if (!statusOk) return false;
-      const info = saleCatalogInfo(v);
-      if (activeDim === "Tipo" && activeVal && !info.types.has(activeVal))
-        return false;
-      if (activeDim === "Marca" && activeVal && !info.brands.has(activeVal))
-        return false;
-      if (activeDim === "Producto" && activeVal && !info.prods.has(activeVal))
-        return false;
+      const prods = saleProducts(v);
+      if (activeProd && !prods.has(activeProd)) return false;
       if (!qNorm) return true;
       const hay = normalize(
-        [
-          v.customer,
-          v.folio,
-          v.channel,
-          v.seller,
-          ...info.prods,
-          ...info.brands,
-          ...info.types,
-        ].join(" "),
+        [v.customer, v.folio, v.channel, v.seller, ...prods].join(" "),
       );
       return hay.includes(qNorm);
     });
@@ -697,7 +642,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                 </>
               );
             })()}
-            {searchBox("Buscar cliente, folio, producto o marca")}
+            {searchBox("Buscar cliente, folio o suplemento")}
             <View style={{ marginBottom: 6 }}>
               <Chips
                 row
@@ -726,38 +671,84 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                 />
               </View>
             )}
-            {dimOptions.length > 1 && (
-              <View style={{ marginBottom: activeDim !== "Todo" ? 6 : 10 }}>
-                <Chips
-                  row
-                  options={dimOptions}
-                  value={activeDim}
-                  onChange={(v) =>
+            {prodList.length > 0 && (
+              <View style={{ marginBottom: 10 }}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() =>
                     setFilters((old) => ({
                       ...old,
-                      VentasDim: v,
-                      VentasVal: "",
+                      VentasListaOpen: ventasListOpen ? "" : "1",
                     }))
                   }
-                />
-              </View>
-            )}
-            {activeDim !== "Todo" && (
-              <View style={{ marginBottom: 10 }}>
-                <Chips
-                  row
-                  options={(activeDim === "Tipo"
-                    ? typeList
-                    : activeDim === "Marca"
-                      ? brandList
-                      : prodList
-                  ).map((name) => ({ id: name, name }))}
-                  value={activeVal}
-                  allowEmpty="Todos"
-                  onChange={(v) =>
-                    setFilters((old) => ({ ...old, VentasVal: v }))
-                  }
-                />
+                  style={[
+                    s.input,
+                    s.between,
+                    {
+                      paddingVertical: 10,
+                      paddingHorizontal: 14,
+                      backgroundColor: C.paper,
+                    },
+                  ]}
+                >
+                  <Text style={[s.body, { fontWeight: "600", flex: 1 }]} numberOfLines={1}>
+                    {`📋 Filtrar por suplemento: ${activeProd || "Todos"}`}
+                  </Text>
+                  <Text style={[s.body, { color: C.brand, fontWeight: "700" }]}>
+                    {ventasListOpen ? "Cerrar ▴" : "Elegir ▾"}
+                  </Text>
+                </Pressable>
+                {ventasListOpen && (
+                  <View
+                    style={{
+                      marginTop: 6,
+                      backgroundColor: C.paper,
+                      borderRadius: 16,
+                      padding: 8,
+                      gap: 2,
+                      borderWidth: 1,
+                      borderColor: C.line,
+                    }}
+                  >
+                    {["", ...prodList].map((pName) => {
+                      const on = activeProd === pName;
+                      return (
+                        <Pressable
+                          key={pName || "all"}
+                          accessibilityRole="button"
+                          onPress={() =>
+                            setFilters((old) => ({
+                              ...old,
+                              VentasVal: pName,
+                              VentasListaOpen: "",
+                            }))
+                          }
+                          style={[
+                            s.option,
+                            {
+                              paddingVertical: 10,
+                              paddingHorizontal: 12,
+                              borderRadius: 10,
+                              backgroundColor: on ? C.brandSoft : "transparent",
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              s.body,
+                              {
+                                fontWeight: on ? "700" : "400",
+                                color: on ? C.brand : C.ink,
+                              },
+                            ]}
+                          >
+                            {pName || "Mostrar todas las ventas"}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
             )}
             {filter === "Canceladas" ? (

@@ -1,7 +1,7 @@
 import React from "react";
-import { Alert, Linking, Pressable, ScrollView, View } from "react-native";
+import { Alert, Linking, Pressable, View } from "react-native";
 import { Text } from "../text";
-import { brandsOf, grossUp, jordanianStack, localDay, money, productBrand, today } from "../business";
+import { grossUp, jordanianStack, localDay, money, saleSegment, segmentsOf, today } from "../business";
 import { catalogueImages } from "../catalogueImages";
 import {
   Button,
@@ -198,39 +198,19 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                 📱 Modo Kiosco
               </Text>
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Enviar catálogo PDF o WhatsApp"
-              onPress={() => go("Catálogo para clientes")}
-              style={[
-                s.chip,
-                { alignItems: "center", paddingVertical: 7, paddingHorizontal: 10, backgroundColor: C.soft },
-              ]}
-            >
-              <Text style={[s.chipText, { fontSize: 12.5, color: C.brand, fontWeight: "600" }]} numberOfLines={1}>
-                📤 Catálogo PDF/WA
-              </Text>
-            </Pressable>
           </View>
           {kioskMode && (
-            <Card tone="ok">
-              <View style={s.between}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.subtitle, { marginBottom: 2 }]}>
-                    📱 Catálogo Interactivo · Modo Kiosco
-                  </Text>
-                  <Note>
-                    Filtra por categoría o marca, toca cualquier suplemento para ver sabores y arma tu pedido.
-                  </Note>
-                </View>
-                <Button
-                  title="Salir de Kiosco"
-                  secondary
-                  small
-                  onPress={() => setFilters((old) => ({ ...old, ModoVenta: "POS" }))}
-                />
-              </View>
-            </Card>
+            <View style={[s.between, { marginBottom: 10, paddingHorizontal: 4 }]}>
+              <Text style={[s.subtitle, { marginBottom: 0 }]}>
+                📱 Modo Kiosco · Suplementos y Precios
+              </Text>
+              <Button
+                title="Salir de Kiosco"
+                secondary
+                small
+                onPress={() => setFilters((old) => ({ ...old, ModoVenta: "POS" }))}
+              />
+            </View>
           )}
           {!kioskMode && !!d.mpPending && (
             <Card tone="warn">
@@ -395,27 +375,127 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               )}
             </View>
           )}
-          <ProductGrid
-            products={gridProducts as any}
-            qtyOf={(id) => basketQtyMap.get(id) ?? 0}
-            limitOf={(id) => Math.max(0, productById.get(id)?.available ?? 0)}
-            onAdd={(id) => addToBasket(id, 1, true)}
-            lookupStore={b!}
-            onPhotoResolved={(product, online) =>
-              act(() => b!.saveProductLookupPhoto(product.id, online))
-            }
-            onRemove={removeFromBasket}
-            segment={saleSeg}
-            onSegment={setSaleSeg}
-            onInventoryCode={
-              kioskMode
-                ? undefined
-                : (barcode) => open("Inventario por código", { barcode, autoSell: "1" })
-            }
-            cartCount={totalPieces}
-            onCheckout={openCheckout}
-            expiringIds={d.expiringIds}
-          />
+          {kioskMode ? (
+            <View style={{ gap: 18 }}>
+              {(() => {
+                const availProds = (gridProducts as any[]).filter(
+                  (p) => (productById.get(p.id)?.available ?? 0) > 0,
+                );
+                const tipos = segmentsOf(availProds);
+                if (!tipos.length) {
+                  return <Note>No hay suplementos con existencias disponibles.</Note>;
+                }
+                return tipos.map((tipo) => {
+                  const seenFam = new Set<string>();
+                  const groupItems = availProds.filter((p) => {
+                    if (saleSegment(p) !== tipo) return false;
+                    const k = p.family || p.id;
+                    if (seenFam.has(k)) return false;
+                    seenFam.add(k);
+                    return true;
+                  });
+                  return (
+                    <View key={`kiosk-seg-${tipo}`} style={{ gap: 10 }}>
+                      <View
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: C.line,
+                          paddingBottom: 6,
+                        }}
+                      >
+                        <Text
+                          style={[
+                            s.subtitle,
+                            {
+                              marginBottom: 0,
+                              fontSize: 18,
+                              color: C.ink,
+                              textTransform: "uppercase",
+                              letterSpacing: 0.6,
+                            },
+                          ]}
+                        >
+                          {tipo}
+                        </Text>
+                      </View>
+                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                        {groupItems.map((p: any) => {
+                          const qty = basketQtyMap.get(p.id) ?? 0;
+                          return (
+                            <Pressable
+                              key={p.id}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Kiosco ${p.familyName || p.name}`}
+                              onPress={() => addToBasket(p.id, 1, true)}
+                              style={[
+                                s.tile,
+                                {
+                                  width: "48%",
+                                  padding: 12,
+                                  alignItems: "center",
+                                },
+                                qty > 0 && s.tileOn,
+                              ]}
+                            >
+                              <View style={[s.tilePhoto, { width: "100%", height: 150, marginBottom: 8 }]}>
+                                <ProductPhoto product={p} style={{ width: "100%", height: "100%" }} />
+                                {qty > 0 && (
+                                  <View style={s.tileBadge}>
+                                    <Text style={s.tileBadgeText}>{String(qty)}</Text>
+                                  </View>
+                                )}
+                              </View>
+                              <Text
+                                style={[s.tileName, { textAlign: "center", fontSize: 14 }]}
+                                numberOfLines={2}
+                              >
+                                {p.familyName || p.name}
+                              </Text>
+                              <Text
+                                style={[
+                                  s.price,
+                                  {
+                                    fontSize: 20,
+                                    fontWeight: "700",
+                                    color: C.brand,
+                                    textAlign: "center",
+                                    marginTop: 4,
+                                    marginBottom: 0,
+                                  },
+                                ]}
+                              >
+                                {money(p.price)}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  );
+                });
+              })()}
+            </View>
+          ) : (
+            <ProductGrid
+              products={gridProducts as any}
+              qtyOf={(id) => basketQtyMap.get(id) ?? 0}
+              limitOf={(id) => Math.max(0, productById.get(id)?.available ?? 0)}
+              onAdd={(id) => addToBasket(id, 1, true)}
+              lookupStore={b!}
+              onPhotoResolved={(product, online) =>
+                act(() => b!.saveProductLookupPhoto(product.id, online))
+              }
+              onRemove={removeFromBasket}
+              segment={saleSeg}
+              onSegment={setSaleSeg}
+              onInventoryCode={(barcode) =>
+                open("Inventario por código", { barcode, autoSell: "1" })
+              }
+              cartCount={totalPieces}
+              onCheckout={openCheckout}
+              expiringIds={d.expiringIds}
+            />
+          )}
           {kioskMode ? (
             totalPieces > 0 ? (
               <View style={{ marginTop: 12 }}>
@@ -451,18 +531,15 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
 
   if (page === "Stock" || page === "Catálogo") {
     const filter = filters[page] || "Todos";
-    const stockBrands = brandsOf(products.filter((p) => !p.archived));
-    const activeBrand = stockBrands.includes(filters.StockMarca) ? filters.StockMarca : "";
     const list = matching(products).filter((p) =>
-      (filter === "Archivados"
+      filter === "Archivados"
         ? p.archived
         : !p.archived &&
           (filter === "Bajo mínimo"
             ? p.inventoryKnown && p.available <= p.minimum
             : filter === "Sin stock"
               ? p.available < 1
-              : true)) &&
-      (!activeBrand || productBrand(p) === activeBrand),
+              : true),
     );
     return {
       list: {
@@ -502,34 +579,6 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               "Sin stock",
               "Archivados",
             ])}
-            {stockBrands.length > 0 && (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: 6, paddingBottom: 6 }}
-                style={{ marginBottom: 6 }}
-                keyboardShouldPersistTaps="handled"
-              >
-                {["Todas las marcas", ...stockBrands].map((bName) => {
-                  const val = bName === "Todas las marcas" ? "" : bName;
-                  const on = activeBrand === val;
-                  return (
-                    <Pressable
-                      key={`sbrand-${bName}`}
-                      accessibilityRole="button"
-                      onPress={() =>
-                        setFilters((old) => ({ ...old, StockMarca: on ? "" : val }))
-                      }
-                      style={[s.chip, on && s.chipOn, { paddingVertical: 7, paddingHorizontal: 14 }]}
-                    >
-                      <Text style={[s.chipText, on && s.chipTextOn, { fontSize: 12.5 }]}>
-                        {bName === "Todas las marcas" ? "🏷️ Todas las marcas" : bName}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            )}
           </>
         ),
         item: (p) => {
