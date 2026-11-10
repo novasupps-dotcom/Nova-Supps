@@ -668,7 +668,7 @@ const fold = (x: string) =>
  * Snacks, Vitaminas…) y cuadrícula con la imagen de cada producto. Tocar la
  * foto agrega una pieza; el número en la esquina es lo que lleva la venta.
  */
-export function ProductGrid({
+export function ProductPhoto({
   products,
   qtyOf,
   limitOf,
