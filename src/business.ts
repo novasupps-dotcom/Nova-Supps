@@ -526,7 +526,7 @@ export function jordanianStack(
     return { complete: true, source: "complete", label: "", items: [], probabilities: {} };
   }
 
-  const pillars = ["Proteinas", "Creatinas", "PWO", "Vitaminas"];
+  const pillars = ["Proteínas", "Creatinas", "PWO", "Vitaminas"];
   const pIdx = (seg: string) => {
     const idx = pillars.indexOf(seg);
     return idx >= 0 ? idx : 3;
