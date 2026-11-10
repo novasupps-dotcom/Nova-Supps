@@ -875,6 +875,7 @@ export function ProductGrid({
   const setQuery = onQuery ?? setOwnQuery;
   const [width, setWidth] = useState(0);
   const [brand, setBrand] = useState("");
+  const [openBrands, setOpenBrands] = useState(false);
   // Categoría, marca y texto de búsqueda de cada producto se calculan una sola vez.
   const index = useMemo(() => {
     const seg = new Map<string, string>();
@@ -1043,9 +1044,7 @@ export function ProductGrid({
                 style={[s.chip, on && s.chipOn]}
               >
                 <Text style={[s.chipText, on && s.chipTextOn]}>
-                  {name === "Todos"
-                    ? `Todos (${products.length})`
-                    : `${name} (${count(name)})`}
+                  {name}
                 </Text>
               </Pressable>
             );
@@ -1060,7 +1059,7 @@ export function ProductGrid({
           style={{ marginBottom: 8 }}
           keyboardShouldPersistTaps="handled"
         >
-          {["Todas las marcas", ...index.brands].map((bName) => {
+          {(openBrands ? ["Todas las marcas", ...index.brands] : [activeBrand || "Todas las marcas"]).map((bName) => {
             const val = bName === "Todas las marcas" ? "" : bName;
             const on = activeBrand === val;
             return (
@@ -1069,7 +1068,7 @@ export function ProductGrid({
                 accessibilityRole="button"
                 accessibilityState={{ selected: on }}
                 accessibilityLabel={`Marca ${bName}`}
-                onPress={() => setBrand(on ? "" : val)}
+               onPress={() => { if (!openBrands) { setOpenBrands(true); return; } setBrand(on ? "" : val); setOpenBrands(false); }}
                 style={[
                   s.chip,
                   on && s.chipOn,
@@ -1077,7 +1076,7 @@ export function ProductGrid({
                 ]}
               >
                 <Text style={[s.chipText, on && s.chipTextOn, { fontSize: 12.5 }]}>
-                  {bName === "Todas las marcas" ? "🏷️ Todas las marcas" : bName}
+                 {bName === "Todas las marcas" ? (openBrands ? "🏷️ Todas las marcas" : "🏷️ Filtrar por marca ▾") : (openBrands ? bName : `🏷️ Marca: ${bName} ▾`)}
                 </Text>
               </Pressable>
             );
