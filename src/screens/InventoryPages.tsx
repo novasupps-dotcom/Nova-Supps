@@ -1,7 +1,7 @@
 import React from "react";
 import { Alert, Linking, Pressable, View } from "react-native";
 import { Text } from "../text";
-import { grossUp, jordanianStack, localDay, money, saleSegment, segmentsOf, today } from "../business";
+import { grossUp, jordanianStack, localDay, money, today } from "../business";
 import { catalogueImages } from "../catalogueImages";
 import {
   Button,
@@ -65,7 +65,6 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
     emptyBasket,
     openCheckout,
     filters,
-    setFilters,
     matching,
     searchBox,
     filterChips,
@@ -151,68 +150,12 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
     const basketCustomer = basketCustomerId
       ? customers.find((c) => c.id === basketCustomerId)
       : null;
-    const kioskMode = filters.ModoVenta === "Kiosco";
     const jStack = jordanianStack(b!, gridProducts as any, basket, basketCustomerId || null);
     const totalPieces = basket.reduce((n: number, i: any) => n + i.qty, 0);
     return {
       scroll: (
         <>
-          <View
-            style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              gap: 6,
-              marginBottom: 10,
-              backgroundColor: C.paper,
-              borderRadius: 16,
-              padding: 6,
-            }}
-          >
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Modo Punto de venta"
-              onPress={() => setFilters((old) => ({ ...old, ModoVenta: "POS" }))}
-              style={[
-                s.chip,
-                !kioskMode && s.chipOn,
-                { flex: 1, alignItems: "center", paddingVertical: 7, paddingHorizontal: 8 },
-              ]}
-            >
-              <Text style={[s.chipText, !kioskMode && s.chipTextOn, { fontSize: 12.5, fontWeight: "600" }]} numberOfLines={1}>
-                🛍️ Punto de venta
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Modo Kiosco"
-              onPress={() =>
-                setFilters((old) => ({ ...old, ModoVenta: kioskMode ? "POS" : "Kiosco" }))
-              }
-              style={[
-                s.chip,
-                kioskMode && s.chipOn,
-                { flex: 1, alignItems: "center", paddingVertical: 7, paddingHorizontal: 8 },
-              ]}
-            >
-              <Text style={[s.chipText, kioskMode && s.chipTextOn, { fontSize: 12.5, fontWeight: "600" }]} numberOfLines={1}>
-                📱 Modo Kiosco
-              </Text>
-            </Pressable>
-          </View>
-          {kioskMode && (
-            <View style={[s.between, { marginBottom: 10, paddingHorizontal: 4 }]}>
-              <Text style={[s.subtitle, { marginBottom: 0 }]}>
-                📱 Modo Kiosco · Suplementos y Precios
-              </Text>
-              <Button
-                title="Salir de Kiosco"
-                secondary
-                small
-                onPress={() => setFilters((old) => ({ ...old, ModoVenta: "POS" }))}
-              />
-            </View>
-          )}
-          {!kioskMode && !!d.mpPending && (
+          {!!d.mpPending && (
             <Card tone="warn">
               <Text style={s.subtitle}>
                 Cobro en terminal sin confirmar · {money(d.mpPending.amount)}
@@ -232,7 +175,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               />
             </Card>
           )}
-          {!kioskMode && !!cloudStatus?.conflicts && (
+          {!!cloudStatus?.conflicts && (
             <Card tone="warn">
               <Text
                 style={s.subtitle}
@@ -240,7 +183,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               <Button title="Revisar" small onPress={() => go("Equipo")} />
             </Card>
           )}
-          {!kioskMode && (!!soon.length || lastDays === null || lastDays >= 7) && (
+          {(!!soon.length || lastDays === null || lastDays >= 7) && (
             <MenuList
               items={[
                 ...(soon.length
@@ -276,7 +219,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               ]}
             />
           )}
-          {!kioskMode && !!parkedCart && (
+          {!!parkedCart && (
             <View
               style={[
                 s.between,
@@ -337,7 +280,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                 <Text style={[s.label, { marginBottom: 0, color: C.brand }]}>
                   {jStack.label}
                 </Text>
-                {!kioskMode && !basketCustomer && customers.length > 0 && (
+                {!basketCustomer && customers.length > 0 && (
                   <TextButton
                     title="👤 Elegir cliente"
                     color={C.brand}
@@ -375,155 +318,38 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               )}
             </View>
           )}
-          {kioskMode ? (
-            <View style={{ gap: 18 }}>
-              {(() => {
-                const availProds = (gridProducts as any[]).filter(
-                  (p) => (productById.get(p.id)?.available ?? 0) > 0,
-                );
-                const tipos = segmentsOf(availProds);
-                if (!tipos.length) {
-                  return <Note>No hay suplementos con existencias disponibles.</Note>;
-                }
-                return tipos.map((tipo) => {
-                  const seenFam = new Set<string>();
-                  const groupItems = availProds.filter((p) => {
-                    if (saleSegment(p) !== tipo) return false;
-                    const k = p.family || p.id;
-                    if (seenFam.has(k)) return false;
-                    seenFam.add(k);
-                    return true;
-                  });
-                  return (
-                    <View key={`kiosk-seg-${tipo}`} style={{ gap: 10 }}>
-                      <View
-                        style={{
-                          borderBottomWidth: 1,
-                          borderBottomColor: C.line,
-                          paddingBottom: 6,
-                        }}
-                      >
-                        <Text
-                          style={[
-                            s.subtitle,
-                            {
-                              marginBottom: 0,
-                              fontSize: 18,
-                              color: C.ink,
-                              textTransform: "uppercase",
-                              letterSpacing: 0.6,
-                            },
-                          ]}
-                        >
-                          {tipo}
-                        </Text>
-                      </View>
-                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-                        {groupItems.map((p: any) => {
-                          const qty = basketQtyMap.get(p.id) ?? 0;
-                          return (
-                            <Pressable
-                              key={p.id}
-                              accessibilityRole="button"
-                              accessibilityLabel={`Kiosco ${p.familyName || p.name}`}
-                              onPress={() => addToBasket(p.id, 1, true)}
-                              style={[
-                                s.tile,
-                                {
-                                  width: "48%",
-                                  padding: 12,
-                                  alignItems: "center",
-                                },
-                                qty > 0 && s.tileOn,
-                              ]}
-                            >
-                              <View style={[s.tilePhoto, { width: "100%", height: 150, marginBottom: 8 }]}>
-                                <ProductPhoto product={p} style={{ width: "100%", height: "100%" }} />
-                                {qty > 0 && (
-                                  <View style={s.tileBadge}>
-                                    <Text style={s.tileBadgeText}>{String(qty)}</Text>
-                                  </View>
-                                )}
-                              </View>
-                              <Text
-                                style={[s.tileName, { textAlign: "center", fontSize: 14 }]}
-                                numberOfLines={2}
-                              >
-                                {p.familyName || p.name}
-                              </Text>
-                              <Text
-                                style={[
-                                  s.price,
-                                  {
-                                    fontSize: 20,
-                                    fontWeight: "700",
-                                    color: C.brand,
-                                    textAlign: "center",
-                                    marginTop: 4,
-                                    marginBottom: 0,
-                                  },
-                                ]}
-                              >
-                                {money(p.price)}
-                              </Text>
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                    </View>
-                  );
-                });
-              })()}
-            </View>
-          ) : (
-            <ProductGrid
-              products={gridProducts as any}
-              qtyOf={(id) => basketQtyMap.get(id) ?? 0}
-              limitOf={(id) => Math.max(0, productById.get(id)?.available ?? 0)}
-              onAdd={(id) => addToBasket(id, 1, true)}
-              lookupStore={b!}
-              onPhotoResolved={(product, online) =>
-                act(() => b!.saveProductLookupPhoto(product.id, online))
-              }
-              onRemove={removeFromBasket}
-              segment={saleSeg}
-              onSegment={setSaleSeg}
-              onInventoryCode={(barcode) =>
-                open("Inventario por código", { barcode, autoSell: "1" })
-              }
-              cartCount={totalPieces}
-              onCheckout={openCheckout}
-              expiringIds={d.expiringIds}
+          <ProductGrid
+            products={gridProducts as any}
+            qtyOf={(id) => basketQtyMap.get(id) ?? 0}
+            limitOf={(id) => Math.max(0, productById.get(id)?.available ?? 0)}
+            onAdd={(id) => addToBasket(id, 1, true)}
+            lookupStore={b!}
+            onPhotoResolved={(product, online) =>
+              act(() => b!.saveProductLookupPhoto(product.id, online))
+            }
+            onRemove={removeFromBasket}
+            segment={saleSeg}
+            onSegment={setSaleSeg}
+            onInventoryCode={(barcode) =>
+              open("Inventario por código", { barcode, autoSell: "1" })
+            }
+            cartCount={totalPieces}
+            onCheckout={openCheckout}
+            expiringIds={d.expiringIds}
+          />
+          <View style={[s.between, { marginTop: 8, paddingHorizontal: 4 }]}>
+            <TextButton
+              title="＋ Producto nuevo"
+              onPress={() => open("Producto", { toBasket: "1" })}
             />
-          )}
-          {kioskMode ? (
-            totalPieces > 0 ? (
-              <View style={{ marginTop: 12 }}>
-                <Button
-                  icon="shopping-cart"
-                  title={`Pasar a caja · Cobrar pedido (${totalPieces} ${totalPieces === 1 ? "pieza" : "piezas"})`}
-                  onPress={() => {
-                    setFilters((old) => ({ ...old, ModoVenta: "POS" }));
-                    openCheckout();
-                  }}
-                />
-              </View>
-            ) : null
-          ) : (
-            <View style={[s.between, { marginTop: 8, paddingHorizontal: 4 }]}>
+            {!!basket.length && (
               <TextButton
-                title="＋ Producto nuevo"
-                onPress={() => open("Producto", { toBasket: "1" })}
+                title="Vaciar carrito"
+                color={C.red}
+                onPress={emptyBasket}
               />
-              {!!basket.length && (
-                <TextButton
-                  title="Vaciar carrito"
-                  color={C.red}
-                  onPress={emptyBasket}
-                />
-              )}
-            </View>
-          )}
+            )}
+          </View>
         </>
       ),
     };

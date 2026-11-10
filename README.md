@@ -1,6 +1,6 @@
-# Nova Negocio - 2.10.8
+# Nova Negocio - 2.10.9
 
-**2.10.8 - Motor Gauss-Jordan (Stack Sugerido y descuento en 3 pasos), filtro por marca, Modo Kiosco, calculadora de efectivo, App.tsx reducido y respaldo BD + Realtime (supabase/realtime_y_respaldo.sql, versionCode 69, solo JavaScript).**
+**2.10.9 - Rediseño de Vender: eliminación de Modo Kiosco, botón Filtrar embebido en Buscar producto (Filter Chips, Dropdown Pill de Marca y Toggle Switches), imagen garantizada en todos los productos, ficha minimalista «Acerca de» (Marca, Producto, Servings y Sabor condicional) y botón «Apriétame» con animación física (versionCode 71, solo JavaScript).**
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
 

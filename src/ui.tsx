@@ -1,9 +1,10 @@
 // Componentes compartidos. El lector se carga solo si existe su módulo nativo.
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View, useWindowDimensions } from "react-native";
 import { Text, TextInput } from "./text";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { catalogueImages } from "./catalogueImages";
+import { catalogueThumbs } from "./catalogueThumbs";
 import { canScan } from "./native";
 import { CameraScanner, type ScanResult, type ScanTools } from "./scanner";
 import {
@@ -19,8 +20,10 @@ import {
   productCodes,
 } from "./barcodes";
 import {
+  brandsOf,
   cents,
   money,
+  productBrand,
   today,
   saleSegment,
   segmentsOf,
@@ -432,11 +435,13 @@ export function SearchBox({
   onChange,
   placeholder,
   onSubmit,
+  right,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
   onSubmit?: () => void;
+  right?: React.ReactNode;
 }) {
   return (
     <View style={[s.input, s.searchRow]}>
@@ -474,6 +479,7 @@ export function SearchBox({
           </View>
         </Pressable>
       )}
+      {right}
     </View>
   );
 }
@@ -562,6 +568,82 @@ export function CodeInput({
     </View>
   );
 }
+const CATALOG_NAME_MATCHERS: [RegExp, string][] = [
+  [/coffee\s*fit/i, "NS-CAF-001"],
+  [/aminox|amino\s*x/i, "NS-AMI-001"],
+  [/demon\s*bcaa/i, "NS-AMI-002"],
+  [/killer\s*bcaa/i, "NS-AMI-003"],
+  [/hardcore\s*bcaa/i, "NS-AMI-004"],
+  [/amino\s*energy/i, "NS-AMI-005"],
+  [/\bc4\b|cellucor/i, "NS-BEB-001"],
+  [/muscle\s*sandwich/i, "NS-BAR-001"],
+  [/carnigen/i, "NS-CAR-001"],
+  [/glutamin/i, "NS-GLU-001"],
+  [/\bmass\b.*mutant|mutant.*\bmass\b/i, "NS-GAN-001"],
+  [/venom/i, "NS-PRE-001"],
+  [/nitraflex/i, "NS-PRE-002"],
+  [/psychotic\s*test/i, "NS-PRE-003"],
+  [/psychotic\s*gold.*(muestra|1\s*serv)/i, "NS-PRE-006"],
+  [/psychotic\s*gold/i, "NS-PRE-005"],
+  [/psychotic/i, "NS-PRE-004"],
+  [/nitro\s*test/i, "NS-PRE-007"],
+  [/cbum\s*essential/i, "NS-PRE-008"],
+  [/cbum\s*charged/i, "NS-PRE-009"],
+  [/\bjoker\b|terror\s*labz/i, "NS-PRE-010"],
+  [/iso\s*100|dymatize/i, "NS-PRO-001"],
+  [/nitro[-\s]*tech\s*ripped/i, "NS-PRO-003"],
+  [/nitro[-\s]*tech/i, "NS-PRO-002"],
+  [/whey.*mutant|mutant.*whey/i, "NS-PRO-004"],
+  [/isolate.*raw|raw.*isolate/i, "NS-PRO-005"],
+  [/whey\s*isolate|\bsd\s*nutrition/i, "NS-PRO-006"],
+  [/unique\s*whey|unique\s*nutrition/i, "NS-PRO-007"],
+  [/whey\s*hd|\bbpi\b/i, "NS-PRO-008"],
+  [/testrol\s*60/i, "NS-SOP-002"],
+  [/testrol/i, "NS-SOP-001"],
+  [/d3\s*\+\s*k2|evogen.*d3/i, "NS-VIT-001"],
+  [/glutathione|vitamin\s*c|ghost\s*life/i, "NS-VIT-002"],
+  [/vitamin\s*d3|hi[-\s]*tech/i, "NS-VIT-003"],
+  [/omega.*gat|gat.*omega/i, "NS-OME-002"],
+  [/omega.*ronnie|ronnie.*omega/i, "NS-OME-003"],
+  [/omega|salmon\s*oil/i, "NS-OME-001"],
+];
+
+/** Resuelve la clave de imagen del catálogo para cualquier producto (incluyendo sabores con sufijo o importados). */
+export function resolveCatalogueKey(product: Row | null | undefined): string {
+  if (!product) return "NS-PRO-001";
+  for (const raw of [product.imageKey, product.sku, product.id, product.family]) {
+    const k = String(raw || "").trim();
+    if (!k) continue;
+    if (catalogueImages[k]?.length) return k;
+    const m = /^(NS-[A-Z]{3}-\d{3})/i.exec(k);
+    if (m) {
+      const base = m[1].toUpperCase();
+      if (catalogueImages[base]?.length) return base;
+    }
+  }
+  const text = `${product.familyName || ""} ${product.name || ""} ${product.brand || ""} ${product.presentation || ""}`;
+  if (/creatin/i.test(text)) {
+    const isDragon = /dragon/i.test(text);
+    const isSmall = /\b300\s*g\b/i.test(text);
+    const isKg = /\b(1\s*kg|1000\s*g)\b/i.test(text);
+    if (isDragon) return isKg ? "NS-CRE-002" : "NS-CRE-001";
+    return isSmall ? "NS-CRE-004" : "NS-CRE-003";
+  }
+  for (const [rx, key] of CATALOG_NAME_MATCHERS) {
+    if (rx.test(text) && catalogueImages[key]?.length) return key;
+  }
+  const seg = saleSegment(product);
+  const bySeg: Record<string, string> = {
+    Creatinas: "NS-CRE-003",
+    Proteínas: "NS-PRO-001",
+    PWO: "NS-PRE-004",
+    Aminoácidos: "NS-AMI-001",
+    Vitaminas: "NS-VIT-001",
+    Snacks: "NS-BAR-001",
+  };
+  return bySeg[seg] || "NS-PRO-001";
+}
+
 export function ProductPhoto({
   product,
   index = 0,
@@ -575,37 +657,56 @@ export function ProductPhoto({
   useEffect(
     () => setFailedIndex(0),
     [
-      product.cleanImageUri,
-      product.imageUri,
-      product.imageKey,
-      product.id,
-      product.lookupCode,
+      product?.cleanImageUri,
+      product?.imageUri,
+      product?.imageKey,
+      product?.sku,
+      product?.id,
+      product?.name,
+      product?.lookupCode,
     ],
   );
+  const resolvedKey = resolveCatalogueKey(product);
   const images =
-    catalogueImages[product.imageKey] ||
-    catalogueImages[product.sku] ||
-    catalogueImages[product.id] ||
+    catalogueImages[product?.imageKey] ||
+    catalogueImages[product?.sku] ||
+    catalogueImages[product?.id] ||
+    catalogueImages[resolvedKey] ||
     [];
+  const thumbBase64 =
+    catalogueThumbs[product?.imageKey] ||
+    catalogueThumbs[product?.sku] ||
+    catalogueThumbs[product?.id] ||
+    catalogueThumbs[resolvedKey];
+  const thumbSource = thumbBase64
+    ? { uri: `data:image/jpeg;base64,${thumbBase64}` }
+    : null;
   const uris = [
-    product.cleanImageUri,
-    ...(Array.isArray(product.imageUris) ? product.imageUris : []),
-    product.imageUri,
+    product?.cleanImageUri,
+    ...(Array.isArray(product?.imageUris) ? product.imageUris : []),
+    product?.imageUri,
   ]
     .filter(
       (uri, i, all) => typeof uri === "string" && uri && all.indexOf(uri) === i,
     )
     .map((uri) => ({ uri }));
-  const verified = verifiedProductImage(product);
-  const sources = [verified, ...uris, images[0]].filter(Boolean);
-  const source = index === 0 ? sources[failedIndex] : images[index];
+  const verified = product ? verifiedProductImage(product) : null;
+  const sources = [verified, ...uris, images[0], thumbSource].filter(Boolean);
+  const source =
+    index === 0
+      ? sources[Math.min(failedIndex, Math.max(0, sources.length - 1))]
+      : images[index] || sources[0];
   return source ? (
     <Image
       source={source}
-      onError={() => setFailedIndex((value) => value + 1)}
+      onError={() =>
+        setFailedIndex((value) =>
+          value + 1 < sources.length ? value + 1 : value,
+        )
+      }
       resizeMode="contain"
       style={style}
-      accessibilityLabel={product.name}
+      accessibilityLabel={product?.name || "Producto"}
     />
   ) : (
     <View
@@ -872,75 +973,136 @@ export function ProductGrid({
   const query = queryProp ?? ownQuery;
   const setQuery = onQuery ?? setOwnQuery;
   const [width, setWidth] = useState(0);
-  const [listOpen, setListOpen] = useState(false);
-  const [listSearch, setListSearch] = useState("");
-  const [pickedProductId, setPickedProductId] = useState("");
-  // Texto de búsqueda y segmento de cada producto se calculan una sola vez.
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [brandMenuOpen, setBrandMenuOpen] = useState(false);
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+  const [onlyAvailable, setOnlyAvailable] = useState(false);
+  const [onlyPromo, setOnlyPromo] = useState(false);
+  // Texto de búsqueda, segmento y marca de cada producto se calculan una sola vez.
   const index = useMemo(() => {
     const seg = new Map<string, string>();
+    const brandMap = new Map<string, string>();
     const hay = new Map<string, string>();
     const counts = new Map<string, number>();
     for (const p of products) {
       const g = saleSegment(p);
+      const br = productBrand(p);
       seg.set(p.id, g);
+      brandMap.set(p.id, br);
       counts.set(g, (counts.get(g) ?? 0) + 1);
       hay.set(
         p.id,
         fold(
-          `${p.name} ${p.brand || ""} ${p.category || ""} ${productCodes(p).join(" ")}`,
+          `${p.name} ${p.brand || ""} ${br} ${p.category || ""} ${productCodes(p).join(" ")}`,
         ),
       );
     }
-    return { seg, hay, counts, segments: segmentsOf(products) };
+    return {
+      seg,
+      brandMap,
+      hay,
+      counts,
+      segments: segmentsOf(products),
+      brands: brandsOf(products),
+    };
   }, [products]);
   const segments = index.segments;
   const current =
     segments.includes(segment) || segment === "Todos"
       ? segment
       : segments[0] || "Todos";
-  const pickedProduct = pickedProductId
-    ? products.find((p) => p.id === pickedProductId || p.family === pickedProductId)
-    : null;
+  const hasPromoItems = useMemo(
+    () =>
+      products.some(
+        (p) => !!p.tag || (expiringIds ? expiringIds.has(p.id) : false),
+      ),
+    [products, expiringIds],
+  );
+  const extraFiltersCount =
+    selectedBrands.length + (onlyAvailable ? 1 : 0) + (onlyPromo ? 1 : 0);
   const q = fold(query.trim());
   const shown = useMemo(() => {
-    if (q) return products.filter((p) => (index.hay.get(p.id) || "").includes(q));
-    if (pickedProductId) {
-      const byPick = products.filter(
-        (p) => p.id === pickedProductId || (p.family && p.family === pickedProductId),
-      );
-      if (byPick.length) return byPick;
+    let base = q
+      ? products.filter((p) => (index.hay.get(p.id) || "").includes(q))
+      : products.filter(
+          (p) => current === "Todos" || index.seg.get(p.id) === current,
+        );
+    if (selectedBrands.length > 0) {
+      const bSet = new Set(selectedBrands);
+      base = base.filter((p) => bSet.has(index.brandMap.get(p.id) || ""));
     }
-    return products.filter((p) => current === "Todos" || index.seg.get(p.id) === current);
-  }, [products, index, q, current, pickedProductId]);
+    if (onlyAvailable) {
+      base = base.filter((p) => limitOf(p.id) > 0 || qtyOf(p.id) > 0);
+    }
+    if (onlyPromo) {
+      base = base.filter(
+        (p) => !!p.tag || (expiringIds ? expiringIds.has(p.id) : false),
+      );
+    }
+    return base;
+  }, [
+    products,
+    index,
+    q,
+    current,
+    selectedBrands,
+    onlyAvailable,
+    onlyPromo,
+    limitOf,
+    qtyOf,
+    expiringIds,
+  ]);
   // 2.8: los sabores de un mismo producto se muestran como una sola tarjeta.
-  type Entry = { kind: "one"; p: GridProduct } | { kind: "family"; key: string; name: string; members: GridProduct[] };
+  type Entry =
+    | { kind: "one"; p: GridProduct }
+    | { kind: "family"; key: string; name: string; members: GridProduct[] };
   const entries = useMemo<Entry[]>(() => {
     const list: Entry[] = [];
     const byFamily = new Map<string, GridProduct[]>();
-    for (const p of shown) if (p.family) byFamily.set(p.family, [...(byFamily.get(p.family) ?? []), p]);
+    for (const p of shown)
+      if (p.family)
+        byFamily.set(p.family, [...(byFamily.get(p.family) ?? []), p]);
     const done = new Set<string>();
     for (const p of shown) {
       const members = p.family ? byFamily.get(p.family)! : [];
       if (members.length > 1) {
         if (done.has(p.family!)) continue;
         done.add(p.family!);
-        list.push({ kind: "family", key: p.family!, name: p.familyName || p.name, members });
+        list.push({
+          kind: "family",
+          key: p.family!,
+          name: p.familyName || p.name,
+          members,
+        });
       } else list.push({ kind: "one", p });
     }
     return list;
   }, [shown]);
-  const familyMembers = openFamily
-    ? (() => {
-        const all = products.filter((p) => p.family === openFamily);
-        const inStock = all.filter((p) => limitOf(p.id) > 0 || qtyOf(p.id) > 0);
-        const list = inStock.length ? inStock : all;
-        return expiringIds
-          ? [...list].sort((a, z) => (expiringIds.has(z.id) ? 1 : 0) - (expiringIds.has(a.id) ? 1 : 0))
-          : list;
-      })()
-    : openOne
-      ? products.filter((p) => p.id === openOne)
-      : [];
+  const targetFamily =
+    openFamily ||
+    (openOne ? products.find((p) => p.id === openOne)?.family || null : null);
+  const allSheetMembers =
+    targetFamily && products.filter((p) => p.family === targetFamily).length > 1
+      ? products.filter((p) => p.family === targetFamily)
+      : openOne
+        ? products.filter((p) => p.id === openOne)
+        : [];
+  const familyMembers =
+    allSheetMembers.length > 1
+      ? (() => {
+          const inStock = allSheetMembers.filter(
+            (p) => limitOf(p.id) > 0 || qtyOf(p.id) > 0,
+          );
+          const list = inStock.length ? inStock : allSheetMembers;
+          return expiringIds
+            ? [...list].sort(
+                (a, z) =>
+                  (expiringIds.has(z.id) ? 1 : 0) -
+                  (expiringIds.has(a.id) ? 1 : 0),
+              )
+            : list;
+        })()
+      : allSheetMembers;
   const closeSheet = () => (setOpenFamily(null), setOpenOne(null));
   const cols =
     width >= 960
@@ -956,11 +1118,17 @@ export function ProductGrid({
   const tileWidth: any = width
     ? Math.floor((width - GAP * (cols - 1)) / cols)
     : "48%";
-    // El lector con Enter abre la misma ficha que la cámara.
+  // El lector con Enter abre la misma ficha que la cámara.
   const submit = () => {
     showCode(query);
     setQuery("");
   };
+  const toggleBrand = (br: string) => {
+    setSelectedBrands((prev) =>
+      prev.includes(br) ? prev.filter((x) => x !== br) : [...prev, br],
+    );
+  };
+  const filterBtnActive = filterOpen || extraFiltersCount > 0;
   return (
     <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -970,6 +1138,43 @@ export function ProductGrid({
             onChange={setQuery}
             placeholder="Buscar producto"
             onSubmit={submit}
+            right={
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Filtrar por"
+                accessibilityState={{ expanded: filterOpen }}
+                onPress={() => setFilterOpen((v) => !v)}
+                hitSlop={6}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 5,
+                  paddingHorizontal: 11,
+                  paddingVertical: 6,
+                  borderRadius: 16,
+                  backgroundColor: filterBtnActive ? C.brand : C.paper,
+                  borderWidth: 1,
+                  borderColor: filterBtnActive ? C.brand : C.line,
+                }}
+              >
+                <Icon
+                  name="sliders-horizontal"
+                  size={14}
+                  color={filterBtnActive ? "#fff" : C.ink}
+                />
+                <Text
+                  style={{
+                    fontSize: 12.5,
+                    fontWeight: "600",
+                    color: filterBtnActive ? "#fff" : C.ink,
+                  }}
+                >
+                  {extraFiltersCount > 0
+                    ? `Filtrar (${extraFiltersCount})`
+                    : "Filtrar"}
+                </Text>
+              </Pressable>
+            }
           />
         </View>
         {canScan() && (
@@ -1022,179 +1227,264 @@ export function ProductGrid({
         </Card>
       )}
       {!q && (
-        <View style={{ marginBottom: 10 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Abrir lista vertical de filtro"
-              onPress={() => setListOpen((v) => !v)}
-              style={[
-                s.input,
-                s.between,
-                {
-                  flex: 1,
-                  paddingVertical: 10,
-                  paddingHorizontal: 14,
-                  backgroundColor: C.paper,
-                },
-              ]}
-            >
-              <Text style={[s.body, { fontWeight: "600", flex: 1 }]} numberOfLines={1}>
-                {`📋 Mostrar: ${pickedProduct ? (pickedProduct.familyName || pickedProduct.name) : current === "Todos" ? "Todos los suplementos" : current}`}
-              </Text>
-              <Text style={[s.body, { color: C.brand, fontWeight: "700" }]}>
-                {listOpen ? "Cerrar ▴" : "Elegir de la lista ▾"}
-              </Text>
-            </Pressable>
-            {(pickedProductId !== "" || current !== "Todos") && (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Mostrar todos"
-                onPress={() => {
-                  setPickedProductId("");
-                  onSegment("Todos");
-                  setListOpen(false);
-                }}
-                style={[s.chip, { paddingVertical: 10, paddingHorizontal: 12 }]}
-              >
-                <Text style={[s.chipText, { fontSize: 12.5 }]}>Ver todo</Text>
-              </Pressable>
-            )}
-          </View>
-          <View
-            style={
-              listOpen
-                ? {
-                    marginTop: 8,
-                    backgroundColor: C.paper,
-                    borderRadius: 16,
-                    padding: 10,
-                    gap: 4,
-                    borderWidth: 1,
-                    borderColor: C.line,
-                  }
-                : { display: "none", height: 0, overflow: "hidden" }
-            }
+        <View style={{ marginBottom: 10, gap: 8 }}>
+          {/* 1.b · Chips de selección (Filter Chips): píldoras rápidas con marca de verificación y cambio de color */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 6, paddingRight: 4 }}
+            keyboardShouldPersistTaps="handled"
           >
-            {listOpen && (
-              <TextInput
-                accessibilityLabel="Buscar en la lista vertical"
-                style={[s.input, { marginBottom: 6, paddingVertical: 8 }]}
-                value={listSearch}
-                onChangeText={setListSearch}
-                placeholder="Escribe para buscar en la lista…"
-                placeholderTextColor={C.muted}
-              />
-            )}
-            {[...segments, "Todos"]
-              .filter(
-                (name) =>
-                  !listSearch.trim() ||
-                  fold(name).includes(fold(listSearch.trim())),
-              )
-              .map((name) => {
-                const on = !pickedProductId && name === current;
-                return (
-                  <Pressable
-                    key={name}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: on }}
-                    accessibilityLabel={`Categoría ${name}`}
-                    onPress={() => {
-                      setPickedProductId("");
-                      onSegment(name);
-                      setListOpen(false);
-                    }}
+            {[...segments, "Todos"].map((name) => {
+              const on = name === current;
+              const label =
+                name === "Todos" ? "Mostrar todos los productos" : name;
+              return (
+                <Pressable
+                  key={name}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                  accessibilityLabel={`Categoría ${name}`}
+                  onPress={() => onSegment(name)}
+                  style={[
+                    s.chip,
+                    {
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 5,
+                      paddingHorizontal: 13,
+                      paddingVertical: 7,
+                      minHeight: 34,
+                      borderRadius: 999,
+                      backgroundColor: on ? C.brand : C.paper,
+                      borderWidth: 1,
+                      borderColor: on ? C.brand : C.line,
+                    },
+                  ]}
+                >
+                  {on && <Icon name="check" size={13} color="#fff" />}
+                  <Text
                     style={[
-                      s.option,
+                      s.chipText,
                       {
-                        flexDirection: "row",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        paddingVertical: 10,
-                        paddingHorizontal: 12,
-                        borderRadius: 12,
-                        backgroundColor: on ? C.brandSoft : "transparent",
+                        fontSize: 13,
+                        fontWeight: on ? "700" : "500",
+                        color: on ? "#fff" : C.ink,
                       },
                     ]}
                   >
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {/* Panel compacto desplegado desde el botón embebido "Filtrar por": Dropdown Pills + Toggle Switches */}
+          {(filterOpen || extraFiltersCount > 0) && (
+            <View
+              style={{
+                backgroundColor: C.paper,
+                borderRadius: 18,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                borderWidth: 1,
+                borderColor: C.line,
+                gap: 8,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                {/* Botón desplegable (Dropdown Pill) para Marca con contador de seleccionadas */}
+                {index.brands.length > 0 && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Filtrar por marca"
+                    onPress={() => setBrandMenuOpen((v) => !v)}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 5,
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 999,
+                      backgroundColor:
+                        selectedBrands.length > 0 ? C.brandSoft : C.fill,
+                      borderWidth: 1,
+                      borderColor:
+                        selectedBrands.length > 0 ? C.brand : "transparent",
+                    }}
+                  >
+                    <Icon
+                      name="tag"
+                      size={13}
+                      color={selectedBrands.length > 0 ? C.brand : C.ink}
+                    />
                     <Text
-                      style={[
-                        s.body,
-                        {
-                          fontWeight: on ? "700" : "500",
-                          color: on ? C.brand : C.ink,
-                        },
-                      ]}
+                      style={{
+                        fontSize: 13,
+                        fontWeight: selectedBrands.length > 0 ? "700" : "500",
+                        color: selectedBrands.length > 0 ? C.brand : C.ink,
+                      }}
                     >
-                      {name === "Todos" ? "Mostrar todos los suplementos" : name}
+                      {selectedBrands.length > 0
+                        ? `Marca (${selectedBrands.length})`
+                        : "Marca"}
                     </Text>
-                    <Text style={[s.muted, { fontSize: 12 }]}>
-                      {name === "Todos"
-                        ? `${products.length}`
-                        : `${index.counts.get(name) ?? 0}`}
+                    <Icon
+                      name="chevron-down"
+                      size={14}
+                      color={selectedBrands.length > 0 ? C.brand : C.muted}
+                      style={
+                        brandMenuOpen
+                          ? { transform: [{ rotate: "180deg" }] }
+                          : undefined
+                      }
+                    />
+                  </Pressable>
+                )}
+
+                {/* Botón de interruptor (Toggle Switch): Solo con existencias */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 6,
+                    paddingHorizontal: 10,
+                    paddingVertical: 3,
+                    borderRadius: 999,
+                    backgroundColor: onlyAvailable ? C.brandSoft : C.fill,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 12.5,
+                      fontWeight: onlyAvailable ? "700" : "500",
+                      color: onlyAvailable ? C.brand : C.ink,
+                    }}
+                  >
+                    Con stock
+                  </Text>
+                  <Switch
+                    accessibilityLabel="Solo con existencias"
+                    value={onlyAvailable}
+                    onValueChange={setOnlyAvailable}
+                  />
+                </View>
+
+                {/* Botón de interruptor (Toggle Switch): Solo en oferta / prioridad */}
+                {hasPromoItems && (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 6,
+                      paddingHorizontal: 10,
+                      paddingVertical: 3,
+                      borderRadius: 999,
+                      backgroundColor: onlyPromo ? C.brandSoft : C.fill,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: onlyPromo ? "700" : "500",
+                        color: onlyPromo ? C.brand : C.ink,
+                      }}
+                    >
+                      En oferta / FEFO
+                    </Text>
+                    <Switch
+                      accessibilityLabel="Solo en oferta o prioridad"
+                      value={onlyPromo}
+                      onValueChange={setOnlyPromo}
+                    />
+                  </View>
+                )}
+
+                {extraFiltersCount > 0 && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Limpiar filtros"
+                    onPress={() => {
+                      setSelectedBrands([]);
+                      setOnlyAvailable(false);
+                      setOnlyPromo(false);
+                      setBrandMenuOpen(false);
+                    }}
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      borderRadius: 999,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: "600",
+                        color: C.red,
+                      }}
+                    >
+                      Limpiar
                     </Text>
                   </Pressable>
-                );
-              })}
-            {listOpen &&
-              (() => {
-                const seenFam = new Set<string>();
-                const lq = fold(listSearch.trim());
-                return products
-                  .filter((p) => {
-                    const key = p.family || p.id;
-                    if (seenFam.has(key)) return false;
-                    seenFam.add(key);
-                    if (!lq) return true;
-                    return (index.hay.get(p.id) || "").includes(lq);
-                  })
-                  .slice(0, 40)
-                  .map((p) => {
-                    const key = p.family || p.id;
-                    const active = pickedProductId === key;
+                )}
+              </View>
+
+              {/* Menú flotante compacto de marcas (Dropdown Pill abierto) */}
+              {brandMenuOpen && index.brands.length > 0 && (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: 6,
+                    paddingTop: 6,
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: C.line,
+                  }}
+                >
+                  {index.brands.map((bName) => {
+                    const active = selectedBrands.includes(bName);
                     return (
                       <Pressable
-                        key={`item-${key}`}
+                        key={bName}
                         accessibilityRole="button"
-                        onPress={() => {
-                          setPickedProductId(key);
-                          setListOpen(false);
+                        accessibilityState={{ selected: active }}
+                        accessibilityLabel={`Marca ${bName}`}
+                        onPress={() => toggleBrand(bName)}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 4,
+                          paddingHorizontal: 11,
+                          paddingVertical: 6,
+                          borderRadius: 999,
+                          backgroundColor: active ? C.brand : C.soft,
                         }}
-                        style={[
-                          s.option,
-                          {
-                            flexDirection: "row",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            paddingVertical: 10,
-                            paddingHorizontal: 12,
-                            borderRadius: 12,
-                            backgroundColor: active ? C.brandSoft : "transparent",
-                          },
-                        ]}
                       >
+                        {active && <Icon name="check" size={12} color="#fff" />}
                         <Text
-                          style={[
-                            s.body,
-                            {
-                              flex: 1,
-                              fontWeight: active ? "700" : "400",
-                              color: active ? C.brand : C.ink,
-                            },
-                          ]}
-                          numberOfLines={1}
+                          style={{
+                            fontSize: 12.5,
+                            fontWeight: active ? "700" : "500",
+                            color: active ? "#fff" : C.ink,
+                          }}
                         >
-                          {`• ${p.familyName || p.name}`}
-                        </Text>
-                        <Text style={[s.muted, { fontSize: 12.5, marginLeft: 8 }]}>
-                          {money(p.price)}
+                          {bName}
                         </Text>
                       </Pressable>
                     );
-                  });
-              })()}
-          </View>
+                  })}
+                </View>
+              )}
+            </View>
+          )}
         </View>
       )}
       {!!q && (
@@ -1204,22 +1494,40 @@ export function ProductGrid({
         {entries.map((entry) => {
           if (entry.kind === "family") {
             const qty = entry.members.reduce((n, m) => n + qtyOf(m.id), 0);
-            const left = entry.members.reduce((n, m) => n + Math.max(0, limitOf(m.id) - qtyOf(m.id)), 0);
-            const avail = entry.members.reduce((n, m) => n + (Number.isFinite(limitOf(m.id)) ? limitOf(m.id) : 0), 0);
+            const left = entry.members.reduce(
+              (n, m) => n + Math.max(0, limitOf(m.id) - qtyOf(m.id)),
+              0,
+            );
+            const avail = entry.members.reduce(
+              (n, m) => n + (Number.isFinite(limitOf(m.id)) ? limitOf(m.id) : 0),
+              0,
+            );
             const prices = entry.members.map((m) => m.price);
             const low = Math.min(...prices);
             const out = avail < 1 && qty < 1;
-            const photo = entry.members.find((m) => m.imageUri || m.imageKey) || entry.members[0];
+            const photo =
+              entry.members.find((m) => productHasImage(m)) || entry.members[0];
             return (
-              <View key={"fam:" + entry.key} style={[s.tile, { width: tileWidth }, qty > 0 && s.tileOn, out && { opacity: 0.45 }]}>
+              <View
+                key={"fam:" + entry.key}
+                style={[
+                  s.tile,
+                  { width: tileWidth },
+                  qty > 0 && s.tileOn,
+                  out && { opacity: 0.45 },
+                ]}
+              >
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Elegir sabor de ${entry.name}`}
                   disabled={out}
                   onPress={() => setOpenFamily(entry.key)}
                 >
-                  <View style={s.tilePhoto}>
-                    <ProductPhoto product={photo} style={{ width: "100%", height: "100%" }} />
+                  <View style={[s.tilePhoto, { height: 124, backgroundColor: C.soft, padding: 6 }]}>
+                    <ProductPhoto
+                      product={photo}
+                      style={{ width: "100%", height: "100%" }}
+                    />
                     {qty > 0 && (
                       <View style={s.tileBadge}>
                         <Text style={s.tileBadgeText}>{qty}</Text>
@@ -1229,15 +1537,38 @@ export function ProductGrid({
                   <Text style={s.tileName} numberOfLines={2}>
                     {entry.name}
                   </Text>
-                  <Text style={s.tilePrice}>{(prices.some((x) => x !== low) ? "desde " : "") + money(low)}</Text>
-                  {avail > 0 && entry.members.some((m) => expiringIds?.has(m.id) && limitOf(m.id) > 0) && (
-                    <Text style={[s.tileTag, { color: C.amber }]} numberOfLines={1}>
-                      Prioridad · vence pronto
-                    </Text>
-                  )}
-                  <Text style={[s.tileStock, { color: avail < 1 ? C.red : C.muted }]}>
+                  <Text style={s.tilePrice}>
+                    {(prices.some((x) => x !== low) ? "desde " : "") +
+                      money(low)}
+                  </Text>
+                  {avail > 0 &&
+                    entry.members.some(
+                      (m) => expiringIds?.has(m.id) && limitOf(m.id) > 0,
+                    ) && (
+                      <Text
+                        style={[s.tileTag, { color: C.amber }]}
+                        numberOfLines={1}
+                      >
+                        Prioridad · vence pronto
+                      </Text>
+                    )}
+                  <Text
+                    style={[
+                      s.tileStock,
+                      { color: avail < 1 ? C.red : C.muted },
+                    ]}
+                  >
                     {`${entry.members.length} sabores · ${avail < 1 ? "sin existencias" : `${left} disponibles`}`}
                   </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ver ${entry.name}`}
+                  hitSlop={8}
+                  style={[s.tileInfo, { backgroundColor: C.brandSoft }]}
+                  onPress={() => setOpenFamily(entry.key)}
+                >
+                  <Icon name="info" size={14} color={C.brand} />
                 </Pressable>
               </View>
             );
@@ -1265,7 +1596,7 @@ export function ProductGrid({
                 onPress={() => onAdd(p.id)}
                 onLongPress={() => setOpenOne(p.id)}
               >
-                <View style={s.tilePhoto}>
+                <View style={[s.tilePhoto, { height: 124, backgroundColor: C.soft, padding: 6 }]}>
                   <ProductPhoto
                     product={p}
                     style={{ width: "100%", height: "100%" }}
@@ -1304,17 +1635,15 @@ export function ProductGrid({
                       : `${max} ${max === 1 ? "disponible" : "disponibles"}`}
                 </Text>
               </Pressable>
-              {!!p.description && String(p.description).trim().length > 0 && (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Ver ${p.name}`}
-                  hitSlop={8}
-                  style={[s.tileInfo, { backgroundColor: C.brandSoft }]}
-                  onPress={() => setOpenOne(p.id)}
-                >
-                  <Icon name="info" size={14} color={C.brand} />
-                </Pressable>
-              )}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Ver ${p.name}`}
+                hitSlop={8}
+                style={[s.tileInfo, { backgroundColor: C.brandSoft }]}
+                onPress={() => setOpenOne(p.id)}
+              >
+                <Icon name="info" size={14} color={C.brand} />
+              </Pressable>
               {qty > 0 && (
                 <View style={s.tileActions}>
                   <Pressable
@@ -1353,7 +1682,8 @@ export function ProductGrid({
       {!!familyMembers.length && (
         <ProductSheet
           members={familyMembers}
-          family={!!openFamily}
+          allMembers={allSheetMembers}
+          family={allSheetMembers.length > 1 || !!openFamily}
           qtyOf={qtyOf}
           limitOf={limitOf}
           onAdd={onAdd}
@@ -1367,12 +1697,56 @@ export function ProductGrid({
     </View>
   );
 }
+
+function isRealFlavor(raw?: string | null): boolean {
+  const f = String(raw || "").trim();
+  if (!f) return false;
+  return !/^(sin\s*sabor|por\s*confirmar|natural|n\/?a|ninguno|-)$/i.test(f);
+}
+
+function extractProductSheetInfo(p: GridProduct): {
+  brand: string;
+  productName: string;
+  servings: string;
+  flavor: string;
+} {
+  const rawName = String(p.familyName || p.name || "").trim();
+  const parts = rawName
+    .split("·")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const productName = parts[0] || String(p.name || "").trim();
+  const brand =
+    String(p.brand || "").trim() ||
+    (parts.length >= 2 &&
+    !/^\d+\s*(kg|g|lb|oz|serv|cap|tab|ml|pza|barra|lata)/i.test(parts[1])
+      ? parts[1]
+      : "") ||
+    productBrand(p);
+  const rawPres = String(p.presentation || "").trim();
+  const partPres =
+    parts.length >= 3 ? parts[2] : parts.length === 2 && /^\d+/.test(parts[1]) ? parts[1] : "";
+  const descMatch = /(\d+\s*(?:servicios?|servings?|cápsulas?|tabletas?|gomitas?|barras?|latas?|kg|g|lb|oz|ml))/i.exec(
+    String(p.description || ""),
+  );
+  const servings =
+    (rawPres && !/^por\s*confirmar$/i.test(rawPres) ? rawPres : "") ||
+    (partPres && !/^por\s*confirmar$/i.test(partPres) ? partPres : "") ||
+    (descMatch ? descMatch[1] : "") ||
+    (rawPres || partPres || "1 pieza");
+  const flavor = isRealFlavor(p.flavor) ? String(p.flavor).trim() : "";
+  return { brand, productName, servings, flavor };
+}
+
 /**
- * 2.9 · Ficha del producto al vender: imagen en grande, sabor(es), descripción, precio y
- * existencias; se agrega desde aquí y «Cobrar» lleva directo a la forma de pago.
+ * 2.10.8 · Ficha minimalista "Acerca de" del producto:
+ * - Foto informativa optimizada (con resolución garantizada de imagen).
+ * - Renglones minimalistas ordenados: Marca, Producto, Servings y Sabor (solo si tiene sabor; con Filter Chips si hay varios sabores).
+ * - Botón interactivo "Apriétame" con animación física (inspirada en Material Design Z-elevation + Apple HIG spring clarity).
  */
 function ProductSheet({
   members,
+  allMembers = members,
   family,
   qtyOf,
   limitOf,
@@ -1384,6 +1758,7 @@ function ProductSheet({
   expiringIds,
 }: {
   members: GridProduct[];
+  allMembers?: GridProduct[];
   family: boolean;
   qtyOf: (id: string) => number;
   limitOf: (id: string) => number;
@@ -1395,88 +1770,517 @@ function ProductSheet({
   expiringIds?: Set<string>;
 }) {
   const { height } = useWindowDimensions();
-  const first = members[0];
-  const photo = members.find((m) => m.imageUri || m.imageKey) || first;
-  const title = family ? first.familyName || first.name : first.name;
-  const sub = [first.brand, first.presentation, !family && first.flavor].filter(Boolean).join(" · ");
-  const low = Math.min(...members.map((m) => m.price));
-  const varies = members.some((m) => m.price !== low);
-  const description = members.map((m) => m.description).find((d) => !!d && String(d).trim());
-  const stockText = (max: number) =>
-    !Number.isFinite(max) ? "" : max < 1 ? "Sin existencias" : `${max} ${max === 1 ? "disponible" : "disponibles"}`;
-  const row = (m: GridProduct) => {
-    const qty = qtyOf(m.id);
-    const max = limitOf(m.id);
-    const none = max < 1 && qty < 1;
-    const full = none || qty >= max;
-    return (
-      <View key={m.id} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 10, borderTopWidth: 1, borderColor: C.line, opacity: none ? 0.45 : 1 }}>
-        <Pressable
-          style={{ flex: 1 }}
-          accessibilityRole="button"
-          accessibilityLabel={family ? `Agregar sabor ${m.flavor || m.name}` : "Agregar al carrito"}
-          disabled={full}
-          onPress={() => onAdd(m.id)}
-        >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            <Text style={[s.body, { fontWeight: "600" }]} numberOfLines={1}>
-              {family ? m.flavor || m.name : qty ? "En el carrito" : "Agregar al carrito"}
-            </Text>
-            {max > 0 && expiringIds?.has(m.id) && (
-              <Pill text="Prioridad · vence pronto" tone="warn" />
-            )}
-          </View>
-          <Text style={s.muted}>{family ? `${money(m.price)} · ${stockText(max)}` : stockText(max)}</Text>
-        </Pressable>
-        {qty > 0 && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Quitar una de ${m.flavor || m.name}`}
-            style={s.tileBtn}
-            onPress={() => onRemove(m.id)}
-          >
-            <Icon name={qty > 1 ? "minus" : "trash-2"} size={18} color={C.ink} />
-          </Pressable>
-        )}
-        {qty > 0 && <Text style={[s.subtitle, { marginBottom: 0, marginHorizontal: 10 }]}>{qty}</Text>}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Agregar otra de ${m.flavor || m.name}`}
-          accessibilityState={{ disabled: full }}
-          disabled={full}
-          style={[s.tileBtn, { backgroundColor: C.brand }, full && { opacity: 0.35 }]}
-          onPress={() => onAdd(m.id)}
-        >
-          <Icon name="plus" size={18} color="#fff" />
-        </Pressable>
-      </View>
-    );
+  const [selectedId, setSelectedId] = useState<string>(members[0]?.id || "");
+  useEffect(() => {
+    if (!members.some((m) => m.id === selectedId)) {
+      setSelectedId(members[0]?.id || "");
+    }
+  }, [members, selectedId]);
+
+  const selected = members.find((m) => m.id === selectedId) || members[0];
+  const photo =
+    (productHasImage(selected) ? selected : null) ||
+    allMembers.find((m) => productHasImage(m)) ||
+    members.find((m) => productHasImage(m)) ||
+    selected;
+
+  const info = extractProductSheetInfo(selected);
+  const multiFlavors = members.length > 1;
+  const showFlavorRow = multiFlavors || !!info.flavor;
+
+  const qty = qtyOf(selected.id);
+  const max = limitOf(selected.id);
+  const none = max < 1 && qty < 1;
+  const full = none || qty >= max;
+  const stockText = !Number.isFinite(max)
+    ? ""
+    : max < 1
+      ? "Sin existencias"
+      : `${max} ${max === 1 ? "disponible" : "disponibles"}`;
+
+  // Animación física (Google Material Design tactile elevation + Apple HIG fluid spring)
+  const btnScale = useRef(Animated ? new Animated.Value(1) : null).current;
+  const photoScale = useRef(Animated ? new Animated.Value(1) : null).current;
+  const pulseAnim = useRef(Animated ? new Animated.Value(0) : null).current;
+
+  const handlePressIn = () => {
+    if (btnScale && Animated?.spring) {
+      Animated.spring(btnScale, {
+        toValue: 0.94,
+        speed: 50,
+        bounciness: 4,
+        useNativeDriver: true,
+      }).start();
+    }
   };
+  const handlePressOut = () => {
+    if (btnScale && Animated?.spring) {
+      Animated.spring(btnScale, {
+        toValue: 1,
+        speed: 28,
+        bounciness: 12,
+        useNativeDriver: true,
+      }).start();
+    }
+  };
+  const triggerAprietame = () => {
+    if (full) return;
+    onAdd(selected.id);
+    if (Animated?.sequence && Animated?.spring && btnScale && photoScale && pulseAnim) {
+      pulseAnim.setValue(0);
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(btnScale, {
+            toValue: 0.9,
+            duration: 75,
+            useNativeDriver: true,
+          }),
+          Animated.spring(btnScale, {
+            toValue: 1.06,
+            speed: 36,
+            bounciness: 16,
+            useNativeDriver: true,
+          }),
+          Animated.spring(btnScale, {
+            toValue: 1,
+            speed: 24,
+            bounciness: 10,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.spring(photoScale, {
+            toValue: 1.05,
+            speed: 34,
+            bounciness: 14,
+            useNativeDriver: true,
+          }),
+          Animated.spring(photoScale, {
+            toValue: 1,
+            speed: 22,
+            bounciness: 10,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 460,
+          easing: Easing?.out ? Easing.out(Easing.cubic) : undefined,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  };
+
+  const PhotoWrapper: any = photoScale && Animated?.View ? Animated.View : View;
+  const BtnWrapper: any = btnScale && Animated?.View ? Animated.View : View;
+
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)" }} onTouchStart={noteTouch}>
-        <View style={{ backgroundColor: C.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, maxHeight: "92%" }}>
-          <ScrollView>
-            <View style={{ height: Math.min(320, Math.round(height * 0.36)), borderRadius: 18, backgroundColor: C.soft, overflow: "hidden", marginBottom: 12 }}>
-              <ProductPhoto product={photo} style={{ width: "100%", height: "100%" }} />
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "flex-end",
+          backgroundColor: "rgba(0,0,0,0.38)",
+        }}
+        onTouchStart={noteTouch}
+      >
+        <View
+          style={{
+            backgroundColor: C.paper,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            padding: 18,
+            maxHeight: "92%",
+          }}
+        >
+          <ScrollView keyboardShouldPersistTaps="handled">
+            {/* Foto informativa con elevación limpia y respuesta elástica */}
+            <PhotoWrapper
+              style={[
+                {
+                  height: Math.min(280, Math.round(height * 0.32)),
+                  borderRadius: 20,
+                  backgroundColor: C.soft,
+                  overflow: "hidden",
+                  marginBottom: 14,
+                  padding: 10,
+                },
+                photoScale ? { transform: [{ scale: photoScale }] } : null,
+              ]}
+            >
+              <ProductPhoto
+                product={photo}
+                style={{ width: "100%", height: "100%" }}
+              />
+            </PhotoWrapper>
+
+            {/* Renglones simplificados, ordenados y minimalistas */}
+            <View
+              style={{
+                backgroundColor: C.soft,
+                borderRadius: 18,
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                gap: 8,
+                marginBottom: 14,
+              }}
+            >
+              <View style={s.between}>
+                <Text style={[s.muted, { fontSize: 13.5, fontWeight: "600" }]}>
+                  Marca:
+                </Text>
+                <Text
+                  style={[
+                    s.body,
+                    { fontSize: 15, fontWeight: "700", flex: 1, textAlign: "right" },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {info.brand}
+                </Text>
+              </View>
+
+              <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: C.line }} />
+
+              <View style={s.between}>
+                <Text style={[s.muted, { fontSize: 13.5, fontWeight: "600" }]}>
+                  Producto:
+                </Text>
+                <Text
+                  style={[
+                    s.body,
+                    { fontSize: 15, fontWeight: "700", flex: 1, textAlign: "right" },
+                  ]}
+                  numberOfLines={2}
+                >
+                  {info.productName}
+                </Text>
+              </View>
+
+              <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: C.line }} />
+
+              <View style={s.between}>
+                <Text style={[s.muted, { fontSize: 13.5, fontWeight: "600" }]}>
+                  Servings:
+                </Text>
+                <Text
+                  style={[
+                    s.body,
+                    { fontSize: 15, fontWeight: "600", flex: 1, textAlign: "right" },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {info.servings}
+                </Text>
+              </View>
+
+              {showFlavorRow && (
+                <>
+                  <View
+                    style={{
+                      height: StyleSheet.hairlineWidth,
+                      backgroundColor: C.line,
+                    }}
+                  />
+                  {multiFlavors ? (
+                    <View style={{ gap: 8, paddingTop: 2 }}>
+                      <Text
+                        style={[s.muted, { fontSize: 13.5, fontWeight: "600" }]}
+                      >
+                        Sabor:
+                      </Text>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          flexWrap: "wrap",
+                          gap: 6,
+                        }}
+                      >
+                        {members.map((m) => {
+                          const fLabel = m.flavor || m.name;
+                          const isSel = m.id === selected.id;
+                          const mQty = qtyOf(m.id);
+                          const mMax = limitOf(m.id);
+                          const mOut = mMax < 1 && mQty < 1;
+                          return (
+                            <Pressable
+                              key={m.id}
+                              accessibilityRole="button"
+                              accessibilityState={{ selected: isSel }}
+                              accessibilityLabel={`Agregar sabor ${fLabel}`}
+                              onPress={() => setSelectedId(m.id)}
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                gap: 5,
+                                paddingHorizontal: 13,
+                                paddingVertical: 7,
+                                borderRadius: 999,
+                                backgroundColor: isSel ? C.brand : C.paper,
+                                borderWidth: 1,
+                                borderColor: isSel ? C.brand : C.line,
+                                opacity: mOut ? 0.45 : 1,
+                              }}
+                            >
+                              {isSel && (
+                                <Icon name="check" size={13} color="#fff" />
+                              )}
+                              <Text
+                                style={{
+                                  fontSize: 13.5,
+                                  fontWeight: isSel ? "700" : "500",
+                                  color: isSel ? "#fff" : C.ink,
+                                }}
+                              >
+                                {fLabel}
+                              </Text>
+                              {mQty > 0 && (
+                                <View
+                                  style={{
+                                    backgroundColor: isSel
+                                      ? "rgba(255,255,255,0.26)"
+                                      : C.brandSoft,
+                                    borderRadius: 10,
+                                    paddingHorizontal: 6,
+                                    paddingVertical: 1,
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontSize: 11.5,
+                                      fontWeight: "700",
+                                      color: isSel ? "#fff" : C.brand,
+                                    }}
+                                  >
+                                    {String(mQty)}
+                                  </Text>
+                                </View>
+                              )}
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={s.between}>
+                      <Text
+                        style={[s.muted, { fontSize: 13.5, fontWeight: "600" }]}
+                      >
+                        Sabor:
+                      </Text>
+                      <Text
+                        style={[
+                          s.body,
+                          {
+                            fontSize: 15,
+                            fontWeight: "600",
+                            flex: 1,
+                            textAlign: "right",
+                          },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {info.flavor}
+                      </Text>
+                    </View>
+                  )}
+                </>
+              )}
             </View>
-            <Text style={[s.title, { fontSize: 22, marginBottom: 2 }]}>{title}</Text>
-            {!!sub && <Text style={s.muted}>{sub}</Text>}
-            <Text style={[s.price, { fontSize: 24, marginTop: 6 }]}>{(varies ? "desde " : "") + money(low)}</Text>
-            {!!first.tag && <Text style={s.tileTag}>{first.tag}</Text>}
-            {!!description && <Text style={[s.body, { marginTop: 8, color: C.muted }]}>{String(description).trim()}</Text>}
-            <View style={{ height: 8 }} />
-            {family && <Text style={[s.label, { marginBottom: 0 }]}>{`${members.length} sabores`}</Text>}
-            {members.map(row)}
+
+            {/* Encabezado compacto de precio y existencias */}
+            <View style={[s.between, { marginBottom: 12, paddingHorizontal: 4 }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={[s.price, { fontSize: 24, marginVertical: 0 }]}>
+                  {money(selected.price)}
+                </Text>
+                {!!selected.tag && <Pill text={selected.tag} tone="ok" />}
+                {max > 0 && expiringIds?.has(selected.id) && (
+                  <Pill text="Prioridad · vence pronto" tone="warn" />
+                )}
+              </View>
+              <Text
+                style={[
+                  s.muted,
+                  {
+                    fontSize: 13,
+                    fontWeight: "600",
+                    color: max < 1 ? C.red : C.muted,
+                  },
+                ]}
+              >
+                {stockText}
+              </Text>
+            </View>
+
+            {/* Botón interactivo "Apriétame" con animación física (Material elevation + HIG spring) */}
+            <View style={{ position: "relative", marginVertical: 4 }}>
+              {pulseAnim && Animated?.View && (
+                <Animated.View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    borderRadius: 28,
+                    backgroundColor: C.brand,
+                    opacity: pulseAnim.interpolate({
+                      inputRange: [0, 0.25, 1],
+                      outputRange: [0, 0.32, 0],
+                    }),
+                    transform: [
+                      {
+                        scale: pulseAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.96, 1.12],
+                        }),
+                      },
+                    ],
+                  }}
+                />
+              )}
+              <BtnWrapper
+                style={btnScale ? { transform: [{ scale: btnScale }] } : undefined}
+              >
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Apriétame"
+                  accessibilityState={{ disabled: full }}
+                  disabled={full}
+                  onPressIn={handlePressIn}
+                  onPressOut={handlePressOut}
+                  onPress={triggerAprietame}
+                  style={{
+                    backgroundColor: full ? C.fill : C.brand,
+                    borderRadius: 26,
+                    paddingVertical: 15,
+                    paddingHorizontal: 22,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 10,
+                    shadowColor: C.brand,
+                    shadowOpacity: full ? 0 : 0.3,
+                    shadowRadius: 14,
+                    shadowOffset: { width: 0, height: 6 },
+                    elevation: full ? 0 : 7,
+                  }}
+                >
+                  <Icon
+                    name={qty > 0 ? "check" : "shopping-cart"}
+                    size={20}
+                    color={full ? C.faint : "#fff"}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 18,
+                      fontWeight: "800",
+                      color: full ? C.faint : "#fff",
+                      letterSpacing: 0.3,
+                    }}
+                  >
+                    {full ? "Sin más existencias" : "Apriétame"}
+                  </Text>
+                  {qty > 0 && (
+                    <View
+                      style={{
+                        backgroundColor: "rgba(255,255,255,0.24)",
+                        borderRadius: 14,
+                        paddingHorizontal: 10,
+                        paddingVertical: 3,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: "#fff",
+                          fontSize: 13,
+                          fontWeight: "700",
+                        }}
+                      >
+                        {`+${qty} en carrito`}
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
+              </BtnWrapper>
+            </View>
+
+            {/* Controles rápidos de cantidad cuando ya está en el carrito */}
+            {qty > 0 && (
+              <View
+                style={[
+                  s.between,
+                  {
+                    marginTop: 10,
+                    backgroundColor: C.brandSoft,
+                    borderRadius: 18,
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    s.body,
+                    { fontSize: 14, fontWeight: "700", color: C.brand },
+                  ]}
+                >
+                  {`En el carrito · ${qty} ${qty === 1 ? "pieza" : "piezas"}`}
+                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Quitar una de ${selected.flavor || selected.name}`}
+                    style={s.tileBtn}
+                    onPress={() => onRemove(selected.id)}
+                  >
+                    <Icon
+                      name={qty > 1 ? "minus" : "trash-2"}
+                      size={17}
+                      color={C.ink}
+                    />
+                  </Pressable>
+                  <Text
+                    style={[
+                      s.subtitle,
+                      { marginBottom: 0, minWidth: 22, textAlign: "center" },
+                    ]}
+                  >
+                    {String(qty)}
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Agregar otra de ${selected.flavor || selected.name}`}
+                    accessibilityState={{ disabled: full }}
+                    disabled={full}
+                    style={[
+                      s.tileBtn,
+                      { backgroundColor: C.brand },
+                      full && { opacity: 0.35 },
+                    ]}
+                    onPress={triggerAprietame}
+                  >
+                    <Icon name="plus" size={17} color="#fff" />
+                  </Pressable>
+                </View>
+              </View>
+            )}
           </ScrollView>
-          <View style={{ height: 8 }} />
+          <View style={{ height: 10 }} />
           {onCheckout && cartCount > 0 ? (
             <View style={[s.row, { gap: 8, marginVertical: 0 }]}>
               <Button title="Seguir" secondary flex onPress={onClose} />
-              <Button title={`Cobrar · ${cartCount} ${cartCount === 1 ? "pieza" : "piezas"}`} flex onPress={onCheckout} />
+              <Button
+                title={`Cobrar · ${cartCount} ${cartCount === 1 ? "pieza" : "piezas"}`}
+                flex
+                onPress={onCheckout}
+              />
             </View>
           ) : (
-            <Button title="Listo" onPress={onClose} />
+            <Button title="Listo" secondary onPress={onClose} />
           )}
         </View>
         <CartFlyLayer />
