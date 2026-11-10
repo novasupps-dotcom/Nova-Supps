@@ -955,8 +955,7 @@ export function ProductGrid({
   const tileWidth: any = width
     ? Math.floor((width - GAP * (cols - 1)) / cols)
     : "48%";
-  const count = (name: string) => index.counts.get(name) ?? 0;
-  // El lector con Enter abre la misma ficha que la cámara.
+    // El lector con Enter abre la misma ficha que la cámara.
   const submit = () => {
     showCode(query);
     setQuery("");
