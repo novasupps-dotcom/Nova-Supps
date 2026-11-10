@@ -564,7 +564,7 @@ export function CodeInput({
     </View>
   );
 }
-export function ProductPhoto({
+export function ProductGrid({
   product,
   index = 0,
   style,
@@ -1028,7 +1028,7 @@ export function ProductPhoto({
           style={{ marginBottom: 8 }}
           keyboardShouldPersistTaps="handled"
         >
-          {(openBrands ? [...segments, "Todos"] : [].map((name) => {
+          {(openBrands ? [...segments, "Todos"] : []).map((name) => {
             const on = name === current;
             return (
               <Pressable
@@ -1075,7 +1075,7 @@ export function ProductPhoto({
                 ]}
               >
                 <Text style={[s.chipText, on && s.chipTextOn, { fontSize: 12.5 }]}>
-                 {bName === "Todas las marcas" ? (openBrands ? "🏷️ Todas las marcas" : "⚙️ Filtrar por tipo o marca ▾" : (openBrands ? bName : `🏷️ Marca: ${bName} ▾`)}
+                 {bName === "Todas las marcas" ? (openBrands ? "🏷️ Todas las marcas" : "⚙️ Filtrar por tipo o marca ▾)" : (openBrands ? bName : `🏷️ Marca: ${bName} ▾`)}
                 </Text>
               </Pressable>
             );
