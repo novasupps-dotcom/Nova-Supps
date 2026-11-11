@@ -642,7 +642,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                 </>
               );
             })()}
-            {searchBox("Buscar cliente, folio o suplemento")}
+            {false && searchBox("Buscar cliente, folio o suplemento")}
             <View style={{ marginBottom: 6 }}>
               <Chips
                 row
@@ -934,7 +934,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
             onChange={(v) => setCorteDay(v || today())}
             quick={[
               { label: "Hoy", days: 0 },
-              { label: "Ayer", days: -1 },
+              { label: "Ayer", days: -1 }, { label: "Semana", days: -7 },
             ]}
             allowEmpty={false}
           />
