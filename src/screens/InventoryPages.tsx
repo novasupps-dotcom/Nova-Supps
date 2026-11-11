@@ -261,7 +261,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
             >
               <View style={{ flex: 1 }}>
                 <Text style={[s.body, { fontWeight: "600", color: C.ink }]}>
-                  {`Venta en espera · ${parkedCart.items.reduce((n, i) => n + i.qty, 0)} pzas (${parkedCart.at})`}
+                  {`Venta en espera · ${parkedCart?.items.reduce((n, i) => n + i.qty, 0)} pzas (${parkedCart?.at})`}
                 </Text>
               </View>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
