@@ -566,7 +566,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
       ...accounts
         .filter(
           (a) =>
-            (a.kind === "Banco" || a.kind === "Transferencia") && used.has(a.id),
+            (a.kind === "Banco" || a.kind === "Billetera") && used.has(a.id),
         )
         .map((a) => ({ id: "acct:" + a.id, name: `${a.name}` })),
       ...(accounts.some((a) => a.kind === "Tarjeta" && used.has(a.id))
