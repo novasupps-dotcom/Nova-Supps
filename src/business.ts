@@ -394,6 +394,8 @@ const KNOWN_BRANDS: [RegExp, string][] = [
   [/muscletech/i, "Muscletech"],
   [/raw\s*nutrition|\bcbum\b/i, "Raw Nutrition"],
   [/rule\s*1|\br1\b/i, "Rule 1"],
+  [/\bevogen(\s*nutrition)?\b/i, "Evogen"],
+  [/ghost\s*life/i, "Ghost Life"],
   [/\bghost\b/i, "Ghost"],
   [/universal|animal\s*pak/i, "Universal"],
   [/cellucor|\bc4\b/i, "Cellucor"],
@@ -411,7 +413,15 @@ export function productBrand(p: {
   category?: string | null;
 }): string {
   const explicit = String(p.brand || "").trim();
-  if (explicit && !/^(prote[ií]nas?|creatinas?|pre|pwo|bcaa|eaa|amino[aá]cidos?|vitaminas?|ganador|gainer)$/i.test(explicit)) return explicit;
+  if (
+    explicit &&
+    !/^(prote[ií]nas?|creatinas?|pre|pwo|bcaa|eaa|amino[aá]cidos?|vitaminas?|ganador|gainer)$/i.test(
+      explicit,
+    )
+  ) {
+    for (const [rx, label] of KNOWN_BRANDS) if (rx.test(explicit)) return label;
+    return explicit;
+  }
   const name = String(p.name || "").trim();
   for (const [rx, label] of KNOWN_BRANDS) if (rx.test(name)) return label;
   if (name.includes("·")) {

@@ -1,6 +1,6 @@
-# Nova Negocio - 2.10.12
+# Nova Negocio - 2.10.13
 
-**2.10.12 - Renderizado nativo instantáneo de imágenes en todas las pantallas (`Vender`, `Stock`, `Detalle producto`, `Editar producto`, `Carrito`, `Vendedor` y `Catálogo PDF`) con caché en memoria, downsampling nativo (`resizeMethod="resize"`), sin parpadeos (`fadeDuration={0}`) y cero impacto en base de datos (versionCode 74, solo JavaScript).**
+**2.10.13 - Selección múltiple de filtros en `Vender` (`Tipo de suplemento`, `Marca`, `Precio` y chips rápidos) con combinación inteligente de criterios sin cerrar el panel prematuramente y renderizado nativo instantáneo de imágenes en memoria (versionCode 75, solo JavaScript).**
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
 

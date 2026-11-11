@@ -1046,7 +1046,8 @@ export function ProductGrid({
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [onlyPromo, setOnlyPromo] = useState(false);
-  const [priceRange, setPriceRange] = useState<"all" | "under500" | "500to900" | "over900">("all");
+  type PriceBucket = "under500" | "500to900" | "over900";
+  const [selectedPrices, setSelectedPrices] = useState<PriceBucket[]>([]);
   const [priceSort, setPriceSort] = useState<"none" | "asc" | "desc">("none");
   const [openAcc, setOpenAcc] = useState<{ tipo: boolean; marca: boolean; precio: boolean }>({
     tipo: true,
@@ -1067,13 +1068,18 @@ export function ProductGrid({
     }
   }, [filterOpen, sheetAnim]);
 
-  // Texto de búsqueda, segmento y marca de cada producto se calculan una sola vez.
+  // Texto de búsqueda, segmento, marca y rango de precio de cada producto se calculan una sola vez.
   const index = useMemo(() => {
     const seg = new Map<string, string>();
     const brandMap = new Map<string, string>();
     const hay = new Map<string, string>();
     const counts = new Map<string, number>();
     const brandCounts = new Map<string, number>();
+    const priceCounts: Record<PriceBucket, number> = {
+      under500: 0,
+      "500to900": 0,
+      over900: 0,
+    };
     for (const p of products) {
       const g = saleSegment(p);
       const br = productBrand(p);
@@ -1081,6 +1087,9 @@ export function ProductGrid({
       brandMap.set(p.id, br);
       counts.set(g, (counts.get(g) ?? 0) + 1);
       if (br) brandCounts.set(br, (brandCounts.get(br) ?? 0) + 1);
+      if (p.price <= 50000) priceCounts.under500++;
+      else if (p.price <= 90000) priceCounts["500to900"]++;
+      else priceCounts.over900++;
       hay.set(
         p.id,
         fold(
@@ -1094,29 +1103,74 @@ export function ProductGrid({
       hay,
       counts,
       brandCounts,
+      priceCounts,
       segments: segmentsOf(products),
       brands: brandsOf(products),
     };
   }, [products]);
   const segments = index.segments;
-  const current =
-    segment && segments.includes(segment) ? segment : "Todos";
 
-  const priceRangeLabel: Record<typeof priceRange, string> = {
-    all: "Cualquier precio",
+  const parseSegments = (raw: string | undefined, valid: string[]): string[] => {
+    if (!raw || raw === "Todos") return [];
+    return raw
+      .split("|")
+      .map((s) => s.trim())
+      .filter((s) => s && s !== "Todos" && valid.includes(s));
+  };
+
+  const [selectedSegments, setSelectedSegments] = useState<string[]>(() =>
+    parseSegments(segment, segments),
+  );
+  const prevSegmentProp = useRef(segment);
+  useEffect(() => {
+    if (prevSegmentProp.current !== segment) {
+      prevSegmentProp.current = segment;
+      setSelectedSegments(parseSegments(segment, segments));
+    }
+  }, [segment, segments]);
+
+  const applySegments = (next: string[]) => {
+    const clean = next.filter((s) => segments.includes(s));
+    const serialized = clean.length === 0 ? "Todos" : clean.join("|");
+    prevSegmentProp.current = serialized;
+    setSelectedSegments(clean);
+    onSegment(serialized);
+  };
+
+  const toggleSegment = (name: string) => {
+    const next = selectedSegments.includes(name)
+      ? selectedSegments.filter((x) => x !== name)
+      : [...selectedSegments, name];
+    applySegments(next);
+  };
+
+  const togglePrice = (code: PriceBucket) => {
+    setSelectedPrices((prev) =>
+      prev.includes(code) ? prev.filter((x) => x !== code) : [...prev, code],
+    );
+  };
+
+  const priceRangeLabel: Record<PriceBucket, string> = {
     under500: "Hasta $500",
     "500to900": "$500 – $900",
     over900: "Más de $900",
   };
 
+  const matchesPriceBucket = (price: number, bucket: PriceBucket) => {
+    if (bucket === "under500") return price <= 50000;
+    if (bucket === "500to900") return price > 50000 && price <= 90000;
+    return price > 90000;
+  };
+
   // Chips de filtros activos para mostrar encima de los resultados y quitar con un toque.
   const activeChips = useMemo(() => {
     const chips: { key: string; label: string; clear: () => void }[] = [];
-    if (current !== "Todos") {
+    for (const segName of selectedSegments) {
       chips.push({
-        key: `seg:${current}`,
-        label: current,
-        clear: () => onSegment("Todos"),
+        key: `seg:${segName}`,
+        label: segName,
+        clear: () =>
+          applySegments(selectedSegments.filter((x) => x !== segName)),
       });
     }
     for (const br of selectedBrands) {
@@ -1140,11 +1194,11 @@ export function ProductGrid({
         clear: () => setOnlyPromo(false),
       });
     }
-    if (priceRange !== "all") {
+    for (const pr of selectedPrices) {
       chips.push({
-        key: `price:${priceRange}`,
-        label: priceRangeLabel[priceRange],
-        clear: () => setPriceRange("all"),
+        key: `price:${pr}`,
+        label: priceRangeLabel[pr],
+        clear: () => setSelectedPrices((prev) => prev.filter((x) => x !== pr)),
       });
     }
     if (priceSort !== "none") {
@@ -1155,14 +1209,22 @@ export function ProductGrid({
       });
     }
     return chips;
-  }, [current, selectedBrands, onlyAvailable, onlyPromo, priceRange, priceSort, onSegment]);
+  }, [
+    selectedSegments,
+    selectedBrands,
+    onlyAvailable,
+    onlyPromo,
+    selectedPrices,
+    priceSort,
+    segments,
+  ]);
 
   const clearAllFilters = () => {
-    onSegment("Todos");
+    applySegments([]);
     setSelectedBrands([]);
     setOnlyAvailable(false);
     setOnlyPromo(false);
-    setPriceRange("all");
+    setSelectedPrices([]);
     setPriceSort("none");
   };
 
@@ -1173,10 +1235,32 @@ export function ProductGrid({
   const shown = useMemo(() => {
     let base = q
       ? products.filter((p) => (index.hay.get(p.id) || "").includes(q))
-      : products.filter(
-          (p) => current === "Todos" || index.seg.get(p.id) === current,
-        );
-    if (selectedBrands.length > 0) {
+      : [...products];
+    if (!q && selectedSegments.length > 0 && selectedBrands.length > 0) {
+      const segSet = new Set(selectedSegments);
+      const brandSet = new Set(selectedBrands);
+      const brandsWithSegOverlap = new Set<string>();
+      const segsWithBrandOverlap = new Set<string>();
+      for (const p of base) {
+        const g = index.seg.get(p.id) || "";
+        const b = index.brandMap.get(p.id) || "";
+        if (segSet.has(g) && brandSet.has(b)) {
+          brandsWithSegOverlap.add(b);
+          segsWithBrandOverlap.add(g);
+        }
+      }
+      base = base.filter((p) => {
+        const g = index.seg.get(p.id) || "";
+        const b = index.brandMap.get(p.id) || "";
+        if (segSet.has(g) && brandSet.has(b)) return true;
+        if (brandSet.has(b) && !brandsWithSegOverlap.has(b)) return true;
+        if (segSet.has(g) && !segsWithBrandOverlap.has(g)) return true;
+        return false;
+      });
+    } else if (!q && selectedSegments.length > 0) {
+      const segSet = new Set(selectedSegments);
+      base = base.filter((p) => segSet.has(index.seg.get(p.id) || ""));
+    } else if (selectedBrands.length > 0) {
       const bSet = new Set(selectedBrands);
       base = base.filter((p) => bSet.has(index.brandMap.get(p.id) || ""));
     }
@@ -1188,23 +1272,21 @@ export function ProductGrid({
         (p) => !!p.tag || (expiringIds ? expiringIds.has(p.id) : false),
       );
     }
-    if (priceRange === "under500") {
-      base = base.filter((p) => p.price <= 50000);
-    } else if (priceRange === "500to900") {
-      base = base.filter((p) => p.price > 50000 && p.price <= 90000);
-    } else if (priceRange === "over900") {
-      base = base.filter((p) => p.price > 90000);
+    if (selectedPrices.length > 0) {
+      base = base.filter((p) =>
+        selectedPrices.some((bucket) => matchesPriceBucket(p.price, bucket)),
+      );
     }
     return base;
   }, [
     products,
     index,
     q,
-    current,
+    selectedSegments,
     selectedBrands,
     onlyAvailable,
     onlyPromo,
-    priceRange,
+    selectedPrices,
     limitOf,
     qtyOf,
     expiringIds,
@@ -1969,10 +2051,15 @@ export function ProductGrid({
                         style={{
                           fontSize: 12.5,
                           fontWeight: "600",
-                          color: current !== "Todos" ? C.brand : C.muted,
+                          color:
+                            selectedSegments.length > 0 ? C.brand : C.muted,
                         }}
                       >
-                        {current === "Todos" ? "Todo el stock" : current}
+                        {selectedSegments.length === 0
+                          ? "Todo el stock"
+                          : selectedSegments.length === 1
+                            ? selectedSegments[0]
+                            : `${selectedSegments.length} seleccionados`}
                       </Text>
                       <Icon
                         name="chevron-down"
@@ -1992,24 +2079,18 @@ export function ProductGrid({
                         key: "Todos",
                         label: "Todo el stock",
                         accessibilityLabel: "Categoría Todos",
-                        selected: current === "Todos",
+                        selected: selectedSegments.length === 0,
                         count: products.length,
-                        onPress: () => {
-                          onSegment("Todos");
-                          setFilterOpen(false);
-                        },
+                        onPress: () => applySegments([]),
                       })}
                       {segments.map((name) =>
                         renderCheckRow({
                           key: name,
                           label: name,
                           accessibilityLabel: `Categoría ${name}`,
-                          selected: current === name,
+                          selected: selectedSegments.includes(name),
                           count: index.counts.get(name) ?? 0,
-                          onPress: () => {
-                            onSegment(current === name ? "Todos" : name);
-                            setFilterOpen(false);
-                          },
+                          onPress: () => toggleSegment(name),
                         }),
                       )}
                     </View>
@@ -2068,9 +2149,11 @@ export function ProductGrid({
                               selectedBrands.length > 0 ? C.brand : C.muted,
                           }}
                         >
-                          {selectedBrands.length > 0
-                            ? `${selectedBrands.length} ${selectedBrands.length === 1 ? "seleccionada" : "seleccionadas"}`
-                            : "Todas"}
+                          {selectedBrands.length === 0
+                            ? "Todas"
+                            : selectedBrands.length === 1
+                              ? selectedBrands[0]
+                              : `${selectedBrands.length} seleccionadas`}
                         </Text>
                         <Icon
                           name="chevron-down"
@@ -2086,6 +2169,14 @@ export function ProductGrid({
                     </Pressable>
                     {openAcc.marca && (
                       <View>
+                        {renderCheckRow({
+                          key: "__all_brands__",
+                          label: "Todas las marcas",
+                          accessibilityLabel: "Marca Todas",
+                          selected: selectedBrands.length === 0,
+                          count: products.length,
+                          onPress: () => setSelectedBrands([]),
+                        })}
                         {index.brands.map((bName) =>
                           renderCheckRow({
                             key: bName,
@@ -2144,10 +2235,14 @@ export function ProductGrid({
                         style={{
                           fontSize: 12.5,
                           fontWeight: "600",
-                          color: priceRange !== "all" ? C.brand : C.muted,
+                          color: selectedPrices.length > 0 ? C.brand : C.muted,
                         }}
                       >
-                        {priceRangeLabel[priceRange]}
+                        {selectedPrices.length === 0
+                          ? "Cualquier precio"
+                          : selectedPrices.length === 1
+                            ? priceRangeLabel[selectedPrices[0]]
+                            : `${selectedPrices.length} seleccionados`}
                       </Text>
                       <Icon
                         name="chevron-down"
@@ -2163,9 +2258,16 @@ export function ProductGrid({
                   </Pressable>
                   {openAcc.precio && (
                     <View>
+                      {renderCheckRow({
+                        key: "all",
+                        label: "Cualquier precio",
+                        accessibilityLabel: "Precio Cualquier precio",
+                        selected: selectedPrices.length === 0,
+                        count: products.length,
+                        onPress: () => setSelectedPrices([]),
+                      })}
                       {(
                         [
-                          ["all", "Cualquier precio"],
                           ["under500", "Hasta $500"],
                           ["500to900", "$500 – $900"],
                           ["over900", "Más de $900"],
@@ -2175,8 +2277,9 @@ export function ProductGrid({
                           key: code,
                           label: lbl,
                           accessibilityLabel: `Precio ${lbl}`,
-                          selected: priceRange === code,
-                          onPress: () => setPriceRange(code),
+                          selected: selectedPrices.includes(code),
+                          count: index.priceCounts[code] ?? 0,
+                          onPress: () => togglePrice(code),
                         }),
                       )}
                     </View>

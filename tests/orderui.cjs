@@ -161,12 +161,20 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   assert(pressables((n) => /^Marca /.test(n.props.accessibilityLabel || "")).length > 0, "listado ordenado de Marca en acordeón");
   await act(async () => pressables((n) => n.props.accessibilityLabel === "Acordeón Precio")[0].props.onPress());
   assert(pressables((n) => n.props.accessibilityLabel === "Precio Cualquier precio").length === 1, "acordeón de Precio expandido");
+  // Selección múltiple en Tipo de suplemento sin cerrar el modal automáticamente
+  await act(async () => pressables((n) => n.props.accessibilityLabel === "Categoría Creatinas")[0].props.onPress());
+  assert(ui.root.findAll((n) => n.type === "Modal").length === 1, "el modal permanece abierto al seleccionar una categoría para permitir selección múltiple");
+  await act(async () => pressables((n) => n.props.accessibilityLabel === "Categoría PWO")[0].props.onPress());
+  assert(pressables((n) => n.props.accessibilityLabel === "Categoría Creatinas")[0].props.accessibilityState.selected === true, "Creatinas sigue seleccionada");
+  assert(pressables((n) => n.props.accessibilityLabel === "Categoría PWO")[0].props.accessibilityState.selected === true, "PWO también está seleccionada");
   await act(async () => pressables((n) => n.props.accessibilityLabel === "Filtro rápido En existencia")[0].props.onPress());
   await act(async () => pressables((n) => n.props.accessibilityLabel === "Cerrar filtros")[0].props.onPress());
   assert(!ui.root.findAll((n) => n.type === "Modal").length, "Modal Bottom Sheet cerrado");
+  assert(pressables((n) => n.props.accessibilityLabel === "Quitar filtro Creatinas").length === 1, "chip activo de Creatinas");
+  assert(pressables((n) => n.props.accessibilityLabel === "Quitar filtro PWO").length === 1, "chip activo de PWO");
   assert(pressables((n) => n.props.accessibilityLabel === "Quitar filtro En existencia").length === 1, "chip de filtro activo visible en la lista de resultados");
-  await act(async () => pressables((n) => n.props.accessibilityLabel === "Quitar filtro En existencia")[0].props.onPress());
-  assert(pressables((n) => n.props.accessibilityLabel === "Quitar filtro En existencia").length === 0, "chip de filtro activo eliminado con un toque");
+  await act(async () => pressables((n) => n.props.accessibilityLabel === "Ver todo el stock")[0].props.onPress());
+  assert(pressables((n) => n.props.accessibilityLabel === "Quitar filtro En existencia").length === 0, "todos los chips de filtro limpiados con un toque");
   await act(async () => pressables((n) => n.props.accessibilityLabel === "Agregar Creatine · GAT Sport · 1 kg")[0].props.onPress());
   assert.equal(cart[crea], 1, "+ agrega sin abrir la ficha");
   assert(!ui.root.findAll((n) => n.type === "Modal").length);
