@@ -135,14 +135,14 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   assert(text(modal).includes("Producto:") && text(modal).includes("Psychotic Black"), text(modal));
   assert(text(modal).includes("Servings:") && text(modal).includes("60 Servicios"), text(modal));
   assert(text(modal).includes("Sabor:"), "tiene sabores → muestra Sabor:");
+  assert(!text(modal).includes("Apriétame"), "sin botón Apriétame");
   await act(async () => pressables((n) => n.props.accessibilityLabel === "Agregar sabor Grape")[0].props.onPress());
-  await act(async () => pressables((n) => n.props.accessibilityLabel === "Apriétame")[0].props.onPress());
   const grapeId = grid.find((p) => p.flavor === "Grape").id;
   assert.equal(cart[grapeId], 1);
   issues.push(...screenIssues(ui, "sabores"));
   await act(async () => ui.unmount());
 
-  // 2.9 / 2.10.8 · Ficha minimalista "Acerca de": Marca, Producto, Servings (sin Sabor cuando es Sin Sabor), imagen garantizada y botón «Apriétame».
+  // 2.9 / 2.10.10 · Ficha minimalista "Acerca de": Marca, Producto, Servings (sin Sabor cuando es Sin Sabor), sin botón Apriétame y filtro en lista compacta.
   b.quickProduct({ id: crea, sku: "NS-CRE-003", name: "Creatine · GAT Sport · 1 kg", category: "Creatina", brand: "GAT Sport", flavor: "Sin Sabor", presentation: "1 kg", price: 64000, description: "Monohidrato de creatina micronizada." });
   const grid2 = b.stock().filter((p) => !p.archived);
   let checkout = 0;
@@ -150,9 +150,10 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   await act(async () => { ui = renderer.create(React.createElement(ProductGrid, props2())); });
   assert(!all().includes("Elegir de la lista"), "sin botón antiguo de filtro vertical");
   assert(pressables((n) => n.props.accessibilityLabel === "Filtrar por").length === 1, "botón Filtrar por embebido en Buscar producto");
-  assert(pressables((n) => n.props.accessibilityLabel === "Categoría Todos").length === 1, "Filter Chip Mostrar todos los productos visible");
+  assert(pressables((n) => /^Categoría /.test(n.props.accessibilityLabel || "")).length === 0, "sin barra horizontal de chips afuera de Filtrar");
   await act(async () => pressables((n) => n.props.accessibilityLabel === "Filtrar por")[0].props.onPress());
-  assert(pressables((n) => n.props.accessibilityLabel === "Filtrar por marca").length === 1, "Dropdown Pill de Marca visible al desplegar Filtrar por");
+  assert(pressables((n) => n.props.accessibilityLabel === "Categoría Todos").length === 1, "opción Todo el stock en lista de Filtrar");
+  assert(pressables((n) => /^Marca /.test(n.props.accessibilityLabel || "")).length > 0, "listado ordenado de Marca en Filtrar");
   await act(async () => pressables((n) => n.props.accessibilityLabel === "Filtrar por")[0].props.onPress());
   assert(!ui.root.findAll((n) => n.type === "Modal").length, "sin ficha abierta");
   await act(async () => pressables((n) => n.props.accessibilityLabel === "Agregar Creatine · GAT Sport · 1 kg")[0].props.onPress());
@@ -165,10 +166,10 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   assert(text(sheet).includes("Producto:") && text(sheet).includes("Creatine"), text(sheet));
   assert(text(sheet).includes("Servings:") && text(sheet).includes("1 kg"), text(sheet));
   assert(!text(sheet).includes("Sabor:"), "Sin Sabor no debe indicar renglón de Sabor");
+  assert(!text(sheet).includes("Apriétame"), "sin botón Apriétame");
   assert(text(sheet).includes("En el carrito"), text(sheet));
-  assert( text(sheet).includes("Apriétame"), text(sheet));
   issues.push(...screenIssues(ui, "ficha"));
-  await act(async () => pressables((n) => n.props.accessibilityLabel === "Apriétame")[0].props.onPress());
+  await act(async () => pressables((n) => n.props.accessibilityLabel === "Agregar otra de Sin Sabor")[0].props.onPress());
   assert.equal(cart[crea], 2);
   await act(async () => ui.update(React.createElement(ProductGrid, props2())));
   await press("Cobrar · 3 piezas");

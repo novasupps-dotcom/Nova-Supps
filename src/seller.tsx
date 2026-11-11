@@ -192,7 +192,7 @@ export function SellerApp({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
-  const [seg, setSeg] = useState("");
+  const [seg, setSeg] = useState("Todos");
   const [gridQuery, setGridQuery] = useState("");
   const [keyboard, setKeyboard] = useState(false);
   // 2.0.1 · Vender tiene dos pantallas separadas: productos y carrito (cliente, forma de pago y cobro).

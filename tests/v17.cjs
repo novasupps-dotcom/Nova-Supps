@@ -89,12 +89,17 @@ const day = (n) => addDays(require("../src/business.ts").today(), n);
 
   // ---------- 3. Venta por categoría con fotos ----------
   await tab("Vender");
-  const cats = ui.root.findAll((n) => n.type === "Pressable" && /^Categoría /.test(n.props.accessibilityLabel || "")).map((n) => n.props.accessibilityLabel.slice(10));
-  assert.deepEqual(cats.slice(0, 3), ["Creatinas", "Proteínas", "PWO"].filter((c) => cats.includes(c)).slice(0, 3), "orden: Creatinas, Proteínas, PWO…");
-  assert(cats.includes("Snacks") && cats.includes("Vitaminas") && cats.at(-1) === "Todos", JSON.stringify(cats));
   const prods = b.stock().filter((p) => !p.archived);
+  assert.deepEqual(tiles().sort(), prods.map((p) => p.name).sort(), "por default muestra todo el stock con fotos");
+  await pressLabel("Filtrar por");
+  const cats = ui.root.findAll((n) => n.type === "Pressable" && /^Categoría /.test(n.props.accessibilityLabel || "")).map((n) => n.props.accessibilityLabel.slice(10));
+  assert.equal(cats[0], "Todos", "Todo el stock arriba");
+  assert.deepEqual(cats.slice(1, 4), ["Creatinas", "Proteínas", "PWO"].filter((c) => cats.includes(c)).slice(0, 3), "orden: Creatinas, Proteínas, PWO…");
+  assert(cats.includes("Snacks") && cats.includes("Vitaminas"), JSON.stringify(cats));
+  await pressLabel("Categoría Creatinas");
   const creat = prods.filter((p) => saleSegment(p) === "Creatinas").map((p) => p.name).sort();
-  assert.deepEqual(tiles().sort(), creat, "primero muestra Creatinas con fotos");
+  assert.deepEqual(tiles().sort(), creat, "filtra Creatinas en 2 clics");
+  await pressLabel("Filtrar por");
   await pressLabel("Categoría PWO");
   const pwo = prods.filter((p) => saleSegment(p) === "PWO");
   assert.deepEqual(tiles().sort(), pwo.map((p) => p.name).sort(), "PWO");

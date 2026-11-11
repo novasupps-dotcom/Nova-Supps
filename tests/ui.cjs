@@ -38,7 +38,7 @@ async function flush(ms=800){await act(async()=>{await new Promise(r=>setTimeout
 (async()=>{
  global.__NOVA_SKIP_LOCK=true;require('./seed.cjs')(db).setSetting('appRole','owner');await act(async()=>{ui=renderer.create(React.createElement(App));});
  // 2.0: abre en Vender (categorías con fotos); el resumen está en Ventas → 📊 Resumen.
- assert(ui.root.findAll(n=>/^Categoría /.test(n.props.accessibilityLabel||'')).length>0,'abre en Vender');
+ assert(ui.root.findAll(n=>n.props.accessibilityLabel==='Filtrar por').length>0,'abre en Vender');
  await press('Ventas');assert(text(ui.root).includes('Vendido hoy'));await press('Resumen');await pressExact('Todo');
  const home=text(ui.root);
  for(const v of ['$5,409.00','$3,374.00','$1,116.00','$919.00','$37.30','$881.70','$5,371.70','$4,272.70'])assert(home.includes(v),'Resumen: '+v);

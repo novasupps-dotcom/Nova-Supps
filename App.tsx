@@ -304,7 +304,7 @@ function AppContent({ business }: { business?: Business }) {
     period: ExportPeriod;
     busy: boolean;
   } | null>(null);
-  const [saleSeg, setSaleSeg] = useState("");
+  const [saleSeg, setSaleSeg] = useState("Todos");
   const [gridMsg, setGridMsg] = useState("");
   // 1.8 · Carrito de compras: se llena desde Vender o Stock y se cobra desde el carrito.
   const [basket, setBasketState] = useState<Cart>([]);

@@ -1,6 +1,6 @@
-# Nova Negocio - 2.10.9
+# Nova Negocio - 2.10.10
 
-**2.10.9 - Rediseño de Vender: eliminación de Modo Kiosco, botón Filtrar embebido en Buscar producto (Filter Chips, Dropdown Pill de Marca y Toggle Switches), imagen garantizada en todos los productos, ficha minimalista «Acerca de» (Marca, Producto, Servings y Sabor condicional) y botón «Apriétame» con animación física (versionCode 71, solo JavaScript).**
+**2.10.10 - Vender optimizado: todo el stock por default, listado ordenado compacto (Tipo de suplemento y Marca) al tocar Filtrar sin barra horizontal de chips, ficha «Acerca de» homologada en fondo blanco uniforme sin franjas grises y eliminación del botón «Apriétame» (versionCode 72, solo JavaScript).**
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
 

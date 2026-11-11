@@ -65,7 +65,7 @@ const flush=async(n=6,ms=15)=>{for(let i=0;i<n;i++)await act(async()=>{await new
  const t=s.all();for(const banned of ['Corte de caja','Gastos operativos','Cuentas y movimientos','Eliminar','Costo'])assert(!t.includes(banned),'el vendedor no debe ver: '+banned);
  {const {screenIssues}=require('./screenCheck.cjs');const bad=[];
   for(const t of ['Vender','Stock','Mis ventas','Caja','Cuenta','Vender']){await s.press(t);await flush(2);bad.push(...screenIssues(seller,'vendedor · '+t));}
-  assert(seller.root.findAll(n=>/^Categoría /.test(n.props.accessibilityLabel||'')).length>0,'el vendedor vende por categoría');
+  assert(seller.root.findAll(n=>n.props.accessibilityLabel==='Filtrar por').length>0,'el vendedor vende por categoría');
   assert.deepEqual(bad,[],bad.join('\n'));}
  console.log('  ✓ vendedor entra con su código de un solo uso y solo ve vender, stock, sus ventas y cuenta (pantallas sin errores, venta por categoría)');
  // Venta en efectivo con cliente nuevo y límite de existencias
