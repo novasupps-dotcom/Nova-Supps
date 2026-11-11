@@ -1361,7 +1361,15 @@ export function SellerApp({
       <Card key={p.product_id}>
         <View style={s.productRow}>
           <ProductPhoto
-            product={{ ...p, id: p.product_id, imageKey: p.image_key }}
+            product={{
+              ...p,
+              id: p.product_id,
+              imageKey: p.image_key,
+              imageUri: p.scan_data?.imageUri || p.imageUri || "",
+              family: p.scan_data?.family || "",
+              familyName: p.scan_data?.familyName || "",
+              presentation: p.scan_data?.presentation || "",
+            }}
             style={s.productImage}
           />
           <View style={{ flex: 1 }}>
@@ -1464,7 +1472,15 @@ export function SellerApp({
             >
               {!!p && (
                 <ProductPhoto
-                  product={{ ...p, id: p.product_id, imageKey: p.image_key }}
+                  product={{
+                    ...p,
+                    id: p.product_id,
+                    imageKey: p.image_key,
+                    imageUri: p.scan_data?.imageUri || p.imageUri || "",
+                    family: p.scan_data?.family || "",
+                    familyName: p.scan_data?.familyName || "",
+                    presentation: p.scan_data?.presentation || "",
+                  }}
                   style={{ width: 48, height: 58 }}
                 />
               )}

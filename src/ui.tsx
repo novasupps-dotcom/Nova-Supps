@@ -608,20 +608,35 @@ const CATALOG_NAME_MATCHERS: [RegExp, string][] = [
   [/omega|salmon\s*oil/i, "NS-OME-001"],
 ];
 
-/** Resuelve la clave de imagen del catálogo para cualquier producto (incluyendo sabores con sufijo o importados). */
-export function resolveCatalogueKey(product: Row | null | undefined): string {
-  if (!product) return "NS-PRO-001";
+/** Caché en memoria de objetos source base64 y URIs fallidas para renderizado instantáneo sin presión de memoria ni consultas a BD. */
+const THUMB_SOURCE_CACHE = new Map<string, { uri: string }>();
+function getThumbSource(key: string | null | undefined): { uri: string } | null {
+  if (!key) return null;
+  let cached = THUMB_SOURCE_CACHE.get(key);
+  if (!cached) {
+    const b64 = catalogueThumbs[key];
+    if (!b64) return null;
+    cached = { uri: `data:image/jpeg;base64,${b64}` };
+    THUMB_SOURCE_CACHE.set(key, cached);
+  }
+  return cached;
+}
+const FAILED_URIS = new Set<string>();
+
+/** Devuelve la clave exacta o por nombre del catálogo nativo si el producto coincide con un artículo conocido. */
+export function directCatalogueKey(product: Row | null | undefined): string | null {
+  if (!product) return null;
   for (const raw of [product.imageKey, product.sku, product.id, product.family]) {
     const k = String(raw || "").trim();
     if (!k) continue;
-    if (catalogueImages[k]?.length) return k;
+    if (catalogueImages[k]?.length || catalogueThumbs[k]) return k;
     const m = /^(NS-[A-Z]{3}-\d{3})/i.exec(k);
     if (m) {
       const base = m[1].toUpperCase();
-      if (catalogueImages[base]?.length) return base;
+      if (catalogueImages[base]?.length || catalogueThumbs[base]) return base;
     }
   }
-  const text = `${product.familyName || ""} ${product.name || ""} ${product.brand || ""} ${product.presentation || ""}`;
+  const text = `${product.familyName || ""} ${product.sourceName || ""} ${product.name || ""} ${product.brand || ""} ${product.presentation || ""}`;
   if (/creatin/i.test(text)) {
     const isDragon = /dragon/i.test(text);
     const isSmall = /\b300\s*g\b/i.test(text);
@@ -630,8 +645,16 @@ export function resolveCatalogueKey(product: Row | null | undefined): string {
     return isSmall ? "NS-CRE-004" : "NS-CRE-003";
   }
   for (const [rx, key] of CATALOG_NAME_MATCHERS) {
-    if (rx.test(text) && catalogueImages[key]?.length) return key;
+    if (rx.test(text) && (catalogueImages[key]?.length || catalogueThumbs[key])) return key;
   }
+  return null;
+}
+
+/** Resuelve la clave de imagen del catálogo para cualquier producto (incluyendo sabores con sufijo o importados). */
+export function resolveCatalogueKey(product: Row | null | undefined): string {
+  const direct = directCatalogueKey(product);
+  if (direct) return direct;
+  if (!product) return "NS-PRO-001";
   const seg = saleSegment(product);
   const bySeg: Record<string, string> = {
     Creatinas: "NS-CRE-003",
@@ -640,6 +663,12 @@ export function resolveCatalogueKey(product: Row | null | undefined): string {
     Aminoácidos: "NS-AMI-001",
     Vitaminas: "NS-VIT-001",
     Snacks: "NS-BAR-001",
+    "Soporte hormonal": "NS-SOP-001",
+    "Quemadores de Grasa": "NS-CAR-001",
+    "Omega 3": "NS-OME-001",
+    Glutamina: "NS-GLU-001",
+    Ganadores: "NS-GAN-001",
+    Energía: "NS-CAF-001",
   };
   return bySeg[seg] || "NS-PRO-001";
 }
@@ -647,10 +676,12 @@ export function resolveCatalogueKey(product: Row | null | undefined): string {
 export function ProductPhoto({
   product,
   index = 0,
+  highRes = false,
   style,
 }: {
   product: Row;
   index?: number;
+  highRes?: boolean;
   style: any;
 }) {
   const [failedIndex, setFailedIndex] = useState(0);
@@ -666,62 +697,100 @@ export function ProductPhoto({
       product?.lookupCode,
     ],
   );
-  const resolvedKey = resolveCatalogueKey(product);
+  const directKey = directCatalogueKey(product);
+  const resolvedKey = directKey || resolveCatalogueKey(product);
   const images =
     catalogueImages[product?.imageKey] ||
     catalogueImages[product?.sku] ||
     catalogueImages[product?.id] ||
     catalogueImages[resolvedKey] ||
     [];
-  const thumbBase64 =
-    catalogueThumbs[product?.imageKey] ||
-    catalogueThumbs[product?.sku] ||
-    catalogueThumbs[product?.id] ||
-    catalogueThumbs[resolvedKey];
-  const thumbSource = thumbBase64
-    ? { uri: `data:image/jpeg;base64,${thumbBase64}` }
-    : null;
-  const uris = [
+  const thumbSource =
+    getThumbSource(product?.imageKey) ||
+    getThumbSource(product?.sku) ||
+    getThumbSource(product?.id) ||
+    getThumbSource(resolvedKey);
+  const rawUris = [
+    product?.imageUri,
     product?.cleanImageUri,
     ...(Array.isArray(product?.imageUris) ? product.imageUris : []),
-    product?.imageUri,
-  ]
-    .filter(
-      (uri, i, all) => typeof uri === "string" && uri && all.indexOf(uri) === i,
-    )
+  ].filter(
+    (uri, i, all): uri is string =>
+      typeof uri === "string" && !!uri && !FAILED_URIS.has(uri) && all.indexOf(uri) === i,
+  );
+  const localUris = rawUris
+    .filter((u) => /^(file|content|data|ph|assets-library):/i.test(u))
+    .map((uri) => ({ uri }));
+  const remoteUris = rawUris
+    .filter((u) => /^https?:/i.test(u))
     .map((uri) => ({ uri }));
   const verified = product ? verifiedProductImage(product) : null;
-  const sources = [verified, ...uris, images[0], thumbSource].filter(Boolean);
-  const source =
-    index === 0
-      ? sources[Math.min(failedIndex, Math.max(0, sources.length - 1))]
-      : images[index] || sources[0];
-  return source ? (
+  const useFullFirst = highRes || index > 0;
+  const catPrimary = useFullFirst
+    ? [images[index] || images[0], thumbSource]
+    : [thumbSource, images[0]];
+  const sources = (
+    directKey
+      ? [verified, ...localUris, ...catPrimary, ...remoteUris]
+      : [verified, ...localUris, ...remoteUris, ...catPrimary]
+  ).filter(Boolean);
+  const source: any = sources[Math.min(failedIndex, Math.max(0, sources.length - 1))];
+  const handleError = () => {
+    if (source && typeof source === "object" && typeof source.uri === "string" && !source.uri.startsWith("data:")) {
+      FAILED_URIS.add(source.uri);
+    }
+    setFailedIndex((value) => (value + 1 < sources.length ? value + 1 : value));
+  };
+  if (!source) {
+    return (
+      <View
+        style={[
+          style,
+          {
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: C.paper,
+            borderRadius: 10,
+          },
+        ]}
+      >
+        <Icon name="package" size={30} color={C.faint} />
+      </View>
+    );
+  }
+  if (useFullFirst && index === 0 && thumbSource && source !== thumbSource) {
+    return (
+      <View style={[style, { overflow: "hidden" }]}>
+        <Image
+          source={thumbSource}
+          resizeMode="contain"
+          fadeDuration={0}
+          accessible={false}
+          importantForAccessibility="no"
+          style={StyleSheet.absoluteFill}
+        />
+        <Image
+          source={source}
+          onError={handleError}
+          resizeMode="contain"
+          resizeMethod="resize"
+          fadeDuration={0}
+          style={{ width: "100%", height: "100%" }}
+          accessibilityLabel={product?.name || "Producto"}
+        />
+      </View>
+    );
+  }
+  return (
     <Image
       source={source}
-      onError={() =>
-        setFailedIndex((value) =>
-          value + 1 < sources.length ? value + 1 : value,
-        )
-      }
+      onError={handleError}
       resizeMode="contain"
+      resizeMethod="resize"
+      fadeDuration={0}
       style={style}
       accessibilityLabel={product?.name || "Producto"}
     />
-  ) : (
-    <View
-      style={[
-        style,
-        {
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: C.paper,
-          borderRadius: 10,
-        },
-      ]}
-    >
-      <Icon name="package" size={30} color={C.faint} />
-    </View>
   );
 }
 export type GridProduct = {
@@ -2330,6 +2399,7 @@ function ProductSheet({
             >
               <ProductPhoto
                 product={photo}
+                highRes
                 style={{ width: "100%", height: "100%" }}
               />
             </View>

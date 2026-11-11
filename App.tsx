@@ -103,6 +103,7 @@ import {
   SearchBox,
   ProductPhoto,
   ProductGrid,
+  directCatalogueKey,
   DateField,
   QUICK_FOLLOWUP,
   addDays,
@@ -3461,14 +3462,36 @@ function AppContent({ business }: { business?: Business }) {
     form === "Cliente" && val("id")
       ? customers.find((c) => c.id === val("id"))
       : null;
+  const previewMatchedKey = directCatalogueKey(
+    editingProduct
+      ? {
+          ...editingProduct,
+          name: val("name") || editingProduct.name,
+          sku: val("sku") || editingProduct.sku,
+          brand: val("brand") || editingProduct.brand,
+          presentation: val("presentation") || editingProduct.presentation,
+          imageKey: val("imageKey") || editingProduct.imageKey,
+        }
+      : {
+          id: val("id"),
+          name: val("name"),
+          sku: val("sku"),
+          brand: val("brand"),
+          presentation: val("presentation"),
+          imageKey: val("imageKey"),
+        },
+  );
   const photoPreview = f.imageUri
     ? [{ uri: f.imageUri }]
     : editingProduct?.imageUri
       ? [{ uri: editingProduct.imageUri }]
-      : catalogueImages[val("imageKey")] ||
-        catalogueImages[val("sku")] ||
-        catalogueImages[val("id")] ||
-        [];
+      : editingProduct?.cleanImageUri
+        ? [{ uri: editingProduct.cleanImageUri }]
+        : catalogueImages[val("imageKey")] ||
+          catalogueImages[val("sku")] ||
+          catalogueImages[val("id")] ||
+          (previewMatchedKey ? catalogueImages[previewMatchedKey] : null) ||
+          [];
 
   const payOverlay = (
     <PayOverlayModal

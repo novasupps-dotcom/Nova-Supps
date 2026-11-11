@@ -1097,12 +1097,25 @@ export function OwnerFormModal(props: {
                     {more()}
                     {advanced && (
                       <>
-                        {photoPreview.slice(0, 1).map((img: any, i: number) => (
-                          <Image
+                        {photoPreview.slice(0, 1).map((_: any, i: number) => (
+                          <ProductPhoto
                             key={i}
-                            source={img}
+                            product={{
+                              ...(editingProduct || {}),
+                              id: val("id") || editingProduct?.id,
+                              name: val("name") || editingProduct?.name,
+                              sku: val("sku") || editingProduct?.sku,
+                              brand: val("brand") || editingProduct?.brand,
+                              presentation:
+                                val("presentation") ||
+                                editingProduct?.presentation,
+                              imageKey:
+                                val("imageKey") || editingProduct?.imageKey,
+                              imageUri:
+                                val("imageUri") || editingProduct?.imageUri,
+                            }}
+                            highRes
                             style={s.photo}
-                            resizeMode="contain"
                           />
                         ))}
                         <Button

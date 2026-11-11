@@ -1,6 +1,6 @@
-# Nova Negocio - 2.10.11
+# Nova Negocio - 2.10.12
 
-**2.10.11 - Feed agrupado con cabeceros por Tipo de suplemento (`Creatinas`, `Proteínas`, `PWO`...) y panel de filtrado facetado en Modal Bottom Sheet con chips rápidos, acordeones progresivos y chips activos en resultados (versionCode 73, solo JavaScript).**
+**2.10.12 - Renderizado nativo instantáneo de imágenes en todas las pantallas (`Vender`, `Stock`, `Detalle producto`, `Editar producto`, `Carrito`, `Vendedor` y `Catálogo PDF`) con caché en memoria, downsampling nativo (`resizeMethod="resize"`), sin parpadeos (`fadeDuration={0}`) y cero impacto en base de datos (versionCode 74, solo JavaScript).**
 
 App de GGG · Nova Supps para Android e iPhone (Expo / React Native / SQLite): catálogo, inventario por lotes, ventas, caja, clientes y vendedores con su propio teléfono (Supabase). El teléfono del dueño es la caja central; los vendedores venden contra el catálogo y las existencias que el dueño publica.
 

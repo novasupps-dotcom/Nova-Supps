@@ -23,7 +23,7 @@ import { jpegSize } from "../pdf";
 import { base64ToBytes, bytesToBase64, compressJpegBase64, rgbToJpegBase64 } from "../photos";
 import { decodePng, isPng, shrinkRgb } from "../png";
 import { validWhatsapp, whatsappNumber } from "../receipt";
-import { Button, C, Card, Checkbox, Chips, Icon, MenuList, Note, SearchBox, fmtDay, s } from "../ui";
+import { Button, C, Card, Checkbox, Chips, Icon, MenuList, Note, SearchBox, fmtDay, resolveCatalogueKey, s } from "../ui";
 
 export { STORE_NAME } from "../theme";
 import { STORE_NAME, TILE } from "../theme";
@@ -55,7 +55,7 @@ export function catalogItems(
       segment,
       price: grossUp(Number(p.price), feeBps),
       tag: promos.length ? promoTagFor(promos, p.id, segment, day) : "",
-      imageKey: p.imageKey || p.sku || p.id,
+      imageKey: resolveCatalogueKey(p),
       out: Number(p.available) < 1,
       // Mismo orden que las fotos de la app: la del proveedor, las extra y la tuya.
       uris: [p.cleanImageUri, ...(Array.isArray(p.imageUris) ? p.imageUris : []), p.imageUri].filter(

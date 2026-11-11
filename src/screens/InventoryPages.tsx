@@ -14,6 +14,8 @@ import {
   daysBetween,
   fmtDay,
   followUpsDue,
+  productHasImage,
+  resolveCatalogueKey,
   s,
   MenuList,
   QuickActions,
@@ -125,6 +127,32 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
     }
     return m;
   })();
+  const familyPhoto = (() => {
+    let m = FAMILY_PHOTO_CACHE.get(d);
+    if (!m) {
+      m = new Map<string, any>();
+      for (const item of products) {
+        if (item.family && !m.has(item.family) && productHasImage(item)) {
+          m.set(item.family, item);
+        }
+      }
+      FAMILY_PHOTO_CACHE.set(d, m);
+    }
+    return m;
+  })();
+  const withFamilyPhoto = (p: any) => {
+    if (productHasImage(p) || !p.family) return p;
+    const sib = familyPhoto.get(p.family);
+    return sib
+      ? {
+          ...p,
+          imageUri: p.imageUri || sib.imageUri,
+          cleanImageUri: p.cleanImageUri || sib.cleanImageUri,
+          imageUris: p.imageUris || sib.imageUris,
+          imageKey: p.imageKey || sib.imageKey,
+        }
+      : p;
+  };
   const askMerge = (g: DuplicateGroup, keep: any) => {
     const others = g.products.filter((p) => p.id !== keep.id);
     const pieces = others.reduce((n, p) => n + (Number(p.stock) || 0), 0);
@@ -418,7 +446,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               onLongPress={() => (p.archived ? undefined : askDelete(p))}
             >
               <View style={s.productRow}>
-                <ProductPhoto product={p} style={{ width: 68, height: 84 }} />
+                <ProductPhoto product={withFamilyPhoto(p)} style={{ width: 68, height: 84 }} />
                 <View style={{ flex: 1 }}>
                   <View style={[s.between, { alignItems: "flex-start", gap: 8 }]}>
                     <Text style={[s.body, { fontWeight: "600", flex: 1 }]} numberOfLines={2}>
@@ -516,11 +544,14 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
     const p = products.find((x) => x.id === productDetailId);
     if (!p)
       return { scroll: <Note>Este producto ya no está disponible.</Note> };
-    const photos = p.imageUri
-      ? [{ uri: p.imageUri }]
-      : catalogueImages[p.imageKey] ||
-        catalogueImages[p.sku] ||
-        catalogueImages[p.id] ||
+    const photoProduct = withFamilyPhoto(p);
+    const resolvedKey = resolveCatalogueKey(photoProduct);
+    const photos = photoProduct.imageUri
+      ? [{ uri: photoProduct.imageUri }]
+      : catalogueImages[photoProduct.imageKey] ||
+        catalogueImages[photoProduct.sku] ||
+        catalogueImages[photoProduct.id] ||
+        catalogueImages[resolvedKey] ||
         [];
     return {
       scroll: (
@@ -538,8 +569,9 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               {(photos.length ? photos : [null]).map((_: any, i: number) => (
                 <ProductPhoto
                   key={i}
-                  product={p}
+                  product={photoProduct}
                   index={i}
+                  highRes
                   style={{
                     width: 145,
                     height: 190,
@@ -809,3 +841,4 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
 
 const DUP_CACHE = new WeakMap<object, DuplicateGroup[]>();
 const SOLD30_CACHE = new WeakMap<object, Map<string, number>>();
+const FAMILY_PHOTO_CACHE = new WeakMap<object, Map<string, any>>();
