@@ -974,7 +974,30 @@ export function ProductGrid({
   const setQuery = onQuery ?? setOwnQuery;
   const [width, setWidth] = useState(0);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [selectedBrand, setSelectedBrand] = useState("");
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+  const [onlyAvailable, setOnlyAvailable] = useState(false);
+  const [onlyPromo, setOnlyPromo] = useState(false);
+  const [priceRange, setPriceRange] = useState<"all" | "under500" | "500to900" | "over900">("all");
+  const [priceSort, setPriceSort] = useState<"none" | "asc" | "desc">("none");
+  const [openAcc, setOpenAcc] = useState<{ tipo: boolean; marca: boolean; precio: boolean }>({
+    tipo: true,
+    marca: true,
+    precio: false,
+  });
+  const sheetAnim = useRef(Animated ? new Animated.Value(0) : null).current;
+  useEffect(() => {
+    if (!sheetAnim || !Animated?.timing) return;
+    if (filterOpen) {
+      sheetAnim.setValue(0);
+      Animated.timing(sheetAnim, {
+        toValue: 1,
+        duration: 240,
+        easing: Easing?.out ? Easing.out(Easing.cubic) : undefined,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [filterOpen, sheetAnim]);
+
   // Texto de búsqueda, segmento y marca de cada producto se calculan una sola vez.
   const index = useMemo(() => {
     const seg = new Map<string, string>();
@@ -1009,12 +1032,74 @@ export function ProductGrid({
   const segments = index.segments;
   const current =
     segment && segments.includes(segment) ? segment : "Todos";
-  const hasActiveFilter = current !== "Todos" || !!selectedBrand;
-  const activeFilterLabel = selectedBrand
-    ? selectedBrand
-    : current !== "Todos"
-      ? current
-      : "Filtrar";
+
+  const priceRangeLabel: Record<typeof priceRange, string> = {
+    all: "Cualquier precio",
+    under500: "Hasta $500",
+    "500to900": "$500 – $900",
+    over900: "Más de $900",
+  };
+
+  // Chips de filtros activos para mostrar encima de los resultados y quitar con un toque.
+  const activeChips = useMemo(() => {
+    const chips: { key: string; label: string; clear: () => void }[] = [];
+    if (current !== "Todos") {
+      chips.push({
+        key: `seg:${current}`,
+        label: current,
+        clear: () => onSegment("Todos"),
+      });
+    }
+    for (const br of selectedBrands) {
+      chips.push({
+        key: `br:${br}`,
+        label: br,
+        clear: () => setSelectedBrands((prev) => prev.filter((x) => x !== br)),
+      });
+    }
+    if (onlyAvailable) {
+      chips.push({
+        key: "avail",
+        label: "En existencia",
+        clear: () => setOnlyAvailable(false),
+      });
+    }
+    if (onlyPromo) {
+      chips.push({
+        key: "promo",
+        label: "En oferta",
+        clear: () => setOnlyPromo(false),
+      });
+    }
+    if (priceRange !== "all") {
+      chips.push({
+        key: `price:${priceRange}`,
+        label: priceRangeLabel[priceRange],
+        clear: () => setPriceRange("all"),
+      });
+    }
+    if (priceSort !== "none") {
+      chips.push({
+        key: `sort:${priceSort}`,
+        label: priceSort === "asc" ? "Menor precio" : "Mayor precio",
+        clear: () => setPriceSort("none"),
+      });
+    }
+    return chips;
+  }, [current, selectedBrands, onlyAvailable, onlyPromo, priceRange, priceSort, onSegment]);
+
+  const clearAllFilters = () => {
+    onSegment("Todos");
+    setSelectedBrands([]);
+    setOnlyAvailable(false);
+    setOnlyPromo(false);
+    setPriceRange("all");
+    setPriceSort("none");
+  };
+
+  const hasActiveFilter = activeChips.length > 0;
+  const activeFilterLabel =
+    activeChips.length > 0 ? `Filtrar (${activeChips.length})` : "Filtrar";
   const q = fold(query.trim());
   const shown = useMemo(() => {
     let base = q
@@ -1022,8 +1107,24 @@ export function ProductGrid({
       : products.filter(
           (p) => current === "Todos" || index.seg.get(p.id) === current,
         );
-    if (selectedBrand) {
-      base = base.filter((p) => (index.brandMap.get(p.id) || "") === selectedBrand);
+    if (selectedBrands.length > 0) {
+      const bSet = new Set(selectedBrands);
+      base = base.filter((p) => bSet.has(index.brandMap.get(p.id) || ""));
+    }
+    if (onlyAvailable) {
+      base = base.filter((p) => limitOf(p.id) > 0 || qtyOf(p.id) > 0);
+    }
+    if (onlyPromo) {
+      base = base.filter(
+        (p) => !!p.tag || (expiringIds ? expiringIds.has(p.id) : false),
+      );
+    }
+    if (priceRange === "under500") {
+      base = base.filter((p) => p.price <= 50000);
+    } else if (priceRange === "500to900") {
+      base = base.filter((p) => p.price > 50000 && p.price <= 90000);
+    } else if (priceRange === "over900") {
+      base = base.filter((p) => p.price > 90000);
     }
     return base;
   }, [
@@ -1031,7 +1132,13 @@ export function ProductGrid({
     index,
     q,
     current,
-    selectedBrand,
+    selectedBrands,
+    onlyAvailable,
+    onlyPromo,
+    priceRange,
+    limitOf,
+    qtyOf,
+    expiringIds,
   ]);
   // 2.8: los sabores de un mismo producto se muestran como una sola tarjeta.
   type Entry =
@@ -1059,6 +1166,37 @@ export function ProductGrid({
     }
     return list;
   }, [shown]);
+
+  // Agrupación ordenada por Tipo de suplemento con su Cabecero (Creatinas, Proteínas, PWO, etc.)
+  const sections = useMemo(() => {
+    const entryName = (e: Entry) => (e.kind === "family" ? e.name : e.p.name);
+    const entryPrice = (e: Entry) =>
+      e.kind === "family"
+        ? Math.min(...e.members.map((m) => m.price))
+        : e.p.price;
+    const entrySeg = (e: Entry) =>
+      index.seg.get(e.kind === "family" ? e.members[0].id : e.p.id) || "Otros";
+
+    const bySeg = new Map<string, Entry[]>();
+    for (const e of entries) {
+      const g = entrySeg(e);
+      const arr = bySeg.get(g) || [];
+      arr.push(e);
+      bySeg.set(g, arr);
+    }
+    const orderedKeys = [
+      ...segments.filter((g) => bySeg.has(g)),
+      ...[...bySeg.keys()].filter((g) => !segments.includes(g)),
+    ];
+    return orderedKeys.map((segName) => {
+      const items = [...(bySeg.get(segName) || [])].sort((a, b) => {
+        if (priceSort === "asc") return entryPrice(a) - entryPrice(b);
+        if (priceSort === "desc") return entryPrice(b) - entryPrice(a);
+        return entryName(a).localeCompare(entryName(b), "es");
+      });
+      return { segment: segName, items };
+    });
+  }, [entries, index.seg, segments, priceSort]);
   const targetFamily =
     openFamily ||
     (openOne ? products.find((p) => p.id === openOne)?.family || null : null);
@@ -1104,7 +1242,273 @@ export function ProductGrid({
     showCode(query);
     setQuery("");
   };
+  const toggleBrand = (br: string) => {
+    setSelectedBrands((prev) =>
+      prev.includes(br) ? prev.filter((x) => x !== br) : [...prev, br],
+    );
+  };
   const filterBtnActive = filterOpen || hasActiveFilter;
+  const renderEntry = (entry: Entry) => {
+    if (entry.kind === "family") {
+      const qty = entry.members.reduce((n, m) => n + qtyOf(m.id), 0);
+      const left = entry.members.reduce(
+        (n, m) => n + Math.max(0, limitOf(m.id) - qtyOf(m.id)),
+        0,
+      );
+      const avail = entry.members.reduce(
+        (n, m) => n + (Number.isFinite(limitOf(m.id)) ? limitOf(m.id) : 0),
+        0,
+      );
+      const prices = entry.members.map((m) => m.price);
+      const low = Math.min(...prices);
+      const out = avail < 1 && qty < 1;
+      const photo =
+        entry.members.find((m) => productHasImage(m)) || entry.members[0];
+      return (
+        <View
+          key={"fam:" + entry.key}
+          style={[
+            s.tile,
+            { width: tileWidth },
+            qty > 0 && s.tileOn,
+            out && { opacity: 0.45 },
+          ]}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Elegir sabor de ${entry.name}`}
+            disabled={out}
+            onPress={() => setOpenFamily(entry.key)}
+          >
+            <View
+              style={[
+                s.tilePhoto,
+                { height: 124, backgroundColor: C.paper, padding: 6 },
+              ]}
+            >
+              <ProductPhoto
+                product={photo}
+                style={{ width: "100%", height: "100%" }}
+              />
+              {qty > 0 && (
+                <View style={s.tileBadge}>
+                  <Text style={s.tileBadgeText}>{qty}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={s.tileName} numberOfLines={2}>
+              {entry.name}
+            </Text>
+            <Text style={s.tilePrice}>
+              {(prices.some((x) => x !== low) ? "desde " : "") + money(low)}
+            </Text>
+            {avail > 0 &&
+              entry.members.some(
+                (m) => expiringIds?.has(m.id) && limitOf(m.id) > 0,
+              ) && (
+                <Text
+                  style={[s.tileTag, { color: C.amber }]}
+                  numberOfLines={1}
+                >
+                  Prioridad · vence pronto
+                </Text>
+              )}
+            <Text
+              style={[
+                s.tileStock,
+                { color: avail < 1 ? C.red : C.muted },
+              ]}
+            >
+              {`${entry.members.length} sabores · ${avail < 1 ? "sin existencias" : `${left} disponibles`}`}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Ver ${entry.name}`}
+            hitSlop={8}
+            style={[s.tileInfo, { backgroundColor: C.brandSoft }]}
+            onPress={() => setOpenFamily(entry.key)}
+          >
+            <Icon name="info" size={14} color={C.brand} />
+          </Pressable>
+        </View>
+      );
+    }
+    const p = entry.p;
+    const qty = qtyOf(p.id);
+    const max = limitOf(p.id);
+    const out = max < 1 && qty < 1;
+    const atMax = qty >= max;
+    return (
+      <View
+        key={p.id}
+        style={[
+          s.tile,
+          { width: tileWidth },
+          qty > 0 && s.tileOn,
+          out && { opacity: 0.45 },
+        ]}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Agregar ${p.name}`}
+          accessibilityState={{ disabled: out || atMax }}
+          disabled={out}
+          onPress={() => onAdd(p.id)}
+          onLongPress={() => setOpenOne(p.id)}
+        >
+          <View
+            style={[
+              s.tilePhoto,
+              { height: 124, backgroundColor: C.paper, padding: 6 },
+            ]}
+          >
+            <ProductPhoto
+              product={p}
+              style={{ width: "100%", height: "100%" }}
+            />
+            {qty > 0 && (
+              <View style={s.tileBadge}>
+                <Text style={s.tileBadgeText}>{qty}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={s.tileName} numberOfLines={2}>
+            {p.name}
+          </Text>
+          <Text style={s.tilePrice}>{money(p.price)}</Text>
+          {!!p.tag ? (
+            <Text style={s.tileTag} numberOfLines={1}>
+              {p.tag}
+            </Text>
+          ) : max > 0 && expiringIds?.has(p.id) ? (
+            <Text style={[s.tileTag, { color: C.amber }]} numberOfLines={1}>
+              Prioridad · vence pronto
+            </Text>
+          ) : null}
+          <Text
+            style={[
+              s.tileStock,
+              { color: max < 1 ? C.red : max <= 2 ? C.amber : C.muted },
+            ]}
+          >
+            {!Number.isFinite(max)
+              ? ""
+              : max < 1
+                ? qty
+                  ? "Ya no quedan más"
+                  : "Sin existencias"
+                : `${max} ${max === 1 ? "disponible" : "disponibles"}`}
+          </Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Ver ${p.name}`}
+          hitSlop={8}
+          style={[s.tileInfo, { backgroundColor: C.brandSoft }]}
+          onPress={() => setOpenOne(p.id)}
+        >
+          <Icon name="info" size={14} color={C.brand} />
+        </Pressable>
+        {qty > 0 && (
+          <View style={s.tileActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Quitar una de ${p.name}`}
+              style={s.tileBtn}
+              onPress={() => onRemove(p.id)}
+            >
+              <Icon
+                name={qty > 1 ? "minus" : "trash-2"}
+                size={18}
+                color={C.ink}
+              />
+            </Pressable>
+            <Text style={[s.subtitle, { marginBottom: 0 }]}>{qty}</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Agregar otra de ${p.name}`}
+              accessibilityState={{ disabled: atMax }}
+              style={[s.tileBtn, atMax && { opacity: 0.35 }]}
+              onPress={() => onAdd(p.id)}
+            >
+              <Icon name="plus" size={18} color={C.ink} />
+            </Pressable>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  const renderCheckRow = ({
+    key,
+    label,
+    accessibilityLabel,
+    selected,
+    count,
+    onPress,
+  }: {
+    key: string;
+    label: string;
+    accessibilityLabel: string;
+    selected: boolean;
+    count?: number;
+    onPress: () => void;
+  }) => (
+    <Pressable
+      key={key}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        backgroundColor: selected ? C.brandSoft : C.paper,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: C.line,
+      }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
+        <View
+          style={{
+            width: 20,
+            height: 20,
+            borderRadius: 6,
+            borderWidth: 1.5,
+            borderColor: selected ? C.brand : C.faint,
+            backgroundColor: selected ? C.brand : C.paper,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {selected && <Icon name="check" size={12} color="#fff" />}
+        </View>
+        <Text
+          style={{
+            fontSize: 14,
+            fontWeight: selected ? "700" : "500",
+            color: selected ? C.brand : C.ink,
+          }}
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
+      </View>
+      {count !== undefined && (
+        <Text style={{ fontSize: 12.5, color: C.muted, fontWeight: "600" }}>
+          {String(count)}
+        </Text>
+      )}
+    </Pressable>
+  );
+
+  const SheetBackdrop: any = sheetAnim && Animated?.View ? Animated.View : View;
+  const SheetPanel: any = sheetAnim && Animated?.View ? Animated.View : View;
+
   return (
     <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -1115,65 +1519,40 @@ export function ProductGrid({
             placeholder="Buscar producto"
             onSubmit={submit}
             right={
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                {hasActiveFilter && (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Ver todo el stock"
-                    onPress={() => {
-                      onSegment("Todos");
-                      setSelectedBrand("");
-                      setFilterOpen(false);
-                    }}
-                    hitSlop={6}
-                    style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: 12,
-                      backgroundColor: C.brandSoft,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Icon name="x" size={12} color={C.brand} />
-                  </Pressable>
-                )}
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Filtrar por"
-                  accessibilityState={{ expanded: filterOpen }}
-                  onPress={() => setFilterOpen((v) => !v)}
-                  hitSlop={6}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Filtrar por"
+                accessibilityState={{ expanded: filterOpen }}
+                onPress={() => setFilterOpen((v) => !v)}
+                hitSlop={6}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 5,
+                  paddingHorizontal: 11,
+                  paddingVertical: 6,
+                  borderRadius: 16,
+                  backgroundColor: filterBtnActive ? C.brand : C.paper,
+                  borderWidth: 1,
+                  borderColor: filterBtnActive ? C.brand : C.line,
+                }}
+              >
+                <Icon
+                  name="sliders-horizontal"
+                  size={13}
+                  color={filterBtnActive ? "#fff" : C.ink}
+                />
+                <Text
                   style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 5,
-                    paddingHorizontal: 11,
-                    paddingVertical: 6,
-                    borderRadius: 16,
-                    backgroundColor: filterBtnActive ? C.brand : C.paper,
-                    borderWidth: 1,
-                    borderColor: filterBtnActive ? C.brand : C.line,
+                    fontSize: 12.5,
+                    fontWeight: "600",
+                    color: filterBtnActive ? "#fff" : C.ink,
                   }}
+                  numberOfLines={1}
                 >
-                  <Icon
-                    name="sliders-horizontal"
-                    size={13}
-                    color={filterBtnActive ? "#fff" : C.ink}
-                  />
-                  <Text
-                    style={{
-                      fontSize: 12.5,
-                      fontWeight: "600",
-                      color: filterBtnActive ? "#fff" : C.ink,
-                      maxWidth: 110,
-                    }}
-                    numberOfLines={1}
-                  >
-                    {activeFilterLabel}
-                  </Text>
-                </Pressable>
-              </View>
+                  {activeFilterLabel}
+                </Text>
+              </Pressable>
             }
           />
         </View>
@@ -1226,403 +1605,576 @@ export function ProductGrid({
           </View>
         </Card>
       )}
-      {/* Listado compacto y ordenado (Tipo de suplemento y Marca) al tocar "Filtrar" */}
-      {!q && filterOpen && (
+
+      {/* Chips de filtros activos en la lista de resultados: muestran qué está aplicado y se quitan con un toque */}
+      {!q && activeChips.length > 0 && (
         <View
           style={{
-            backgroundColor: C.paper,
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: C.line,
+            flexDirection: "row",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 6,
             marginBottom: 10,
-            overflow: "hidden",
           }}
         >
-          {/* Opción superior para ver todo el stock en 1 clic */}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Categoría Todos"
-            accessibilityState={{ selected: !hasActiveFilter }}
-            onPress={() => {
-              onSegment("Todos");
-              setSelectedBrand("");
-              setFilterOpen(false);
-            }}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              backgroundColor: !hasActiveFilter ? C.brandSoft : C.paper,
-              borderBottomWidth: StyleSheet.hairlineWidth,
-              borderBottomColor: C.line,
-            }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              {!hasActiveFilter && (
-                <Icon name="check" size={13} color={C.brand} />
-              )}
-              <Text
-                style={{
-                  fontSize: 13,
-                  fontWeight: !hasActiveFilter ? "700" : "600",
-                  color: !hasActiveFilter ? C.brand : C.ink,
-                }}
-              >
-                Todo el stock
-              </Text>
-            </View>
-            <Text style={{ fontSize: 12, color: C.muted, fontWeight: "600" }}>
-              {String(products.length)}
-            </Text>
-          </Pressable>
-
-          {/* Dos columnas en forma de lista ordenada compacta (no ocupa media pantalla) */}
-          <View style={{ flexDirection: "row", maxHeight: 156 }}>
-            {/* Columna 1: Tipo de suplemento */}
-            <View
+          {activeChips.map((chip) => (
+            <Pressable
+              key={chip.key}
+              accessibilityRole="button"
+              accessibilityLabel={`Quitar filtro ${chip.label}`}
+              onPress={chip.clear}
               style={{
-                flex: 1,
-                borderRightWidth: StyleSheet.hairlineWidth,
-                borderRightColor: C.line,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 5,
+                paddingLeft: 11,
+                paddingRight: 8,
+                paddingVertical: 5,
+                borderRadius: 999,
+                backgroundColor: C.brandSoft,
+                borderWidth: 1,
+                borderColor: C.brand,
               }}
             >
               <Text
                 style={{
-                  fontSize: 11,
+                  fontSize: 12.5,
                   fontWeight: "700",
-                  color: C.muted,
-                  paddingHorizontal: 12,
-                  paddingTop: 6,
-                  paddingBottom: 4,
+                  color: C.brand,
                 }}
               >
-                TIPO DE SUPLEMENTO
+                {chip.label}
               </Text>
-              <ScrollView
-                style={{ maxHeight: 130 }}
-                nestedScrollEnabled
-                keyboardShouldPersistTaps="handled"
-              >
-                {segments.map((name) => {
-                  const on = current === name && !selectedBrand;
-                  const count = index.counts.get(name) ?? 0;
-                  return (
-                    <Pressable
-                      key={name}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Categoría ${name}`}
-                      accessibilityState={{ selected: on }}
-                      onPress={() => {
-                        onSegment(name);
-                        setSelectedBrand("");
-                        setFilterOpen(false);
-                      }}
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        paddingHorizontal: 12,
-                        paddingVertical: 7,
-                        backgroundColor: on ? C.brandSoft : C.paper,
-                        borderTopWidth: StyleSheet.hairlineWidth,
-                        borderTopColor: C.line,
-                      }}
-                    >
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 5,
-                          flex: 1,
-                        }}
-                      >
-                        {on && <Icon name="check" size={12} color={C.brand} />}
-                        <Text
-                          style={{
-                            fontSize: 13,
-                            fontWeight: on ? "700" : "500",
-                            color: on ? C.brand : C.ink,
-                          }}
-                          numberOfLines={1}
-                        >
-                          {name}
-                        </Text>
-                      </View>
-                      <Text style={{ fontSize: 11.5, color: C.muted }}>
-                        {String(count)}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </View>
-
-            {/* Columna 2: Marca */}
-            {index.brands.length > 0 && (
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={{
-                    fontSize: 11,
-                    fontWeight: "700",
-                    color: C.muted,
-                    paddingHorizontal: 12,
-                    paddingTop: 6,
-                    paddingBottom: 4,
-                  }}
-                >
-                  MARCA
-                </Text>
-                <ScrollView
-                  style={{ maxHeight: 130 }}
-                  nestedScrollEnabled
-                  keyboardShouldPersistTaps="handled"
-                >
-                  {index.brands.map((bName) => {
-                    const on = selectedBrand === bName;
-                    const count = index.brandCounts.get(bName) ?? 0;
-                    return (
-                      <Pressable
-                        key={bName}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Marca ${bName}`}
-                        accessibilityState={{ selected: on }}
-                        onPress={() => {
-                          setSelectedBrand(on ? "" : bName);
-                          onSegment("Todos");
-                          setFilterOpen(false);
-                        }}
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          paddingHorizontal: 12,
-                          paddingVertical: 7,
-                          backgroundColor: on ? C.brandSoft : C.paper,
-                          borderTopWidth: StyleSheet.hairlineWidth,
-                          borderTopColor: C.line,
-                        }}
-                      >
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: 5,
-                            flex: 1,
-                          }}
-                        >
-                          {on && <Icon name="check" size={12} color={C.brand} />}
-                          <Text
-                            style={{
-                              fontSize: 13,
-                              fontWeight: on ? "700" : "500",
-                              color: on ? C.brand : C.ink,
-                            }}
-                            numberOfLines={1}
-                          >
-                            {bName}
-                          </Text>
-                        </View>
-                        <Text style={{ fontSize: 11.5, color: C.muted }}>
-                          {String(count)}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            )}
-          </View>
+              <Icon name="x" size={12} color={C.brand} />
+            </Pressable>
+          ))}
+          {activeChips.length > 1 && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Ver todo el stock"
+              onPress={clearAllFilters}
+              style={{
+                paddingHorizontal: 9,
+                paddingVertical: 5,
+              }}
+            >
+              <Text style={{ fontSize: 12.5, fontWeight: "700", color: C.muted }}>
+                Limpiar todo
+              </Text>
+            </Pressable>
+          )}
         </View>
       )}
-      {!!q && (
-        <Note>{`${shown.length} ${shown.length === 1 ? "resultado" : "resultados"} en todas las categorías`}</Note>
-      )}
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: GAP }}>
-        {entries.map((entry) => {
-          if (entry.kind === "family") {
-            const qty = entry.members.reduce((n, m) => n + qtyOf(m.id), 0);
-            const left = entry.members.reduce(
-              (n, m) => n + Math.max(0, limitOf(m.id) - qtyOf(m.id)),
-              0,
-            );
-            const avail = entry.members.reduce(
-              (n, m) => n + (Number.isFinite(limitOf(m.id)) ? limitOf(m.id) : 0),
-              0,
-            );
-            const prices = entry.members.map((m) => m.price);
-            const low = Math.min(...prices);
-            const out = avail < 1 && qty < 1;
-            const photo =
-              entry.members.find((m) => productHasImage(m)) || entry.members[0];
-            return (
-              <View
-                key={"fam:" + entry.key}
-                style={[
-                  s.tile,
-                  { width: tileWidth },
-                  qty > 0 && s.tileOn,
-                  out && { opacity: 0.45 },
-                ]}
-              >
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Elegir sabor de ${entry.name}`}
-                  disabled={out}
-                  onPress={() => setOpenFamily(entry.key)}
-                >
-                  <View style={[s.tilePhoto, { height: 124, backgroundColor: C.paper, padding: 6 }]}>
-                    <ProductPhoto
-                      product={photo}
-                      style={{ width: "100%", height: "100%" }}
-                    />
-                    {qty > 0 && (
-                      <View style={s.tileBadge}>
-                        <Text style={s.tileBadgeText}>{qty}</Text>
-                      </View>
-                    )}
-                  </View>
-                  <Text style={s.tileName} numberOfLines={2}>
-                    {entry.name}
-                  </Text>
-                  <Text style={s.tilePrice}>
-                    {(prices.some((x) => x !== low) ? "desde " : "") +
-                      money(low)}
-                  </Text>
-                  {avail > 0 &&
-                    entry.members.some(
-                      (m) => expiringIds?.has(m.id) && limitOf(m.id) > 0,
-                    ) && (
-                      <Text
-                        style={[s.tileTag, { color: C.amber }]}
-                        numberOfLines={1}
-                      >
-                        Prioridad · vence pronto
-                      </Text>
-                    )}
-                  <Text
-                    style={[
-                      s.tileStock,
-                      { color: avail < 1 ? C.red : C.muted },
-                    ]}
-                  >
-                    {`${entry.members.length} sabores · ${avail < 1 ? "sin existencias" : `${left} disponibles`}`}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Ver ${entry.name}`}
-                  hitSlop={8}
-                  style={[s.tileInfo, { backgroundColor: C.brandSoft }]}
-                  onPress={() => setOpenFamily(entry.key)}
-                >
-                  <Icon name="info" size={14} color={C.brand} />
-                </Pressable>
-              </View>
-            );
-          }
-          const p = entry.p;
-          const qty = qtyOf(p.id);
-          const max = limitOf(p.id);
-          const out = max < 1 && qty < 1;
-          const atMax = qty >= max;
-          return (
-            <View
-              key={p.id}
+
+      {/* Modal Bottom Sheet de filtrado facetado (Material BottomSheet + Apple Sheets + Acordeones de divulgación progresiva) */}
+      {filterOpen && (
+        <Modal
+          visible
+          transparent
+          animationType="none"
+          onRequestClose={() => setFilterOpen(false)}
+        >
+          <View style={{ flex: 1, justifyContent: "flex-end" }}>
+            <SheetBackdrop
               style={[
-                s.tile,
-                { width: tileWidth },
-                qty > 0 && s.tileOn,
-                out && { opacity: 0.45 },
+                {
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  backgroundColor: "rgba(0,0,0,0.42)",
+                },
+                sheetAnim ? { opacity: sheetAnim } : null,
               ]}
             >
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Agregar ${p.name}`}
-                accessibilityState={{ disabled: out || atMax }}
-                disabled={out}
-                onPress={() => onAdd(p.id)}
-                onLongPress={() => setOpenOne(p.id)}
+                accessibilityLabel="Cerrar panel de filtros"
+                style={{ flex: 1 }}
+                onPress={() => setFilterOpen(false)}
+              />
+            </SheetBackdrop>
+
+            <SheetPanel
+              style={[
+                {
+                  backgroundColor: C.paper,
+                  borderTopLeftRadius: 26,
+                  borderTopRightRadius: 26,
+                  paddingHorizontal: 16,
+                  paddingTop: 10,
+                  paddingBottom: 16,
+                  maxHeight: "78%",
+                },
+                sheetAnim
+                  ? {
+                      transform: [
+                        {
+                          translateY: sheetAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [220, 0],
+                          }),
+                        },
+                      ],
+                    }
+                  : null,
+              ]}
+            >
+              {/* Indicador superior de arrastre (Bottom Sheet drag handle) */}
+              <View
+                style={{
+                  width: 38,
+                  height: 4,
+                  borderRadius: 2,
+                  backgroundColor: C.line,
+                  alignSelf: "center",
+                  marginBottom: 10,
+                }}
+              />
+
+              {/* Cabecera del Bottom Sheet con botón X */}
+              <View style={[s.between, { marginBottom: 12 }]}>
+                <Text style={{ fontSize: 18, fontWeight: "800", color: C.ink }}>
+                  Filtrar productos
+                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  {hasActiveFilter && (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Limpiar filtros"
+                      onPress={clearAllFilters}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 999,
+                        backgroundColor: C.fill,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: "700",
+                          color: C.brand,
+                        }}
+                      >
+                        Restablecer
+                      </Text>
+                    </Pressable>
+                  )}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Cerrar filtros"
+                    onPress={() => setFilterOpen(false)}
+                    hitSlop={8}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 16,
+                      backgroundColor: C.fill,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Icon name="x" size={16} color={C.ink} />
+                  </Pressable>
+                </View>
+              </View>
+
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
               >
-                <View style={[s.tilePhoto, { height: 124, backgroundColor: C.paper, padding: 6 }]}>
-                  <ProductPhoto
-                    product={p}
-                    style={{ width: "100%", height: "100%" }}
-                  />
-                  {qty > 0 && (
-                    <View style={s.tileBadge}>
-                      <Text style={s.tileBadgeText}>{qty}</Text>
+                {/* 1. Chips de filtro rápidos (Android Filter Chips para 2-4 opciones rápidas) */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    marginBottom: 14,
+                  }}
+                >
+                  {[
+                    {
+                      key: "avail",
+                      label: "En existencia",
+                      active: onlyAvailable,
+                      onPress: () => setOnlyAvailable((v) => !v),
+                    },
+                    {
+                      key: "promo",
+                      label: "En oferta",
+                      active: onlyPromo,
+                      onPress: () => setOnlyPromo((v) => !v),
+                    },
+                    {
+                      key: "asc",
+                      label: "Menor precio",
+                      active: priceSort === "asc",
+                      onPress: () =>
+                        setPriceSort((v) => (v === "asc" ? "none" : "asc")),
+                    },
+                    {
+                      key: "desc",
+                      label: "Mayor precio",
+                      active: priceSort === "desc",
+                      onPress: () =>
+                        setPriceSort((v) => (v === "desc" ? "none" : "desc")),
+                    },
+                  ].map((chip) => (
+                    <Pressable
+                      key={chip.key}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Filtro rápido ${chip.label}`}
+                      accessibilityState={{ selected: chip.active }}
+                      onPress={chip.onPress}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 6,
+                        paddingHorizontal: 13,
+                        paddingVertical: 7,
+                        borderRadius: 999,
+                        backgroundColor: chip.active ? C.brand : C.fill,
+                        borderWidth: 1,
+                        borderColor: chip.active ? C.brand : C.line,
+                      }}
+                    >
+                      {chip.active && (
+                        <Icon name="check" size={13} color="#fff" />
+                      )}
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: chip.active ? "700" : "600",
+                          color: chip.active ? "#fff" : C.ink,
+                        }}
+                      >
+                        {chip.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                {/* 2. Divulgación progresiva con grupos desplegables (Acordeones): Tipo, Marca, Precio */}
+                {/* Acordeón 1: Tipo de suplemento */}
+                <View
+                  style={{
+                    borderRadius: 16,
+                    borderWidth: 1,
+                    borderColor: C.line,
+                    marginBottom: 10,
+                    overflow: "hidden",
+                    backgroundColor: C.paper,
+                  }}
+                >
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Acordeón Tipo de suplemento"
+                    accessibilityState={{ expanded: openAcc.tipo }}
+                    onPress={() =>
+                      setOpenAcc((prev) => ({ ...prev, tipo: !prev.tipo }))
+                    }
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      paddingHorizontal: 14,
+                      paddingVertical: 12,
+                      backgroundColor: C.paper,
+                    }}
+                  >
+                    <Text
+                      style={{ fontSize: 15, fontWeight: "700", color: C.ink }}
+                    >
+                      Tipo de suplemento
+                    </Text>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: "600",
+                          color: current !== "Todos" ? C.brand : C.muted,
+                        }}
+                      >
+                        {current === "Todos" ? "Todo el stock" : current}
+                      </Text>
+                      <Icon
+                        name="chevron-down"
+                        size={16}
+                        color={C.muted}
+                        style={
+                          openAcc.tipo
+                            ? { transform: [{ rotate: "180deg" }] }
+                            : undefined
+                        }
+                      />
+                    </View>
+                  </Pressable>
+                  {openAcc.tipo && (
+                    <View>
+                      {renderCheckRow({
+                        key: "Todos",
+                        label: "Todo el stock",
+                        accessibilityLabel: "Categoría Todos",
+                        selected: current === "Todos",
+                        count: products.length,
+                        onPress: () => {
+                          onSegment("Todos");
+                          setFilterOpen(false);
+                        },
+                      })}
+                      {segments.map((name) =>
+                        renderCheckRow({
+                          key: name,
+                          label: name,
+                          accessibilityLabel: `Categoría ${name}`,
+                          selected: current === name,
+                          count: index.counts.get(name) ?? 0,
+                          onPress: () => {
+                            onSegment(current === name ? "Todos" : name);
+                            setFilterOpen(false);
+                          },
+                        }),
+                      )}
                     </View>
                   )}
                 </View>
-                <Text style={s.tileName} numberOfLines={2}>
-                  {p.name}
-                </Text>
-                <Text style={s.tilePrice}>{money(p.price)}</Text>
-                {!!p.tag ? (
-                  <Text style={s.tileTag} numberOfLines={1}>
-                    {p.tag}
-                  </Text>
-                ) : max > 0 && expiringIds?.has(p.id) ? (
-                  <Text style={[s.tileTag, { color: C.amber }]} numberOfLines={1}>
-                    Prioridad · vence pronto
-                  </Text>
-                ) : null}
-                <Text
-                  style={[
-                    s.tileStock,
-                    { color: max < 1 ? C.red : max <= 2 ? C.amber : C.muted },
-                  ]}
+
+                {/* Acordeón 2: Marca */}
+                {index.brands.length > 0 && (
+                  <View
+                    style={{
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: C.line,
+                      marginBottom: 10,
+                      overflow: "hidden",
+                      backgroundColor: C.paper,
+                    }}
+                  >
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Acordeón Marca"
+                      accessibilityState={{ expanded: openAcc.marca }}
+                      onPress={() =>
+                        setOpenAcc((prev) => ({ ...prev, marca: !prev.marca }))
+                      }
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        paddingHorizontal: 14,
+                        paddingVertical: 12,
+                        backgroundColor: C.paper,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 15,
+                          fontWeight: "700",
+                          color: C.ink,
+                        }}
+                      >
+                        Marca
+                      </Text>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 12.5,
+                            fontWeight: "600",
+                            color:
+                              selectedBrands.length > 0 ? C.brand : C.muted,
+                          }}
+                        >
+                          {selectedBrands.length > 0
+                            ? `${selectedBrands.length} ${selectedBrands.length === 1 ? "seleccionada" : "seleccionadas"}`
+                            : "Todas"}
+                        </Text>
+                        <Icon
+                          name="chevron-down"
+                          size={16}
+                          color={C.muted}
+                          style={
+                            openAcc.marca
+                              ? { transform: [{ rotate: "180deg" }] }
+                              : undefined
+                          }
+                        />
+                      </View>
+                    </Pressable>
+                    {openAcc.marca && (
+                      <View>
+                        {index.brands.map((bName) =>
+                          renderCheckRow({
+                            key: bName,
+                            label: bName,
+                            accessibilityLabel: `Marca ${bName}`,
+                            selected: selectedBrands.includes(bName),
+                            count: index.brandCounts.get(bName) ?? 0,
+                            onPress: () => toggleBrand(bName),
+                          }),
+                        )}
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                {/* Acordeón 3: Precio */}
+                <View
+                  style={{
+                    borderRadius: 16,
+                    borderWidth: 1,
+                    borderColor: C.line,
+                    marginBottom: 8,
+                    overflow: "hidden",
+                    backgroundColor: C.paper,
+                  }}
                 >
-                  {!Number.isFinite(max)
-                    ? ""
-                    : max < 1
-                      ? qty
-                        ? "Ya no quedan más"
-                        : "Sin existencias"
-                      : `${max} ${max === 1 ? "disponible" : "disponibles"}`}
-                </Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Ver ${p.name}`}
-                hitSlop={8}
-                style={[s.tileInfo, { backgroundColor: C.brandSoft }]}
-                onPress={() => setOpenOne(p.id)}
-              >
-                <Icon name="info" size={14} color={C.brand} />
-              </Pressable>
-              {qty > 0 && (
-                <View style={s.tileActions}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`Quitar una de ${p.name}`}
-                    style={s.tileBtn}
-                    onPress={() => onRemove(p.id)}
+                    accessibilityLabel="Acordeón Precio"
+                    accessibilityState={{ expanded: openAcc.precio }}
+                    onPress={() =>
+                      setOpenAcc((prev) => ({ ...prev, precio: !prev.precio }))
+                    }
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      paddingHorizontal: 14,
+                      paddingVertical: 12,
+                      backgroundColor: C.paper,
+                    }}
                   >
-                    <Icon
-                      name={qty > 1 ? "minus" : "trash-2"}
-                      size={18}
-                      color={C.ink}
-                    />
+                    <Text
+                      style={{ fontSize: 15, fontWeight: "700", color: C.ink }}
+                    >
+                      Precio
+                    </Text>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: "600",
+                          color: priceRange !== "all" ? C.brand : C.muted,
+                        }}
+                      >
+                        {priceRangeLabel[priceRange]}
+                      </Text>
+                      <Icon
+                        name="chevron-down"
+                        size={16}
+                        color={C.muted}
+                        style={
+                          openAcc.precio
+                            ? { transform: [{ rotate: "180deg" }] }
+                            : undefined
+                        }
+                      />
+                    </View>
                   </Pressable>
-                  <Text style={[s.subtitle, { marginBottom: 0 }]}>{qty}</Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Agregar otra de ${p.name}`}
-                    accessibilityState={{ disabled: atMax }}
-                    style={[s.tileBtn, atMax && { opacity: 0.35 }]}
-                    onPress={() => onAdd(p.id)}
-                  >
-                    <Icon name="plus" size={18} color={C.ink} />
-                  </Pressable>
+                  {openAcc.precio && (
+                    <View>
+                      {(
+                        [
+                          ["all", "Cualquier precio"],
+                          ["under500", "Hasta $500"],
+                          ["500to900", "$500 – $900"],
+                          ["over900", "Más de $900"],
+                        ] as const
+                      ).map(([code, lbl]) =>
+                        renderCheckRow({
+                          key: code,
+                          label: lbl,
+                          accessibilityLabel: `Precio ${lbl}`,
+                          selected: priceRange === code,
+                          onPress: () => setPriceRange(code),
+                        }),
+                      )}
+                    </View>
+                  )}
                 </View>
-              )}
+              </ScrollView>
+
+              <View style={{ height: 10 }} />
+              <Button
+                title={`Ver resultados (${shown.length})`}
+                onPress={() => setFilterOpen(false)}
+              />
+            </SheetPanel>
+          </View>
+        </Modal>
+      )}
+
+      {!!q && (
+        <Note>{`${shown.length} ${shown.length === 1 ? "resultado" : "resultados"} en todas las categorías`}</Note>
+      )}
+
+      {/* Feed agrupado por Cabecero de Tipo de suplemento y productos ordenados */}
+      {sections.map((sec, idx) => (
+        <View
+          key={sec.segment}
+          style={{ marginTop: idx === 0 ? 2 : 18, marginBottom: 4 }}
+        >
+          <View
+            accessibilityRole="header"
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 8,
+              paddingHorizontal: 4,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 20,
+                fontWeight: "800",
+                color: C.ink,
+                letterSpacing: -0.3,
+              }}
+            >
+              {sec.segment}
+            </Text>
+            <View
+              style={{
+                backgroundColor: C.fill,
+                borderRadius: 12,
+                paddingHorizontal: 9,
+                paddingVertical: 2,
+              }}
+            >
+              <Text
+                style={{ fontSize: 12, fontWeight: "700", color: C.muted }}
+              >
+                {String(sec.items.length)}
+              </Text>
             </View>
-          );
-        })}
-      </View>
+          </View>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: GAP }}>
+            {sec.items.map(renderEntry)}
+          </View>
+        </View>
+      ))}
       {!shown.length && (
         <Note>
           {q ? "No hay coincidencias." : "No hay productos en esta categoría."}

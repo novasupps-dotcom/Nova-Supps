@@ -142,7 +142,7 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   issues.push(...screenIssues(ui, "sabores"));
   await act(async () => ui.unmount());
 
-  // 2.9 / 2.10.10 · Ficha minimalista "Acerca de": Marca, Producto, Servings (sin Sabor cuando es Sin Sabor), sin botón Apriétame y filtro en lista compacta.
+  // 2.9 / 2.10.11 · Feed con cabeceros por Tipo de suplemento, filtrado facetado (Modal Bottom Sheet, chips rápidos, acordeones y chips activos) y ficha minimalista "Acerca de".
   b.quickProduct({ id: crea, sku: "NS-CRE-003", name: "Creatine · GAT Sport · 1 kg", category: "Creatina", brand: "GAT Sport", flavor: "Sin Sabor", presentation: "1 kg", price: 64000, description: "Monohidrato de creatina micronizada." });
   const grid2 = b.stock().filter((p) => !p.archived);
   let checkout = 0;
@@ -151,11 +151,22 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   assert(!all().includes("Elegir de la lista"), "sin botón antiguo de filtro vertical");
   assert(pressables((n) => n.props.accessibilityLabel === "Filtrar por").length === 1, "botón Filtrar por embebido en Buscar producto");
   assert(pressables((n) => /^Categoría /.test(n.props.accessibilityLabel || "")).length === 0, "sin barra horizontal de chips afuera de Filtrar");
+  const headers = ui.root.findAll((n) => n.props?.accessibilityRole === "header").map((n) => text(n));
+  assert(headers.some((h) => h.includes("Creatinas")) && headers.some((h) => h.includes("PWO")), `cabeceros por Tipo de suplemento en el feed: ${headers.join(", ")}`);
   await act(async () => pressables((n) => n.props.accessibilityLabel === "Filtrar por")[0].props.onPress());
-  assert(pressables((n) => n.props.accessibilityLabel === "Categoría Todos").length === 1, "opción Todo el stock en lista de Filtrar");
-  assert(pressables((n) => /^Marca /.test(n.props.accessibilityLabel || "")).length > 0, "listado ordenado de Marca en Filtrar");
-  await act(async () => pressables((n) => n.props.accessibilityLabel === "Filtrar por")[0].props.onPress());
-  assert(!ui.root.findAll((n) => n.type === "Modal").length, "sin ficha abierta");
+  assert(ui.root.findAll((n) => n.type === "Modal").length === 1, "Modal Bottom Sheet de filtros abierto");
+  assert(pressables((n) => n.props.accessibilityLabel === "Filtro rápido En existencia").length === 1, "chip rápido En existencia");
+  assert(pressables((n) => n.props.accessibilityLabel === "Filtro rápido En oferta").length === 1, "chip rápido En oferta");
+  assert(pressables((n) => n.props.accessibilityLabel === "Categoría Todos").length === 1, "opción Todo el stock en acordeón Tipo de suplemento");
+  assert(pressables((n) => /^Marca /.test(n.props.accessibilityLabel || "")).length > 0, "listado ordenado de Marca en acordeón");
+  await act(async () => pressables((n) => n.props.accessibilityLabel === "Acordeón Precio")[0].props.onPress());
+  assert(pressables((n) => n.props.accessibilityLabel === "Precio Cualquier precio").length === 1, "acordeón de Precio expandido");
+  await act(async () => pressables((n) => n.props.accessibilityLabel === "Filtro rápido En existencia")[0].props.onPress());
+  await act(async () => pressables((n) => n.props.accessibilityLabel === "Cerrar filtros")[0].props.onPress());
+  assert(!ui.root.findAll((n) => n.type === "Modal").length, "Modal Bottom Sheet cerrado");
+  assert(pressables((n) => n.props.accessibilityLabel === "Quitar filtro En existencia").length === 1, "chip de filtro activo visible en la lista de resultados");
+  await act(async () => pressables((n) => n.props.accessibilityLabel === "Quitar filtro En existencia")[0].props.onPress());
+  assert(pressables((n) => n.props.accessibilityLabel === "Quitar filtro En existencia").length === 0, "chip de filtro activo eliminado con un toque");
   await act(async () => pressables((n) => n.props.accessibilityLabel === "Agregar Creatine · GAT Sport · 1 kg")[0].props.onPress());
   assert.equal(cart[crea], 1, "+ agrega sin abrir la ficha");
   assert(!ui.root.findAll((n) => n.type === "Modal").length);
