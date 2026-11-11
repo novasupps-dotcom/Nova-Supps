@@ -1,4 +1,6 @@
-# Nova Negocio - 2.10.13
+# Nova Negocio - 2.10.14
+
+**2.10.14 - Se elimina por completo la sugerencia �Stack Base� (venta cruzada) de Vender y del carrito (versionCode 76, solo JavaScript).**
 
 **2.10.13 - Selección múltiple de filtros en `Vender` (`Tipo de suplemento`, `Marca`, `Precio` y chips rápidos) con combinación inteligente de criterios sin cerrar el panel prematuramente y renderizado nativo instantáneo de imágenes en memoria (versionCode 75, solo JavaScript).**
 

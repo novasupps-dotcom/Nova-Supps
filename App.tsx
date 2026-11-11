@@ -22,7 +22,6 @@ import {
   promoSummary,
   promoTagFor,
   saleSegment,
-  jordanianStack,
   type PromoHit,
   type Row,
 } from "./src/business";
@@ -3377,40 +3376,6 @@ function AppContent({ business }: { business?: Business }) {
           })}
         </View>
       )}
-      {form === "Venta" && !!cart.length && (() => {
-        const jStack = jordanianStack(b!, gridProducts as any, cart, val("customerId") || null);
-        if (jStack.complete || !jStack.items.length) return null;
-        return (
-          <View style={{ marginBottom: 8, gap: 4 }}>
-            <Text style={[s.label, { marginBottom: 0, color: C.brand }]}>{jStack.label}</Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-              {jStack.items.map((sug: any) => (
-                <Pressable
-                  key={sug.id}
-                  accessibilityRole="button"
-                  onPress={() => addOne(sug.id)}
-                  style={[
-                    s.chip,
-                    {
-                      backgroundColor: C.brandSoft,
-                      paddingVertical: 6,
-                      paddingHorizontal: 12,
-                      maxWidth: "100%",
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[s.chipText, { color: C.brand, fontSize: 12.5, fontWeight: "600" }]}
-                    numberOfLines={1}
-                  >
-                    {`＋ ${sug.name} (${money(sug.price)})`}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        );
-      })()}
       {form === "Venta" && checkoutFromBasket.current && !!cart.length && (
         <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 18, marginTop: -4, marginBottom: 4 }}>
           <TextButton

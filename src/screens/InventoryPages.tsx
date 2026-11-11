@@ -1,7 +1,7 @@
 import React from "react";
-import { Alert, Linking, Pressable, View } from "react-native";
+import { Alert, Linking, View } from "react-native";
 import { Text } from "../text";
-import { grossUp, jordanianStack, localDay, money, today } from "../business";
+import { grossUp, localDay, money, today } from "../business";
 import { catalogueImages } from "../catalogueImages";
 import {
   Button,
@@ -178,7 +178,6 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
     const basketCustomer = basketCustomerId
       ? customers.find((c) => c.id === basketCustomerId)
       : null;
-    const jStack = jordanianStack(b!, gridProducts as any, basket, basketCustomerId || null);
     const totalPieces = basket.reduce((n: number, i: any) => n + i.qty, 0);
     return {
       scroll: (
@@ -291,59 +290,6 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                 </Text>
               </View>
               <TextButton title="Quitar" color={C.muted} onPress={clearBasketCustomer} />
-            </View>
-          )}
-          {basket.length > 0 &&( jStack.items.length > 0 || jStack.complete) && (
-            <View
-              style={{
-                backgroundColor: C.paper,
-                borderRadius: 18,
-                paddingHorizontal: 12,
-                paddingVertical: 10,
-                marginBottom: 10,
-                gap: 6,
-              }}
-            >
-              <View style={s.between}>
-                <Text style={[s.label, { marginBottom: 0, color: C.brand }]}>
-                  {jStack.label}
-                </Text>
-                {!basketCustomer && customers.length > 0 && (
-                  <TextButton
-                    title="👤 Elegir cliente"
-                    color={C.brand}
-                    onPress={() => go("Clientes")}
-                  />
-                )}
-              </View>
-              {!jStack.complete && (
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-                  {jStack.items.slice(0, 1).map((sug: any) => (
-                    <Pressable
-                      key={sug.id}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Stack sugerido ${sug.name}`}
-                      onPress={() => addToBasket(sug.id, 1, true)}
-                      style={[
-                        s.chip,
-                        {
-                          backgroundColor: C.paper, borderWidth: 1, borderColor: C.line,
-                          paddingVertical: 6,
-                          paddingHorizontal: 11,
-                          maxWidth: "100%",
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[s.chipText, { color: C.brand, fontSize: 12.5, fontWeight: "600" }]}
-                        numberOfLines={1}
-                      >
-                        {`＋ ${sug.name} (${money(sug.price)})`}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
             </View>
           )}
           <ProductGrid
