@@ -246,7 +246,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               ]}
             />
           )}
-          {!!parkedCart && (
+          {false && !!parkedCart && (
             <View
               style={[
                 s.between,
@@ -318,7 +318,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
             />
             {!!basket.length && (
               <TextButton
-                title="Vaciar carrito"
+                title="{false && !!parkedCart && ("
                 color={C.red}
                 onPress={emptyBasket}
               />
@@ -579,7 +579,7 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
                 )}
               </>
             )}
-            {!p.archived && (p.available > 0 || (basketQtyMap.get(p.id) ?? 0) > 0) && (
+            {false && !p.archived && (p.available > 0 || (basketQtyMap.get(p.id) ?? 0) > 0) && (
               <>
                 <View style={{ height: 10 }} />
                 {sellButton(p)}
