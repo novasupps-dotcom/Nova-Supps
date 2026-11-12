@@ -180,11 +180,12 @@ async function flush(ms=800){await act(async()=>{await new Promise(r=>setTimeout
   await press('Ventas');await pressExact('Este mes');const c=ui.root.findAll(n=>n.type==='Pressable'&&typeof n.props.onPress==='function'&&text(n).includes(v.id.slice(-8).toUpperCase()));await act(async()=>c[0].props.onPress());
   await pressExact('Devolver productos / modificar venta');await type('Nuevo total MXN',((v.total-5000)/100).toFixed(2));
   assert(text(ui.root).includes('Devolver al cliente'));assert(text(ui.root).includes('también en Mercado Pago'));
-  await pressExact('Devolver y guardar cambios');for(let i=0;i<4;i++)await flush(15);
+  // 2.11.5: el aviso dura 1.8 s; se revisa después de cada espera (en GitHub las esperas pueden tardar más).
+  await pressExact('Devolver y guardar cambios');let refundToast=text(ui.root).includes('devueltos en Mercado Pago');for(let i=0;i<4;i++){await flush(15);refundToast=refundToast||text(ui.root).includes('devueltos en Mercado Pago');}
   const ref=mpCalls.find(c=>/\/refund$/.test(c.url));assert(ref,'devolución enviada');assert.equal(ref.body.transactions[0].amount,'50.00');assert.equal(ref.body.transactions[0].id,'PAY9');
   assert.equal(sql.prepare("SELECT total FROM sales WHERE id=?").get(v.id).total,v.total-5000);
   assert.equal(sql.prepare("SELECT SUM(amount) n FROM ledger WHERE ref=? AND kind='sale'").get(v.id).n,v.total-5000);
-  assert(text(ui.root).includes('devueltos en Mercado Pago'));}
+  assert(refundToast,'aviso de devolución en Mercado Pago');}
  // Pago rechazado: no se registra nada.
  script={final:{status:'failed',transactions:{payments:[{status:'failed',status_detail:'rejected_by_issuer'}]}}};
  await press('Stock');await sellFromStock();await press(card);
@@ -221,4 +222,4 @@ async function flush(ms=800){await act(async()=>{await new Promise(r=>setTimeout
  assert.equal(alerts.length,0,JSON.stringify(alerts));
  await act(async()=>ui.unmount());
  console.log('UI PASS: resumen neto, Control Operativo, Stock → carrito, comisión visible, borrador al reiniciar, doble cobro, sin relecturas al escribir, fechas rápidas, WhatsApp, importes flexibles, error en formulario, canceladas y terminal Mercado Pago (modo PDV, aprobado/rechazado, comisión real, devolución parcial, abono en terminal).');
-})().catch(e=>{console.error(e.stack);process.exitCode=1});
+})().catch(e=>{console.error(e.stack);process.exit(1)});

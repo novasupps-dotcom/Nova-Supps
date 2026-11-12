@@ -6,13 +6,17 @@ const root = path.resolve(__dirname, "..");
 const unit = fs.readdirSync(path.join(root, "tests")).filter(f => f.endsWith(".test.ts")).map(f => path.join("tests", f));
 const suites = ["ui", "forms", "team", "lock", "charge", "cloud", "photos", "receipt", "v17", "screens", "iosphoto", "terminalnormal", "v21", "secure", "v22", "sql22", "hermes", "catalogui", "orderui"];
 const runs = [["--experimental-strip-types", "--import", "./tests/ts-resolve.mjs", "--test", ...unit], ...suites.map(s => ["tests/" + s + ".cjs"])];
+// 2.11.5: si una prueba falla y se queda esperando, se corta a los 10 minutos (antes GitHub
+// esperaba 40 minutos y cancelaba todo).
+const LIMIT = { timeout: 10 * 60 * 1000, killSignal: "SIGKILL" };
 for (const args of runs) {
-  const result = spawnSync(process.execPath, args, { cwd: root, stdio: "inherit" });
+  const result = spawnSync(process.execPath, args, { cwd: root, stdio: "inherit", ...LIMIT });
+  if (result.signal) { console.error(`La prueba ${args.at(-1)} no terminó en 10 minutos.`); process.exit(1); }
   if (result.error) { console.error(result.error.message); process.exit(1); }
   if (result.status !== 0) process.exit(result.status || 1);
 }
 const python = process.env.NOVA_TEST_PYTHON || (process.platform === "win32" ? "python" : "python3");
-const edge = spawnSync(process.execPath, ["--experimental-strip-types", "tests/edge.cjs"], { cwd: root, stdio: "inherit" });
+const edge = spawnSync(process.execPath, ["--experimental-strip-types", "tests/edge.cjs"], { cwd: root, stdio: "inherit", ...LIMIT });
 if (edge.error) { console.error(edge.error.message); process.exit(1); }
 if (edge.status !== 0) process.exit(edge.status || 1);
 const signing = spawnSync(python, ["tests/resign_apk.py"], { cwd: root, stdio: "inherit" });
