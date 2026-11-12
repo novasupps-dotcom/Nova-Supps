@@ -1,5 +1,6 @@
 // Avisos push por cuenta y teléfono; seguimientos locales a las 9:00.
 import { Platform } from "react-native";
+import { BRANDS_LABEL } from "./receipt";
 import { money, type Business, type Row } from "./business";
 import type { Cloud } from "./cloud";
 import { canPush, notifications, projectId } from "./native";
@@ -541,6 +542,55 @@ export async function notifyUpdateReady(
       trigger: { channelId: "actualizaciones" },
     });
     b.setSetting("updateNotified", update.id);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 2.11.2 · Aviso con los datos que mandó la terminal al cobrar con tarjeta: importe,
+ * tarjeta (marca, crédito/débito, últimos 4), número de operación y comisión real.
+ */
+export async function notifyCardCharge(
+  b: Business,
+  x: { saleId: string; amount: number; card: Row | null | undefined; fee: number | null },
+): Promise<boolean> {
+  if (b.setting("pushOff", false)) return false;
+  const key = "card:" + x.saleId + ":" + (x.card?.operation || "op");
+  if (noticeSeen(b, key)) return true;
+  const N = notifications();
+  if (!N) return false;
+  try {
+    if (!(await N.getPermissionsAsync()).granted) return false;
+    if (Platform.OS === "android")
+      await N.setNotificationChannelAsync("ventas", {
+        name: "Ventas y vendedores",
+        importance: N.AndroidImportance.HIGH,
+        sound: "default",
+        enableVibrate: true,
+      });
+    const c = x.card || {};
+    const brand = String(c.brand || "").toLowerCase();
+    const label = BRANDS_LABEL[brand] || (brand ? brand.replace(/^\w/, (ch) => ch.toUpperCase()) : "Tarjeta");
+    const type = /deb|prepaid/.test(String(c.type || "")) || /^deb/.test(brand) ? "débito" : /cred/.test(String(c.type || "")) ? "crédito" : "";
+    const parts = [
+      `${label}${type ? " " + type : ""}${c.last4 ? ` •••• ${c.last4}` : ""}`,
+      c.operation ? `Op. ${c.operation}` : "",
+      c.authorization ? `Aut. ${c.authorization}` : "",
+      x.fee !== null && x.fee !== undefined ? `Comisión ${money(x.fee)}` : "",
+    ].filter(Boolean);
+    await N.scheduleNotificationAsync({
+      identifier: "tarjeta-" + key,
+      content: {
+        title: `Cobro con tarjeta · ${money(x.amount)}`,
+        body: parts.join(" · "),
+        sound: "default",
+        data: { kind: "card_charge", saleId: x.saleId },
+      },
+      trigger: { channelId: "ventas" },
+    });
+    markNotice(b, key);
     return true;
   } catch {
     return false;

@@ -111,7 +111,7 @@ async function adv(){await press('Ajustes');const sw=ui.root.findAll(n=>n.type==
   assert.equal(sql.prepare("SELECT SUM(l.qty) n FROM lots l JOIN products p ON p.id=l.productId WHERE p.name='Prod B'").get().n,stock0+1,'unidad regresó al inventario');
   assert.equal(sql.prepare("SELECT SUM(amount) n FROM ledger WHERE ref=? AND kind='sale'").get(sale.id).n,sale.total/2,'devolución registrada');
   assert(text(ui.root).includes('Devolución parcial'));});
- await check('1.0.1 · Corte con caja esperada y utilidad con mermas',async()=>{await press('Ventas');await press('Corte de caja');const t=text(ui.root);assert(t.includes('Caja esperada al cierre'));assert(t.includes('Caja al abrir el día'));
+ await check('1.0.1 · Corte con caja esperada y utilidad con mermas',async()=>{await press('Ventas');await press('Corte de caja');const t=text(ui.root);assert(t.includes('Efectivo del corte'));assert(t.includes('Efectivo que debe haber del corte'));assert(!t.includes('Caja al abrir el día'),'2.11.2: sin el saldo acumulado');
   await press('Ventas');await press('Resumen');assert(text(ui.root).includes('Costo de la mercancía (precio de compra)'));assert(text(ui.root).includes('Ganancia proyectada'));});
  await check('1.0.2 · El carrito no pasa de lo disponible',async()=>{await press('Stock');await pressExact('Nuevo producto');await type('Nombre *','Prod Limite');await type('Precio de venta MXN *','80');await type('Stock inicial (opcional)','2');await type('Costo por unidad MXN *','30');await pressExact('Guardar');assert(!formOpen());
   await type('Buscar nombre, SKU o marca','Prod Limite');await sellFromStock();const plus=()=>act(async()=>ui.root.findAll(n=>n.props.accessibilityLabel==='Agregar una')[0].props.onPress());

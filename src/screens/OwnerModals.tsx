@@ -1487,14 +1487,7 @@ export function OwnerFormModal(props: {
                                 {field("transferFrom", "¿Quién transfiere? (emisor)", false, "Nombre o banco de quien paga")}
                               </>
                             );
-                          if (kind === "Tarjeta" && !mpActive)
-                            return (
-                              <>
-                                {field("cardLast4", "Últimos 4 dígitos", true, "1234")}
-                                {chips("cardType", "Tipo de tarjeta", options(["Débito", "Crédito"]))}
-                                {field("cardOp", "No. de operación de la terminal", false, "Opcional")}
-                              </>
-                            );
+                          // 2.11.2: con tarjeta no se captura nada; la terminal manda los datos sola.
                           return null;
                         })()}
                         {fromBasket && cartEditor}
@@ -1575,20 +1568,32 @@ export function OwnerFormModal(props: {
                             </Text>
                             <Icon name={privateOpen ? "chevron-down" : "chevron-right"} size={16} color={C.muted} />
                           </View>
-                          {privateOpen && (
-                            <>
-                              <Text style={[s.label, { marginTop: 6, marginBottom: 2 }]}>Solo lo ves tú</Text>
-                              {row("Subtotal", money(saleCharge.subtotal))}
-                              {row("Tu precio", money(saleBase))}
-                              {row("Comisión que absorbe el cliente", "+" + money(saleCommission))}
-                              {saleIsCard && row(`Mercado Pago descuenta ${feeLabel(bps)}`, minus(fee), { color: C.red })}
-                              {row("Recibes", money(received), { bold: true, color: C.green })}
-                              {cost > 0 &&
-                                row("Ganancia estimada", money(received - cost), {
-                                  color: received - cost >= 0 ? C.green : C.red,
+                          {privateOpen && (() => {
+                            // 2.11.2 · Desglose del dueño: costo, tu precio, comisión de tarjeta (%) y ganancia.
+                            // Cambia al momento con el descuento (%) o la forma de pago.
+                            const gain = received - cost;
+                            const pctOf = (part: number, whole: number) => (whole > 0 ? ` · ${Math.round((part / whole) * 100)}%` : "");
+                            return (
+                              <>
+                                <Text style={[s.label, { marginTop: 6, marginBottom: 2 }]}>Solo lo ves tú</Text>
+                                {row("Costo de la mercancía", cost > 0 ? money(cost) : "Sin costo registrado")}
+                                {saleCharge.discount > 0 && row("Precio de lista", money(saleCharge.subtotal))}
+                                {saleCharge.discount > 0 &&
+                                  row(`Descuento${pctOf(saleCharge.discount, saleCharge.subtotal)}`, minus(saleCharge.discount), { color: C.red })}
+                                {row("Tu precio", money(saleBase), { bold: true })}
+                                {row(`Comisión que absorbe el cliente (${feeLabel(bps)})`, "+" + money(saleCommission))}
+                                {row("Cliente paga", money(saleTotal))}
+                                {saleIsCard
+                                  ? row(`Comisión de tarjeta ${feeLabel(bps)}`, minus(fee), { color: C.red })
+                                  : row("Comisión de tarjeta", "$0.00 · sin tarjeta")}
+                                {row("Recibes", money(received), { bold: true, color: C.green })}
+                                {row(`Ganancia${pctOf(gain, saleBase)}`, cost > 0 ? money(gain) : "—", {
+                                  bold: true,
+                                  color: gain >= 0 ? C.green : C.red,
                                 })}
-                            </>
-                          )}
+                              </>
+                            );
+                          })()}
                           {cost > 0 && saleBase < cost && saleCharge.promo.total > 0 && saleBase + saleCharge.promo.total >= cost && (
                             <Note color={C.amber}>
                               Con la promoción esta venta queda debajo del costo. Se permite porque tú la configuraste.
