@@ -127,6 +127,7 @@ const day = (n) => addDays(require("../src/business.ts").today(), n);
   assert(!ui.root.findAll((n) => /^Categoría /.test(n.props.accessibilityLabel || "")).length, "el carrito no repite el catálogo");
   await pressExact("Cerrar");
   assert(ui.root.findAll((n) => n.props.accessibilityLabel === "Abrir carrito").length, "cerrar no vacía el carrito");
+  await pressLabel("Abrir carrito");
   await pressExact("Vaciar carrito");
   console.log("  ✓ venta por categoría (Creatinas, Proteínas, PWO, Snacks, Vitaminas…) con fotos, sin lista");
 
