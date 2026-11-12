@@ -39,11 +39,11 @@ async function flush(ms=800){await act(async()=>{await new Promise(r=>setTimeout
  global.__NOVA_SKIP_LOCK=true;require('./seed.cjs')(db).setSetting('appRole','owner');await act(async()=>{ui=renderer.create(React.createElement(App));});
  // 2.0: abre en Vender (categorías con fotos); el resumen está en Ventas → 📊 Resumen.
  assert(ui.root.findAll(n=>n.props.accessibilityLabel==='Filtrar por').length>0,'abre en Vender');
- await press('Ventas');assert(text(ui.root).includes('Vendido hoy'));await press('Resumen');await pressExact('Todo');
- const home=text(ui.root);
- for(const v of ['$5,409.00','$3,374.00','$1,116.00','$919.00','$37.30','$881.70','$5,371.70','$4,272.70'])assert(home.includes(v),'Resumen: '+v);
- assert(text(ui.root).includes('Ventas por forma de pago'));
- await press('Gastos operativos');assert(text(ui.root).includes('Publicidad'));
+ await press('Ventas');assert(text(ui.root).includes('Vendido hoy'));await press('Resumen');
+ // 2.11: resumen mensual sencillo (empieza en 0 cada mes, por semana, sin «Todo»).
+ {const home=text(ui.root);for(const t of ['Todo el mes','Ventas totales','Ventas por forma de pago','Disponible','Utilidad','Margen y proyección del stock','Por vendedor','Efectivo en resguardo'])assert(home.includes(t)||(t==='Efectivo en resguardo'&&home.includes('resguardo')),'Resumen: '+t);
+  const label=()=>ui.root.findAll(n=>n.type==='Text'&&/^(Enero|Febrero|Marzo|Abril|Mayo|Junio|Julio|Agosto|Septiembre|Octubre|Noviembre|Diciembre) \d{4}$/.test(text(n).trim()))[0];
+  const before=text(label()).trim();await pressExact('‹');assert.notEqual(text(label()).trim(),before,'mes anterior');}
  await press('Volver');await press('Stock');
  await sellFromStock();assert(/1\s+×\s+\$/.test(text(ui.root)));
  const cash=sql.prepare("SELECT name FROM accounts WHERE kind='Efectivo'").get().name;
@@ -88,19 +88,11 @@ async function flush(ms=800){await act(async()=>{await new Promise(r=>setTimeout
  const session=JSON.parse(sql.prepare("SELECT value FROM settings WHERE key='uiSession'").get().value);assert.equal(session.allow,false);
  Business.prototype.stock=origStock;
  assert.equal(alerts.length,0,JSON.stringify(alerts));
- // 1.5: filtro de Ventas por forma de cobro (efectivo, cada cuenta de transferencia, terminal).
- {await press('Ventas');assert(text(ui.root).includes('Efectivo'),'2.2.6: filtro por forma de cobro en una fila');
-  const groups=[['Efectivo',"a.kind='Efectivo'"],['Terminal (tarjeta)',"a.kind='Tarjeta'"]];
-  for(const a of sql.prepare("SELECT id,name FROM accounts WHERE kind IN ('Banco','Billetera')").all())groups.push([''+a.name,`a.id='${a.id}'`]);
-  let checked=0;for(const [label,cond] of groups){
-   const exp=sql.prepare(`SELECT COUNT(*) n, COALESCE(SUM(t),0) amt FROM (SELECT l.ref, SUM(l.amount) t FROM ledger l JOIN accounts a ON a.id=l.accountId JOIN sales s ON s.id=l.ref WHERE l.kind IN ('sale','refund') AND s.status='confirmed' AND ${cond} GROUP BY l.ref HAVING SUM(l.amount)<>0)`).get();
-   if(!exp.n)continue;
-   await pressExact(label);const t=text(ui.root);
-   assert(new RegExp(`(^|\\s)${exp.n}\\s+ventas?\\s+·`).test(t),label+': '+exp.n+' ventas');
-   const {money}=require('../src/business.ts');assert(t.includes(`: ${money(exp.amt)}`),label+' cobrado '+money(exp.amt));checked++;
-  }
-  assert(checked>=3,'se revisaron efectivo, transferencia y terminal: '+checked);
-  await pressExact('Todos los cobros');}
+ // 2.11: Ventas sin filtros de estado ni de cobro: solo «Este mes» y «Esta semana».
+ {await press('Ventas');const t=text(ui.root);assert(t.includes('Este mes')&&t.includes('Esta semana')&&!t.includes('Todos los cobros')&&!t.includes('Por cobrar ')&&!t.includes('Activas'),'Ventas simplificada');
+  const now=new Date();const mFrom=new Date(now.getFullYear(),now.getMonth(),1).toISOString();
+  const n=sql.prepare("SELECT COUNT(*) n FROM sales WHERE status='confirmed' AND created>=?").get(mFrom).n;
+  assert(new RegExp(`(^|\\s)${n}\\s+ventas?\\s+·`).test(t),'ventas del mes: '+n);}
  // 0.9.3: las canceladas se ocultan y se pueden eliminar desde Ventas.
  const last=sql.prepare("SELECT id,total FROM sales WHERE channel!='Excel' ORDER BY created DESC").get();
  await press('Ventas');await press('Público general');await pressExact('Cancelar venta');
@@ -109,8 +101,8 @@ async function flush(ms=800){await act(async()=>{await new Promise(r=>setTimeout
  assert.equal(sql.prepare('SELECT status FROM sales WHERE id=?').get(last.id).status,'cancelled');
  assert(text(ui.root).includes('Eliminar venta cancelada'));
  await press('Ventas');
- assert(text(ui.root).includes('1 cancelada oculta'),'cancelada oculta');
- await press('Canceladas (1)');await pressExact('Eliminar');
+ assert(text(ui.root).includes('Ver canceladas (1)'),'cancelada oculta');
+ await press('Ver canceladas (1)');await pressExact('Eliminar');
  const dialog=alerts.pop();assert.equal(dialog[0],'Eliminar venta cancelada');
  await act(async()=>dialog[2].find(x=>x.text==='Eliminar').onPress());
  assert.equal(sql.prepare('SELECT count(*) n FROM sales WHERE id=?').get(last.id).n,0);
@@ -185,7 +177,7 @@ async function flush(ms=800){await act(async()=>{await new Promise(r=>setTimeout
   assert.match(msg,/Comprobante de pago con tarjeta/);assert.match(msg,/Autorización: 123456/);assert.match(msg,/•••• 4242/);assert(!formOpen(),'formulario cerrado');}
  // 1.0.1: devolución parcial desde la venta, también en Mercado Pago.
  {const v=sql.prepare("SELECT * FROM sales WHERE id=?").get(last2.id);
-  await press('Ventas');await pressExact('Activas');const c=ui.root.findAll(n=>n.type==='Pressable'&&typeof n.props.onPress==='function'&&text(n).includes(v.id.slice(-8).toUpperCase()));await act(async()=>c[0].props.onPress());
+  await press('Ventas');await pressExact('Este mes');const c=ui.root.findAll(n=>n.type==='Pressable'&&typeof n.props.onPress==='function'&&text(n).includes(v.id.slice(-8).toUpperCase()));await act(async()=>c[0].props.onPress());
   await pressExact('Devolver productos / modificar venta');await type('Nuevo total MXN',((v.total-5000)/100).toFixed(2));
   assert(text(ui.root).includes('Devolver al cliente'));assert(text(ui.root).includes('también en Mercado Pago'));
   await pressExact('Devolver y guardar cambios');for(let i=0;i<4;i++)await flush(15);
@@ -204,7 +196,7 @@ async function flush(ms=800){await act(async()=>{await new Promise(r=>setTimeout
  const credit=bb.sell([{productId:sql.prepare("SELECT p.id FROM products p JOIN lots l ON l.productId=p.id WHERE l.qty>0").get().id,qty:1}],20000,0,null,sql.prepare('SELECT id FROM customers').get().id,null,'Mostrador',true);
  await pressExact('Cerrar');await pressExact('Cerrar');
  script={final:{status:'processed',transactions:{payments:[{id:'PAY10',reference_id:'777',status:'processed',status_detail:'accredited'}]}}};
- await press('Ventas');await pressExact('Por cobrar');const ab=exact('Abonar');await act(async()=>ab[0].props.onPress());await pressExact(card);
+ await press('Ventas');await pressExact('Este mes');const ab=exact('Abonar');await act(async()=>ab[0].props.onPress());await pressExact(card);
  const abBtn=ui.root.findAll(n=>n.type==='Pressable'&&/Cobrar abono de \$200\.00 en la terminal/.test(text(n))&&typeof n.props.onPress==='function');assert(abBtn.length,'botón abono en terminal');
  await act(async()=>abBtn[0].props.onPress());for(let i=0;i<12;i++)await flush(15);
  assert.equal(sql.prepare("SELECT SUM(amount) n FROM ledger WHERE ref=? AND kind='sale'").get(credit).n,20000,'abono aprobado registrado');

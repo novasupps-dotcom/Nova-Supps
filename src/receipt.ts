@@ -27,7 +27,7 @@ export type CardInfo = {
   amount?: number; // centavos
 };
 
-const BRANDS: Record<string, string> = {
+export const BRANDS_LABEL: Record<string, string> = {
   visa: "Visa",
   debvisa: "Visa",
   master: "Mastercard",
@@ -39,7 +39,7 @@ const BRANDS: Record<string, string> = {
 };
 /** "Visa crédito •••• 1234" */
 export function cardLabel(c: CardInfo): string {
-  const brand = BRANDS[String(c.brand || "").toLowerCase()] || (c.brand ? String(c.brand).replace(/^\w/, (x) => x.toUpperCase()) : "Tarjeta");
+  const brand = BRANDS_LABEL[String(c.brand || "").toLowerCase()] || (c.brand ? String(c.brand).replace(/^\w/, (x) => x.toUpperCase()) : "Tarjeta");
   const kind = /debit|prepaid/.test(String(c.type || "")) || /^deb/.test(String(c.brand || "")) ? " débito" : /credit/.test(String(c.type || "")) ? " crédito" : "";
   return `${brand}${kind}${c.last4 ? ` •••• ${c.last4}` : ""}`;
 }

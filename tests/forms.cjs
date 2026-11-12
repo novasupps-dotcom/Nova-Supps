@@ -51,7 +51,7 @@ async function adv(){await press('Ajustes');const sw=ui.root.findAll(n=>n.type==
   await pressExact('Nuevo cliente');await type('Nombre *','Cliente Dos');await pressExact('Guardar');assert(!formOpen(),'el 2º formulario no se cerró');assert.equal(count('customers'),n+2);});
  await check('Editar cliente',async()=>{await press('Clientes');const ed=exact('Editar');await act(async()=>ed[0].props.onPress());await type('Nombre *','Cliente Editado');await pressExact('Frecuente');await pressExact('Guardar');assert(!formOpen());assert(sql.prepare("SELECT count(*) n FROM customers WHERE name='Cliente Editado' AND stage='Frecuente'").get().n===1);});
  await check('Cliente creado desde una venta y luego cobrar',async()=>{const s0=count('sales');
-  await press('Stock');await sellFromStock();await pressExact('＋ Cliente y más opciones');await choose('Cliente','＋ Crear cliente');await type('Nombre *','Cliente Desde Venta');await pressExact('Guardar');
+  await press('Stock');await sellFromStock();await choose('¿Ya es cliente?','＋ Crear cliente');await type('Nombre *','Cliente Desde Venta');await pressExact('Guardar');
   assert(text(ui.root).includes('Cliente Desde Venta'),'el cliente no quedó elegido en la venta');
   await press('Cobrar $');assert(!formOpen(),'la venta no se guardó (botón sin respuesta)');assert.equal(count('sales'),s0+1);
   const c=sql.prepare("SELECT s.customerId FROM sales s ORDER BY created DESC").get();assert.equal(sql.prepare('SELECT name FROM customers WHERE id=?').get(c.customerId).name,'Cliente Desde Venta');});
@@ -68,9 +68,9 @@ async function adv(){await press('Ajustes');const sw=ui.root.findAll(n=>n.type==
   await pressExact('Nueva entrada');await choose('Producto *','Prod C');await type('Cantidad *','2');await type('Costo unitario MXN *','10');await pressExact('Compra pagada');await pressExact(cash);await pressExact('Guardar');assert(!formOpen(),'compra no guardada');assert.equal(count('lots'),n+2);});
  await check('Venta a crédito, abono y editar seguimiento',async()=>{await press('Clientes');const nv=exact('Nueva venta');await act(async()=>nv[0].props.onPress());
   await gridAdd('Prod B');await openCart();assert(!/Cliente\s+Público general/.test(text(ui.root))&&/Cliente\s+Cliente Desde Venta/.test(text(ui.root)),'el cliente se queda elegido en el carrito');
-  await pressExact('＋ Cliente y más opciones');await type('Cobro de hoy MXN','100');await press('Cobrar $');assert(!formOpen(),'venta a crédito no guardada');
-  await press('Ventas');await pressExact('Por cobrar');const ab=exact('Abonar');await act(async()=>ab[0].props.onPress());await pressExact('Guardar');assert(!formOpen(),'abono no guardado');
-  await press('Ventas');await pressExact('Activas');const card=ui.root.findAll(n=>n.type==='Pressable'&&text(n).includes('Cliente Editado')&&typeof n.props.onPress==='function');await act(async()=>card[0].props.onPress());
+  // 2.11: sin «Cobro de hoy» (la venta se cobra completa).
+  await press('Cobrar $');assert(!formOpen(),'venta no guardada');
+  await press('Ventas');await pressExact('Este mes');const card=ui.root.findAll(n=>n.type==='Pressable'&&text(n).includes('Cliente Desde Venta')&&typeof n.props.onPress==='function');await act(async()=>card[0].props.onPress());
   await pressExact('Editar seguimiento');await pressExact('WhatsApp');await pressExact('Guardar');assert(!formOpen(),'seguimiento no guardado');});
  await check('1.0 · Ajuste de inventario (merma y conteo)',async()=>{await press('Stock');await pressExact('Conteo');await choose('Producto *','Prod B');
   const before=sql.prepare("SELECT SUM(l.qty) n FROM lots l JOIN products p ON p.id=l.productId WHERE p.name='Prod B'").get().n;
@@ -81,9 +81,16 @@ async function adv(){await press('Ajustes');const sw=ui.root.findAll(n=>n.type==
   await pressExact('Conteo');await type('Unidades que contaste *','10');await pressExact('Guardar');assert(!formOpen(),'ajuste desde detalle no guardado');});
  await check('1.0 · Renombrar cuenta',async()=>{await adv();await press('Cuentas y movimientos');const r=exact('Renombrar');await act(async()=>r[0].props.onPress());await type('Nombre *','Caja tienda');await pressExact('Guardar');assert(!formOpen());
   assert.equal(sql.prepare("SELECT count(*) n FROM accounts WHERE name='Caja tienda'").get().n,1);});
- await check('1.0 · Corte de caja y compartir',async()=>{await press('Ventas');await press('Corte de caja');const t=text(ui.root);assert(t.includes('Ventas del día'));assert(t.includes('Resultado del día'));
-  global.__shared=[];await pressExact('Compartir corte');assert.match(global.__shared[0].message,/Corte de caja/);assert.match(global.__shared[0].message,/Ventas: \d+/);});
- await check('1.0 · Comprobante (WhatsApp o compartir)',async()=>{await press('Ventas');await pressExact('Activas');
+ await check('1.0 · Corte de caja y compartir',async()=>{await press('Ventas');await press('Corte de caja');const t=text(ui.root);assert(t.includes('Corte de hoy'));assert(t.includes('Resultado del día'));assert(t.includes('Cerrar corte'));
+  global.__shared=[];await pressExact('Compartir corte');assert.match(global.__shared[0].message,/Corte de caja/);assert.match(global.__shared[0].message,/Ventas: \d+/);
+  // 2.11: cerrar el corte (6:30 PM) y ver los últimos 7 días con su estado.
+  await pressExact('Cerrar corte');assert(text(ui.root).includes('Corte realizado'),'corte cerrado');assert(!exact('Cerrar corte').length,'ya no se puede volver a cerrar');
+  await pressExact('Últimos 7 días');const w=text(ui.root);assert(w.includes('Últimos 7 días')&&w.includes('Corte realizado')&&w.includes('Cada corte va de las 6:30 PM'),'vista de 7 días');
+  // 2.11: Nuevo gasto con Efectivo / Transferencia MP / Tarjeta.
+  await press('Ventas');await pressExact('Nuevo gasto');const g=text(ui.root);assert(g.includes('Pagado con *')&&g.includes('Efectivo'),'gasto: pagado con');
+  await type('Importe MXN *','150');await type('Concepto *','Luz');await pressExact('Guardar');assert(!formOpen(),'gasto guardado');
+  await press('Resumen');assert(text(ui.root).includes('Luz'),'el gasto del mes aparece en el resumen');});
+ await check('1.0 · Comprobante (WhatsApp o compartir)',async()=>{await press('Ventas');await pressExact('Este mes');
   const c2=ui.root.findAll(n=>n.type==='Pressable'&&text(n).includes('Cliente Desde Venta')&&typeof n.props.onPress==='function');await act(async()=>c2[0].props.onPress());
   global.__shared=[];await pressExact('Enviar comprobante');assert(formOpen(),'sin teléfono pide número');assert(text(ui.root).includes('Vista previa'));
   await pressExact('Compartir con otra app');assert.match(global.__shared[0].message,/Comprobante/);assert.match(global.__shared[0].message,/\*Total: \$/);await pressExact('Cerrar');
@@ -97,7 +104,7 @@ async function adv(){await press('Ajustes');const sw=ui.root.findAll(n=>n.type==
   await pressExact('Cambiar porcentaje');await type('Comisión (%) *','abc');await pressExact('Guardar');assert(formOpen(),'debe rechazar texto');await type('Comisión (%) *','4.06');await pressExact('Guardar');assert(!formOpen());});
  await check('1.0.1 · Devolver un producto de una venta',async()=>{await press('Stock');await type('Buscar nombre, SKU o marca','Prod B');await sellFromStock();await act(async()=>ui.root.findAll(n=>n.props.accessibilityLabel==='Agregar una')[0].props.onPress());await press('Cobrar $');assert(!formOpen());
   const sale=sql.prepare("SELECT * FROM sales ORDER BY created DESC").get();const stock0=sql.prepare("SELECT SUM(l.qty) n FROM lots l JOIN products p ON p.id=l.productId WHERE p.name='Prod B'").get().n;
-  await press('Ventas');await pressExact('Activas');const c=ui.root.findAll(n=>n.type==='Pressable'&&typeof n.props.onPress==='function'&&text(n).includes(sale.id.slice(-8).toUpperCase()));await act(async()=>c[0].props.onPress());
+  await press('Ventas');await pressExact('Este mes');const c=ui.root.findAll(n=>n.type==='Pressable'&&typeof n.props.onPress==='function'&&text(n).includes(sale.id.slice(-8).toUpperCase()));await act(async()=>c[0].props.onPress());
   await pressExact('Devolver productos / modificar venta');await act(async()=>ui.root.findAll(n=>n.props.accessibilityLabel==='Quitar una')[0].props.onPress());
   assert(text(ui.root).includes('Devolver al cliente'));await pressExact('Guardar cambios');assert(!formOpen(),'modificación no guardada');
   const after=sql.prepare("SELECT * FROM sales WHERE id=?").get(sale.id);assert.equal(after.total,sale.total/2);
@@ -105,7 +112,7 @@ async function adv(){await press('Ajustes');const sw=ui.root.findAll(n=>n.type==
   assert.equal(sql.prepare("SELECT SUM(amount) n FROM ledger WHERE ref=? AND kind='sale'").get(sale.id).n,sale.total/2,'devolución registrada');
   assert(text(ui.root).includes('Devolución parcial'));});
  await check('1.0.1 · Corte con caja esperada y utilidad con mermas',async()=>{await press('Ventas');await press('Corte de caja');const t=text(ui.root);assert(t.includes('Caja esperada al cierre'));assert(t.includes('Caja al abrir el día'));
-  await press('Ventas');await press('Resumen');assert(text(ui.root).includes('Utilidad estimada'));assert(text(ui.root).includes('Mermas y ajustes de inventario'));});
+  await press('Ventas');await press('Resumen');assert(text(ui.root).includes('Costo de la mercancía (precio de compra)'));assert(text(ui.root).includes('Ganancia proyectada'));});
  await check('1.0.2 · El carrito no pasa de lo disponible',async()=>{await press('Stock');await pressExact('Nuevo producto');await type('Nombre *','Prod Limite');await type('Precio de venta MXN *','80');await type('Stock inicial (opcional)','2');await type('Costo por unidad MXN *','30');await pressExact('Guardar');assert(!formOpen());
   await type('Buscar nombre, SKU o marca','Prod Limite');await sellFromStock();const plus=()=>act(async()=>ui.root.findAll(n=>n.props.accessibilityLabel==='Agregar una')[0].props.onPress());
   await plus();await plus();await plus();const qty=()=>Number(ui.root.findAll(n=>n.type==='Text'&&n.props.testID==='qty')[0].props.children);
@@ -117,7 +124,7 @@ async function adv(){await press('Ajustes');const sw=ui.root.findAll(n=>n.type==
   assert(text(ui.root).includes('Prod Limite no tiene existencias'));assert(!ui.root.findAll(n=>n.props.accessibilityLabel==='Abrir carrito').length,'no debe quedar en el carrito');
   // Al modificar la venta, el máximo incluye las unidades que ya tiene.
   const sale=sql.prepare("SELECT s.id FROM sales s JOIN sale_lines l ON l.saleId=s.id WHERE l.name='Prod Limite'").get();
-  await press('Ventas');await pressExact('Activas');const c=ui.root.findAll(n=>n.type==='Pressable'&&typeof n.props.onPress==='function'&&text(n).includes(sale.id.slice(-8).toUpperCase()));await act(async()=>c[0].props.onPress());
+  await press('Ventas');await pressExact('Este mes');const c=ui.root.findAll(n=>n.type==='Pressable'&&typeof n.props.onPress==='function'&&text(n).includes(sale.id.slice(-8).toUpperCase()));await act(async()=>c[0].props.onPress());
   await pressExact('Devolver productos / modificar venta');assert(text(ui.root).includes('Máximo disponible (2)'));await plus();assert.equal(qty(),2);await pressExact('Cerrar');});
  await check('Ningún error inesperado',async()=>{assert.equal(alerts.length,0,JSON.stringify(alerts))});
  await act(async()=>ui.unmount());

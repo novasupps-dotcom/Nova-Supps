@@ -50,6 +50,7 @@ import {
   Card,
   CardFeePreview,
   Checkbox,
+  Chips,
   Icon,
   IconButton,
   Note,
@@ -58,6 +59,7 @@ import {
   QUICK_EXPIRY,
   QUICK_FOLLOWUP,
   SearchBox,
+  SelectAccordion,
   TextButton,
   addDays,
   followUpLabel,
@@ -1304,11 +1306,43 @@ export function OwnerFormModal(props: {
                       { id: "withdrawal", name: "Retiro" },
                       { id: "transfer", name: "Traspaso" },
                     ])}
-                    {accountField(
-                      "accountId",
-                      val("kind") === "transfer"
-                        ? "Cuenta origen *"
-                        : "Cuenta *",
+                    {val("kind") === "expense" ? (
+                      // 2.11 · Gasto: solo Efectivo, Transferencia MP o Tarjeta.
+                      (() => {
+                        const pick = (label: string) =>
+                          label === "Efectivo"
+                            ? accounts.find((a) => a.kind === "Efectivo")
+                            : label === "Transferencia MP"
+                              ? accounts.find((a) => a.kind === "Billetera" && /mercado/i.test(a.name)) ||
+                                accounts.find((a) => a.kind === "Billetera") ||
+                                accounts.find((a) => a.kind === "Banco")
+                              : accounts.find((a) => a.kind === "Tarjeta");
+                        const kindNow = accounts.find((a) => a.id === val("accountId"))?.kind || "";
+                        const current =
+                          val("payWith") ||
+                          (kindNow === "Efectivo" ? "Efectivo" : kindNow === "Tarjeta" ? "Tarjeta" : kindNow ? "Transferencia MP" : "");
+                        const opts = ["Efectivo", "Transferencia MP", "Tarjeta"].filter((x) => pick(x));
+                        return (
+                          <View style={s.field}>
+                            <Text style={s.label}>Pagado con *</Text>
+                            <Chips
+                              options={opts.map((x) => ({ id: x, name: x }))}
+                              value={current}
+                              onChange={(v) => {
+                                set("payWith", v);
+                                set("accountId", pick(v)?.id || "");
+                              }}
+                            />
+                          </View>
+                        );
+                      })()
+                    ) : (
+                      accountField(
+                        "accountId",
+                        val("kind") === "transfer"
+                          ? "Cuenta origen *"
+                          : "Cuenta *",
+                      )
                     )}
                     {val("kind") === "transfer" &&
                       choose(
@@ -1359,103 +1393,62 @@ export function OwnerFormModal(props: {
                               minus(saleCharge.discount),
                               { color: C.red },
                             )}
-                          {salePaid !== null && salePaid !== saleTotal && row("Cobro de hoy", money(salePaid))}
-                          {salePaid !== null &&
-                            salePaid !== saleTotal &&
-                            row("Queda a crédito", money(Math.max(0, saleTotal - salePaid)), { color: C.amber })}
+                          {/* 2.11 · Descuento: un botón; al abrirlo, % rápidos o un importe. */}
                           {listTotal > 0 && (() => {
-                            const discOn = val("applyDiscount") === "1" || !!val("total");
-                            const jd = discOn ? jordanianDiscount(b!, products, cart, val("customerId") || null) : null;
-                            const selectedCustomer = customers.find((c) => c.id === val("customerId"));
+                            const open = val("discOpen") === "1" || !!val("total");
+                            const applyCents = (off: number, tag: string) => {
+                              const off2 = Math.max(0, Math.min(listTotal, off));
+                              set("discTag", tag);
+                              set("total", off2 ? amount(listTotal - off2) : "");
+                            };
                             return (
-                              <View style={{ marginTop: 8, gap: 6 }}>
-                                <Checkbox
-                                  label="2. ¿Aplicar descuento? (Motor Gauss-Jordan · 3 pasos)"
-                                  value={discOn}
-                                  onChange={(on) => {
-                                    set("applyDiscount", on ? "1" : "");
-                                    if (!on) set("total", "");
-                                  }}
-                                />
-                                {discOn && jd && (
-                                  <View style={{ backgroundColor: C.soft, borderRadius: 14, padding: 10, gap: 8 }}>
-                                    <Text style={[s.muted, { fontSize: 12.5, color: jd.affordable ? C.ink : C.amber, fontWeight: "500" }]}>
-                                      {`⚡ Motor Gauss-Jordan: ${jd.summary}`}
-                                    </Text>
-                                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-                                      {jd.steps.map((st) => {
-                                        const strVal = amount(st.base);
-                                        const active = val("total") === strVal;
-                                        return (
-                                          <Pressable
-                                            key={st.step}
-                                            accessibilityRole="button"
-                                            accessibilityLabel={st.label}
-                                            onPress={() => {
-                                              set("total", active ? "" : strVal);
-                                              if (!active) set("markLoyal", "1");
-                                            }}
-                                            style={[
-                                              s.chip,
-                                              active && s.chipOn,
-                                              st.recommended && !active && { backgroundColor: C.brandSoft },
-                                              { paddingVertical: 6, paddingHorizontal: 10 },
-                                            ]}
-                                          >
-                                            <Text
-                                              style={[
-                                                s.chipText,
-                                                active && s.chipTextOn,
-                                                st.recommended && !active && { color: C.brand, fontWeight: "700" },
-                                                { fontSize: 12 },
-                                              ]}
-                                            >
-                                              {`${st.label} (${money(st.base)})`}
-                                            </Text>
-                                          </Pressable>
-                                        );
-                                      })}
-                                      {!!val("total") && (
+                              <View style={{ marginTop: 8, gap: 8 }}>
+                                {!open ? (
+                                  <Pressable
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Aplicar descuento"
+                                    onPress={() => set("discOpen", "1")}
+                                    style={({ pressed }) => [s.chip, { alignSelf: "flex-start", paddingVertical: 6, paddingHorizontal: 12, flexDirection: "row", gap: 6, alignItems: "center" }, pressed && { opacity: 0.7 }]}
+                                  >
+                                    <Icon name="tag" size={14} color={C.ink} />
+                                    <Text style={[s.chipText, { fontSize: 13 }]}>Descuento</Text>
+                                  </Pressable>
+                                ) : (
+                                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                                    {[5, 10, 15, 20].map((pct) => {
+                                      const on = val("discTag") === pct + "%" && !!val("total");
+                                      return (
                                         <Pressable
+                                          key={pct}
                                           accessibilityRole="button"
-                                          onPress={() => set("total", "")}
-                                          style={[s.chip, { paddingVertical: 6, paddingHorizontal: 10 }]}
+                                          accessibilityLabel={`Descuento ${pct}%`}
+                                          onPress={() => (on ? applyCents(0, "") : applyCents(Math.round((listTotal * pct) / 100), pct + "%"))}
+                                          style={[s.chip, on && s.chipOn, { paddingVertical: 6, paddingHorizontal: 12 }]}
                                         >
-                                          <Text style={[s.chipText, { fontSize: 12, color: C.red }]}>Precio normal</Text>
+                                          <Text style={[s.chipText, on && s.chipTextOn, { fontSize: 13 }]}>{pct}%</Text>
                                         </Pressable>
-                                      )}
-                                    </View>
-                                    {moneyField("total", "Modificar monto total MXN (manual)", amount(listTotal))}
-                                    {selectedCustomer ? (
-                                      <Checkbox
-                                        label={`⭐ Marcar a ${selectedCustomer.name} como Cliente Frecuente ("Cliente Leal")`}
-                                        value={val("markLoyal") !== "0"}
-                                        onChange={(v) => set("markLoyal", v ? "1" : "0")}
-                                      />
-                                    ) : (
-                                      <Pressable
-                                        accessibilityRole="button"
-                                        onPress={() => {
-                                          set("markLoyal", "1");
-                                          setSearch("");
-                                          setSelector({
-                                            key: "customerId",
-                                            label: "Cliente",
-                                            rows: customers.filter((c) => !c.archived),
-                                            optional: true,
-                                            create: "Cliente",
-                                          });
+                                      );
+                                    })}
+                                    <View style={{ width: 92 }}>
+                                      <TextInput
+                                        accessibilityLabel="Descuento en pesos"
+                                        style={[s.input, { paddingVertical: 6, minHeight: 34 }]}
+                                        value={val("discTag").startsWith("$") ? val("discTag").slice(1) : ""}
+                                        onChangeText={(v) => {
+                                          const c = tryCents(v);
+                                          if (!v.trim() || c === null) return (set("discTag", v.trim() ? "$" + v : ""), set("total", ""));
+                                          applyCents(c, "$" + v);
                                         }}
-                                        style={[
-                                          s.chip,
-                                          { backgroundColor: C.brandSoft, alignSelf: "flex-start", paddingVertical: 6, paddingHorizontal: 12 },
-                                        ]}
-                                      >
-                                        <Text style={[s.chipText, { color: C.brand, fontSize: 12.5, fontWeight: "600" }]}>
-                                          ⭐ Asignar o registrar como Cliente Frecuente / Leal
-                                        </Text>
-                                      </Pressable>
-                                    )}
+                                        keyboardType="decimal-pad"
+                                        placeholder="$"
+                                        placeholderTextColor={C.muted}
+                                      />
+                                    </View>
+                                    <TextButton
+                                      title="Quitar"
+                                      color={C.muted}
+                                      onPress={() => (set("total", ""), set("discTag", ""), set("discOpen", ""))}
+                                    />
                                   </View>
                                 )}
                               </View>
@@ -1463,78 +1456,62 @@ export function OwnerFormModal(props: {
                           })()}
                         </Card>
                         {accountField("accountId", "Forma de pago *", saleAccounts)}
-                        {accounts.find((a) => a.id === val("accountId"))?.kind === "Efectivo" && (salePaid ?? saleTotal) > 0 && (() => {
-                          const dueAmt = salePaid ?? saleTotal;
-                          const givenCents = tryCents(val("cashGiven"));
-                          const changeCents = givenCents !== null ? givenCents - dueAmt : null;
-                          const bills = [10000, 20000, 50000, 100000].filter((bAmt) => bAmt >= dueAmt);
-                          return (
-                            <View style={{ backgroundColor: C.paper, borderRadius: 16, padding: 12, marginBottom: 10, gap: 8 }}>
-                              <View style={[s.between, { flexWrap: "wrap", gap: 6 }]}>
-                                <Text style={[s.label, { marginBottom: 0 }]}>3. Calculadora de efectivo (Recibido y cambio)</Text>
-                                {changeCents !== null && (
-                                  <Text style={[s.body, { fontWeight: "700", fontSize: 16, color: changeCents >= 0 ? C.green : C.amber }]}>
-                                    {changeCents >= 0 ? `Dar de cambio: ${money(changeCents)}` : `Faltan: ${money(-changeCents)}`}
-                                  </Text>
+                        {(() => {
+                          // 2.11 · Datos del cobro para el comprobante en PDF (sin calculadora).
+                          const kind = accounts.find((a) => a.id === val("accountId"))?.kind || "";
+                          const due = salePaid ?? saleTotal;
+                          if (kind === "Efectivo") {
+                            const given = tryCents(val("cashGiven"));
+                            return (
+                              <View style={{ marginTop: -4, marginBottom: 8 }}>
+                                {moneyField("cashGiven", "¿Con cuánto pagó? MXN", `Exacto · ${amount(due)}`)}
+                                {given !== null && given > 0 && (
+                                  <Note color={given >= due ? C.green : C.amber}>
+                                    {given > due ? `Cambio: ${money(given - due)}` : given === due ? "Pago exacto" : `Faltan ${money(due - given)}`}
+                                  </Note>
                                 )}
                               </View>
-                              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                                <View style={{ flex: 1 }}>
-                                  <TextInput
-                                    accessibilityLabel="Monto recibido en efectivo MXN"
-                                    style={[s.input, { paddingVertical: 8 }]}
-                                    value={val("cashGiven")}
-                                    onChangeText={(v) => set("cashGiven", v)}
-                                    keyboardType="decimal-pad"
-                                    placeholder={`¿Cuánto efectivo recibiste? (ej. ${amount(dueAmt)})`}
-                                    placeholderTextColor={C.muted}
-                                  />
-                                </View>
-                                {!!val("cashGiven") && (
-                                  <TextButton title="Limpiar" color={C.muted} onPress={() => set("cashGiven", "")} />
-                                )}
-                              </View>
-                              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-                                <Pressable
-                                  accessibilityRole="button"
-                                  onPress={() => set("cashGiven", amount(dueAmt))}
-                                  style={[s.chip, val("cashGiven") === amount(dueAmt) && s.chipOn, { paddingVertical: 5, paddingHorizontal: 10 }]}
-                                >
-                                  <Text style={[s.chipText, val("cashGiven") === amount(dueAmt) && s.chipTextOn, { fontSize: 12 }]}>
-                                    {`Exacto (${money(dueAmt)})`}
-                                  </Text>
-                                </Pressable>
-                                {bills.map((bAmt) => {
-                                  const strAmt = amount(bAmt);
-                                  const on = val("cashGiven") === strAmt;
-                                  return (
-                                    <Pressable
-                                      key={bAmt}
-                                      accessibilityRole="button"
-                                      onPress={() => set("cashGiven", on ? "" : strAmt)}
-                                      style={[s.chip, on && s.chipOn, { paddingVertical: 5, paddingHorizontal: 10 }]}
-                                    >
-                                      <Text style={[s.chipText, on && s.chipTextOn, { fontSize: 12 }]}>{`Recibí ${money(bAmt)}`}</Text>
-                                    </Pressable>
-                                  );
-                                })}
-                              </View>
-                            </View>
-                          );
+                            );
+                          }
+                          if (kind === "Banco" || kind === "Billetera")
+                            return (
+                              <>
+                                <TransferInfo
+                                  list={((all: TransferAccount[]) =>
+                                    all.some((t) => t.accountId === val("accountId"))
+                                      ? all.filter((t) => t.accountId === val("accountId"))
+                                      : all.filter((t) => !t.ownerHidden))(b!.setting("transferAccounts", []))}
+                                  amount={saleTotal}
+                                  phone={customers.find((c) => c.id === val("customerId"))?.phone || ""}
+                                  emptyText="Captura tus datos de transferencia en Ajustes → Formas de pago para mandárselos al cliente."
+                                />
+                                {field("transferFrom", "¿Quién transfiere? (emisor)", false, "Nombre o banco de quien paga")}
+                              </>
+                            );
+                          if (kind === "Tarjeta" && !mpActive)
+                            return (
+                              <>
+                                {field("cardLast4", "Últimos 4 dígitos", true, "1234")}
+                                {chips("cardType", "Tipo de tarjeta", options(["Débito", "Crédito"]))}
+                                {field("cardOp", "No. de operación de la terminal", false, "Opcional")}
+                              </>
+                            );
+                          return null;
                         })()}
-                        {["Banco", "Billetera"].includes(accounts.find((a) => a.id === val("accountId"))?.kind || "") && (
-                          <TransferInfo
-                            list={((all: TransferAccount[]) =>
-                              all.some((t) => t.accountId === val("accountId"))
-                                ? all.filter((t) => t.accountId === val("accountId"))
-                                : all.filter((t) => !t.ownerHidden))(b!.setting("transferAccounts", []))}
-                            amount={saleTotal}
-                            phone={customers.find((c) => c.id === val("customerId"))?.phone || ""}
-                            emptyText="Captura tus datos de transferencia en Ajustes → Formas de pago para mandárselos al cliente."
-                          />
-                        )}
                         {fromBasket && cartEditor}
-                        {(advanced || !!val("customerId")) &&
+                        {/* 2.11 · Cliente: solo un check; sin él es Venta al público en general. */}
+                        <Checkbox
+                          label="¿Ya es cliente?"
+                          hint={val("customerId") ? undefined : "Si no, se registra como Venta al público en general."}
+                          value={val("isCustomer") === "1" || !!val("customerId")}
+                          onChange={(on) => {
+                            if (!on) return (set("isCustomer", ""), set("customerId", ""), set("autoFollow", ""));
+                            set("isCustomer", "1");
+                            setSearch("");
+                            setSelector({ key: "customerId", label: "Cliente", rows: customers.filter((c) => !c.archived), optional: true, create: "Cliente" });
+                          }}
+                        />
+                        {(val("isCustomer") === "1" || !!val("customerId")) &&
                           choose(
                             "customerId",
                             "Cliente",
@@ -1553,12 +1530,10 @@ export function OwnerFormModal(props: {
                           const curFollow = val("autoFollow");
                           return (
                             <View style={{ marginBottom: 8 }}>
-                              <Text style={s.label}>Recordatorio de recompra (seguimiento)</Text>
+                              <Text style={s.label}>Recordatorio de recompra</Text>
                               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
                                 {[
-                                  { id: String(sugDays), label: `Recompra ${sugDays}d` },
-                                  { id: "15", label: "15 días" },
-                                  { id: "30", label: "30 días" },
+                                  { id: String(sugDays), label: `${sugDays} días` },
                                   { id: "", label: "Sin agendar" },
                                 ].map((opt) => {
                                   const on = curFollow === opt.id;
@@ -1577,19 +1552,14 @@ export function OwnerFormModal(props: {
                             </View>
                           );
                         })()}
-                        {more("＋ Cliente y más opciones")}
-                        {advanced && (
-                          <>
-                            {val("applyDiscount") !== "1" && !val("total") && moneyField("total", "Precio especial MXN (lo que quieres recibir)", amount(listTotal))}
-                            {moneyField("paid", "Cobro de hoy MXN", "Vacío = pago completo")}
-                            {chips("channel", "Canal *", options(channels))}
-                            {field("notes", "Notas", false, "", true)}
-                            <View style={[s.between, { marginBottom: 6 }]}>
-                              <Text style={[s.body, { flex: 1 }]}>Autorizar venta debajo del costo (solo esta venta)</Text>
-                              <Switch value={allow} onValueChange={setAllow} />
-                            </View>
-                          </>
-                        )}
+                        <View style={{ height: 4 }} />
+                        <SelectAccordion
+                          label="Canal"
+                          value={val("channel") || "Mostrador"}
+                          options={channels}
+                          onChange={(v) => set("channel", v)}
+                        />
+                        <SoldByPicker b={b!} value={val("soldBy") || OWNER_SELLER} onChange={(v) => set("soldBy", v)} />
                         <Pressable
                           accessibilityRole="button"
                           accessibilityLabel="Ver lo que recibes"
@@ -1950,5 +1920,48 @@ export function OwnerFormModal(props: {
           {!!form && payOverlay}
         </SafeAreaView>
       </Modal>
+  );
+}
+
+/** 2.11 · Quién vendió (vendedores sin la app): «Dueño» y los nombres que agregues. */
+export const OWNER_SELLER = "Dueño";
+export function SoldByPicker({ b, value, onChange }: { b: Business; value: string; onChange: (v: string) => void }) {
+  const [names, setNames] = useState<string[]>(() => {
+    const v = b.setting("soldByNames", []);
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()) : [];
+  });
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    const name = draft.trim().replace(/\s+/g, " ").slice(0, 40);
+    if (!name || name.toLowerCase() === OWNER_SELLER.toLowerCase()) return;
+    const next = names.some((n) => n.toLowerCase() === name.toLowerCase()) ? names : [...names, name];
+    setNames(next);
+    try {
+      b.setSetting("soldByNames", next);
+    } catch {}
+    setDraft("");
+    onChange(name);
+  };
+  return (
+    <SelectAccordion
+      label="Vendió"
+      value={value}
+      options={[OWNER_SELLER, ...names]}
+      onChange={onChange}
+      extra={
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingVertical: 8, borderTopWidth: 1, borderColor: C.line }}>
+          <TextInput
+            accessibilityLabel="Nombre del vendedor"
+            style={[s.input, { flex: 1, paddingVertical: 6, minHeight: 34 }]}
+            value={draft}
+            onChangeText={setDraft}
+            placeholder="＋ Agregar vendedor"
+            placeholderTextColor={C.muted}
+            onSubmitEditing={add}
+          />
+          {!!draft.trim() && <TextButton title="Agregar" bold onPress={add} />}
+        </View>
+      }
+    />
   );
 }

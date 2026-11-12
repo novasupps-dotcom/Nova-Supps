@@ -396,6 +396,65 @@ export function Chips({
   );
 }
 /** Casilla de verificación grande y fácil de tocar. */
+/**
+ * 2.11 · Selector plegable (mismo estilo que los filtros de Vender): renglón con el valor
+ * elegido y, al tocarlo, la lista con palomita. `extra` va al final de la lista abierta.
+ */
+export function SelectAccordion({
+  label,
+  value,
+  options,
+  onChange,
+  extra,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+  extra?: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={{ borderRadius: 16, borderWidth: 1, borderColor: C.line, marginBottom: 10, overflow: "hidden", backgroundColor: C.paper }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${label}: ${value || "sin elegir"}`}
+        onPress={() => setOpen((x) => !x)}
+        style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 12, gap: 8 }, pressed && { backgroundColor: C.soft }]}
+      >
+        <Text style={[s.body, { flex: 1, fontWeight: "600" }]}>{label}</Text>
+        <Text style={{ fontSize: 13.5, fontWeight: "600", color: value ? C.brand : C.muted }} numberOfLines={1}>
+          {value || "Elegir"}
+        </Text>
+        <Icon name="chevron-down" size={16} color={C.muted} style={open ? { transform: [{ rotate: "180deg" }] } : undefined} />
+      </Pressable>
+      {open && (
+        <View style={{ borderTopWidth: 1, borderColor: C.line }}>
+          {options.map((o) => {
+            const on = o === value;
+            return (
+              <Pressable
+                key={o}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: on }}
+                accessibilityLabel={`${label} ${o}`}
+                onPress={() => (onChange(o), setOpen(false))}
+                style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 11, gap: 10 }, pressed && { backgroundColor: C.soft }]}
+              >
+                <View style={[s.checkBox, { width: 22, height: 22, borderRadius: 11 }, on && { backgroundColor: C.brand, borderColor: C.brand }]}>
+                  {on && <Icon name="check" size={14} color="#fff" />}
+                </View>
+                <Text style={[s.body, { flex: 1 }, on && { fontWeight: "600" }]}>{o}</Text>
+              </Pressable>
+            );
+          })}
+          {extra}
+        </View>
+      )}
+    </View>
+  );
+}
+
 export function Checkbox({
   label,
   hint,
