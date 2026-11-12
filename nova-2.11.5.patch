@@ -1,0 +1,75 @@
+From 395b4cb3a75a21bdf7f57d221e42c0ecd234879b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 12 Nov 2026 13:18:44 -0600
+Subject: [PATCH] =?UTF-8?q?Pruebas:=20aviso=20de=20devoluci=C3=B3n=20sin?=
+ =?UTF-8?q?=20depender=20del=20tiempo=20y=20l=C3=ADmite=20de=2010=20minuto?=
+ =?UTF-8?q?s?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- ui.cjs: el aviso «devueltos en Mercado Pago» dura 1.8 s; se revisa después de
+  cada espera para que no falle cuando GitHub va lento.
+- ui.cjs: si una prueba falla, el proceso termina en vez de quedarse esperando.
+- run_tests.cjs: cada grupo de pruebas se corta a los 10 minutos (antes la falla
+  dejó el trabajo colgado hasta el límite de 40 minutos de GitHub).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BEDHDf7xVD58wMNapLuanT
+---
+ scripts/run_tests.cjs | 8 ++++++--
+ tests/ui.cjs          | 7 ++++---
+ 2 files changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/scripts/run_tests.cjs b/scripts/run_tests.cjs
+index 2cd9c97..d6cad19 100644
+--- a/scripts/run_tests.cjs
++++ b/scripts/run_tests.cjs
+@@ -6,13 +6,17 @@ const root = path.resolve(__dirname, "..");
+ const unit = fs.readdirSync(path.join(root, "tests")).filter(f => f.endsWith(".test.ts")).map(f => path.join("tests", f));
+ const suites = ["ui", "forms", "team", "lock", "charge", "cloud", "photos", "receipt", "v17", "screens", "iosphoto", "terminalnormal", "v21", "secure", "v22", "sql22", "hermes", "catalogui", "orderui"];
+ const runs = [["--experimental-strip-types", "--import", "./tests/ts-resolve.mjs", "--test", ...unit], ...suites.map(s => ["tests/" + s + ".cjs"])];
++// 2.11.5: si una prueba falla y se queda esperando, se corta a los 10 minutos (antes GitHub
++// esperaba 40 minutos y cancelaba todo).
++const LIMIT = { timeout: 10 * 60 * 1000, killSignal: "SIGKILL" };
+ for (const args of runs) {
+-  const result = spawnSync(process.execPath, args, { cwd: root, stdio: "inherit" });
++  const result = spawnSync(process.execPath, args, { cwd: root, stdio: "inherit", ...LIMIT });
++  if (result.signal) { console.error(`La prueba ${args.at(-1)} no terminó en 10 minutos.`); process.exit(1); }
+   if (result.error) { console.error(result.error.message); process.exit(1); }
+   if (result.status !== 0) process.exit(result.status || 1);
+ }
+ const python = process.env.NOVA_TEST_PYTHON || (process.platform === "win32" ? "python" : "python3");
+-const edge = spawnSync(process.execPath, ["--experimental-strip-types", "tests/edge.cjs"], { cwd: root, stdio: "inherit" });
++const edge = spawnSync(process.execPath, ["--experimental-strip-types", "tests/edge.cjs"], { cwd: root, stdio: "inherit", ...LIMIT });
+ if (edge.error) { console.error(edge.error.message); process.exit(1); }
+ if (edge.status !== 0) process.exit(edge.status || 1);
+ const signing = spawnSync(python, ["tests/resign_apk.py"], { cwd: root, stdio: "inherit" });
+diff --git a/tests/ui.cjs b/tests/ui.cjs
+index 5c9d78b..3377a1d 100644
+--- a/tests/ui.cjs
++++ b/tests/ui.cjs
+@@ -180,11 +180,12 @@ async function flush(ms=800){await act(async()=>{await new Promise(r=>setTimeout
+   await press('Ventas');await pressExact('Este mes');const c=ui.root.findAll(n=>n.type==='Pressable'&&typeof n.props.onPress==='function'&&text(n).includes(v.id.slice(-8).toUpperCase()));await act(async()=>c[0].props.onPress());
+   await pressExact('Devolver productos / modificar venta');await type('Nuevo total MXN',((v.total-5000)/100).toFixed(2));
+   assert(text(ui.root).includes('Devolver al cliente'));assert(text(ui.root).includes('también en Mercado Pago'));
+-  await pressExact('Devolver y guardar cambios');for(let i=0;i<4;i++)await flush(15);
++  // 2.11.5: el aviso dura 1.8 s; se revisa después de cada espera (en GitHub las esperas pueden tardar más).
++  await pressExact('Devolver y guardar cambios');let refundToast=text(ui.root).includes('devueltos en Mercado Pago');for(let i=0;i<4;i++){await flush(15);refundToast=refundToast||text(ui.root).includes('devueltos en Mercado Pago');}
+   const ref=mpCalls.find(c=>/\/refund$/.test(c.url));assert(ref,'devolución enviada');assert.equal(ref.body.transactions[0].amount,'50.00');assert.equal(ref.body.transactions[0].id,'PAY9');
+   assert.equal(sql.prepare("SELECT total FROM sales WHERE id=?").get(v.id).total,v.total-5000);
+   assert.equal(sql.prepare("SELECT SUM(amount) n FROM ledger WHERE ref=? AND kind='sale'").get(v.id).n,v.total-5000);
+-  assert(text(ui.root).includes('devueltos en Mercado Pago'));}
++  assert(refundToast,'aviso de devolución en Mercado Pago');}
+  // Pago rechazado: no se registra nada.
+  script={final:{status:'failed',transactions:{payments:[{status:'failed',status_detail:'rejected_by_issuer'}]}}};
+  await press('Stock');await sellFromStock();await press(card);
+@@ -221,4 +222,4 @@ async function flush(ms=800){await act(async()=>{await new Promise(r=>setTimeout
+  assert.equal(alerts.length,0,JSON.stringify(alerts));
+  await act(async()=>ui.unmount());
+  console.log('UI PASS: resumen neto, Control Operativo, Stock → carrito, comisión visible, borrador al reiniciar, doble cobro, sin relecturas al escribir, fechas rápidas, WhatsApp, importes flexibles, error en formulario, canceladas y terminal Mercado Pago (modo PDV, aprobado/rechazado, comisión real, devolución parcial, abono en terminal).');
+-})().catch(e=>{console.error(e.stack);process.exitCode=1});
++})().catch(e=>{console.error(e.stack);process.exit(1)});
+-- 
+2.43.0
+
