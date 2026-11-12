@@ -1,0 +1,161 @@
+From 0a0642403f1d062d5e78c5211fc031fdf9e6d5af Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 11 Nov 2026 21:51:14 -0600
+Subject: [PATCH] Nova Negocio 2.11.1: quitar importaciones sin usar (tsc
+ --noUnusedLocals en GitHub)
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BEDHDf7xVD58wMNapLuanT
+---
+ app.json                    |  4 ++--
+ package-lock.json           |  4 ++--
+ package.json                |  2 +-
+ src/screens/OwnerModals.tsx |  1 -
+ src/screens/SalesPages.tsx  | 10 ----------
+ src/screens/ownerShared.ts  |  2 +-
+ 6 files changed, 6 insertions(+), 17 deletions(-)
+
+diff --git a/app.json b/app.json
+index d669a86..1387b88 100644
+--- a/app.json
++++ b/app.json
+@@ -2,7 +2,7 @@
+   "expo": {
+     "name": "Nova Negocio",
+     "slug": "nova-negocio",
+-    "version": "2.11.0",
++    "version": "2.11.1",
+     "orientation": "portrait",
+     "userInterfaceStyle": "light",
+     "ios": {
+@@ -20,7 +20,7 @@
+     "android": {
+       "package": "com.novasupps.negocio",
+       "allowBackup": false,
+-      "versionCode": 77,
++      "versionCode": 78,
+       "blockedPermissions": [
+         "android.permission.SYSTEM_ALERT_WINDOW",
+         "android.permission.RECORD_AUDIO"
+diff --git a/package-lock.json b/package-lock.json
+index 178a582..09a00c1 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1,12 +1,12 @@
+ {
+   "name": "nova-negocio",
+-  "version": "2.11.0",
++  "version": "2.11.1",
+   "lockfileVersion": 3,
+   "requires": true,
+   "packages": {
+     "": {
+       "name": "nova-negocio",
+-      "version": "2.11.0",
++      "version": "2.11.1",
+       "dependencies": {
+         "expo": "~55.0.31",
+         "expo-camera": "~55.0.23",
+diff --git a/package.json b/package.json
+index 3ed49ee..a06a943 100644
+--- a/package.json
++++ b/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "nova-negocio",
+-  "version": "2.11.0",
++  "version": "2.11.1",
+   "private": true,
+   "main": "index.ts",
+   "scripts": {
+diff --git a/src/screens/OwnerModals.tsx b/src/screens/OwnerModals.tsx
+index 927751b..84686a0 100644
+--- a/src/screens/OwnerModals.tsx
++++ b/src/screens/OwnerModals.tsx
+@@ -21,7 +21,6 @@ import {
+   cardFee,
+   feeLabel,
+   grossUp,
+-  jordanianDiscount,
+   money,
+   promoSummary,
+   today,
+diff --git a/src/screens/SalesPages.tsx b/src/screens/SalesPages.tsx
+index 01091ba..da35df6 100644
+--- a/src/screens/SalesPages.tsx
++++ b/src/screens/SalesPages.tsx
+@@ -11,7 +11,6 @@ import {
+   C,
+   Card,
+   Chips,
+-  DateField,
+   Note,
+   Pill,
+   fmtDay,
+@@ -22,12 +21,9 @@ import {
+ } from "../ui";
+ import type { Body, OwnerPageContext } from "./ownerContext";
+ import {
+-  PERIODS,
+   amount,
+   minus,
+   normalize,
+-  options,
+-  periodFrom,
+   CORTE_DEFAULT,
+   MONTHS_ES,
+   corteRange,
+@@ -38,7 +34,6 @@ import {
+   units,
+ } from "./ownerShared";
+ import { ReportsPage } from "./Reports";
+-import { MarginProjectionCard } from "./OrderImport";
+ 
+ /** «2026-11-11» ± n días. */
+ function addDaysIso(day: string, n: number): string {
+@@ -100,13 +95,10 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
+     data,
+     page,
+     b,
+-    currentPeriod,
+-    setPeriod,
+     excelCard,
+     excelOpen,
+     openExcel,
+     byMethodCard,
+-    resultCard,
+     line,
+     divider,
+     go,
+@@ -114,7 +106,6 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
+     cashAccount,
+     exportBackup,
+     filters,
+-    searchBox,
+     act,
+     saleDetailId,
+     sendReceipt,
+@@ -614,7 +605,6 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
+     // Las canceladas se ocultan siempre, salvo en su propio filtro.
+     const filter =
+       filters.Ventas === "Todas" ? "Activas" : filters.Ventas || "Activas";
+-    const day = today();
+     const cancelled = sales.filter((v) => v.status === "cancelled");
+     const saleProducts = (v: Row) => {
+       const ls = d.lines.get(v.id) ?? [];
+diff --git a/src/screens/ownerShared.ts b/src/screens/ownerShared.ts
+index 2e326e0..2226e20 100644
+--- a/src/screens/ownerShared.ts
++++ b/src/screens/ownerShared.ts
+@@ -3,7 +3,7 @@ import { type Outcome, type TerminalPayment } from "../mercadopago";
+ import type { IconName } from "../icons";
+ import { TILE } from "../theme";
+ 
+-export const VERSION = "2.11.0";
++export const VERSION = "2.11.1";
+ export const HOME = "Vender";
+ 
+ export const PAGES = [
+-- 
+2.43.0
+
