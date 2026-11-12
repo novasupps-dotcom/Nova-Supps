@@ -7,6 +7,9 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import * as SQLite from "expo-sqlite";
 import * as FS from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
+import { salePdf, salePdfInfo } from "./src/salePdf";
+import { photoFor } from "./src/screens/CustomerCatalog";
+import { bytesToBase64 } from "./src/photos";
 import * as Picker from "expo-document-picker";
 import * as LocalAuthentication from "expo-local-authentication";
 import {
@@ -831,9 +834,7 @@ function AppContent({ business }: { business?: Business }) {
       b!.updateSaleDetails(id, { ...d.f, channel: d.f.channel });
       if (d.f.customerId) {
         const cust = data?.customers.find((c) => c.id === d.f.customerId);
-        const markLoyal =
-          d.f.markLoyal === "1" ||
-          ((d.f.applyDiscount === "1" || !!d.f.total) && d.f.markLoyal !== "0");
+        const markLoyal = d.f.markLoyal === "1";
         if (cust && (Number(d.f.autoFollow) > 0 || markLoyal)) {
           const prevNotes = String(cust.notes || "").trim();
           const loyalTag = "⭐ Cliente Leal";
@@ -860,6 +861,17 @@ function AppContent({ business }: { business?: Business }) {
           mpPaymentId: mpInfo.paymentId || "",
         });
       if (x.promo.hits.length) extra.promos = promoSummary(x.promo.hits);
+      // 2.11 · Quién vendió (vendedores sin la app) y datos del cobro para el comprobante.
+      if (d.f.soldBy && d.f.soldBy !== "Dueño") extra.seller = d.f.soldBy;
+      const kind = data?.accounts.find((a) => a.id === d.f.accountId)?.kind || "";
+      if (kind === "Efectivo" && tryCents(d.f.cashGiven || "")) extra.cashGiven = tryCents(d.f.cashGiven);
+      if ((kind === "Banco" || kind === "Billetera") && d.f.transferFrom?.trim()) extra.transferFrom = d.f.transferFrom.trim().slice(0, 80);
+      if (kind === "Tarjeta" && (d.f.cardLast4 || d.f.cardType || d.f.cardOp))
+        extra.cardManual = {
+          last4: String(d.f.cardLast4 || "").replace(/\D/g, "").slice(-4),
+          type: d.f.cardType || "",
+          operation: String(d.f.cardOp || "").trim().slice(0, 40),
+        };
       if (Object.keys(extra).length)
         b!.setSetting("sale:" + id, {
           ...b!.setting("sale:" + id, {}),
@@ -885,7 +897,47 @@ function AppContent({ business }: { business?: Business }) {
       total: noticeTotal,
       method: account?.kind || d.f.channel,
     }).catch(() => {});
+    // 2.11 · Al cobrar se genera el comprobante en PDF y se abre para compartirlo.
+    if (saleId) setTimeout(() => void shareSalePdf(saleId), 700);
     return { msg, saleId };
+  }
+  /** 2.11 · Comprobante de venta en PDF (logo, productos con foto, fecha, hora y detalle del cobro). */
+  async function shareSalePdf(saleId: string) {
+    try {
+      if (!b) return;
+      const v = b.saleDetail(saleId);
+      const stock = b.stock();
+      const byId = new Map(stock.map((p: Row) => [p.id as string, p]));
+      const info = salePdfInfo(v, {
+        store: STORE_NAME,
+        accounts: b.all("SELECT id,name,kind FROM accounts"),
+        products: byId,
+        transferAccounts: b.setting("transferAccounts", []),
+      });
+      for (let i = 0; i < info.lines.length; i++) {
+        const p: Row | undefined = byId.get((v.lines as Row[])[i]?.productId);
+        if (!p) continue;
+        try {
+          info.lines[i].photo = await photoFor({
+            id: p.id,
+            name: p.name,
+            segment: "",
+            price: p.price,
+            imageKey: p.imageKey,
+            uris: [p.cleanImageUri, ...(Array.isArray(p.imageUris) ? p.imageUris : []), p.imageUri].filter(
+              (u: any, k: number, all: any[]) => typeof u === "string" && !!u && all.indexOf(u) === k,
+            ),
+          });
+        } catch {}
+      }
+      const uri = FS.documentDirectory + `Venta_${info.folio}.pdf`;
+      await FS.writeAsStringAsync(uri, bytesToBase64(salePdf(info)), { encoding: FS.EncodingType.Base64 });
+      if (!(await Sharing.isAvailableAsync())) return;
+      await Sharing.shareAsync(uri, { mimeType: "application/pdf", UTI: "com.adobe.pdf", dialogTitle: `Venta ${info.folio}` });
+      await pruneFiles("Venta_", 20);
+    } catch (e) {
+      notify("No se pudo generar el PDF de la venta: " + errText(e));
+    }
   }
   /** Guarda en la venta el cobro hecho en la terminal y concilia su comisión real. */
   function recordMpPayment(
@@ -3376,27 +3428,10 @@ function AppContent({ business }: { business?: Business }) {
           })}
         </View>
       )}
+      {/* 2.11: «Vaciar carrito» visible (sin «Poner en espera»). */}
       {form === "Venta" && checkoutFromBasket.current && !!cart.length && (
-        <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 18, marginTop: -4, marginBottom: 4 }}>
-          <TextButton
-            title="Poner en espera"
-            color={C.brand}
-            onPress={() => {
-              setParkedCart({
-                items: cart,
-                f: { ...f },
-                at: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-              });
-              setBasket([]);
-              setBasketF({});
-              setCart([]);
-              checkoutFromBasket.current = false;
-              close();
-              go("Vender");
-              notify("Venta puesta en espera");
-            }}
-          />
-          <TextButton title="Vaciar carrito" color={C.red} onPress={emptyBasket} />
+        <View style={{ marginTop: 2, marginBottom: 6 }}>
+          <Button icon="trash-2" title="Vaciar carrito" danger small onPress={emptyBasket} />
         </View>
       )}
       {!cart.length && (

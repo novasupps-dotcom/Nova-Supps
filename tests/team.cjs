@@ -165,10 +165,8 @@ const flush=async(n=6,ms=15)=>{for(let i=0;i<n;i++)await act(async()=>{await new
  await o.press('Ajustes');await o.press('Invitar, formas de pago y sincronizar');await flush(4);await o.press('Sincronizar ahora');await flush(10);
  const mpAcct=ob.accounts().find(a=>a.name==='Mercado Pago');assert(mpAcct,'cuenta Mercado Pago creada al guardar los datos');assert.equal(ob.accounts().filter(a=>a.name==='Banamex').length,1);
  const local=ob.sales().find(v=>v.remoteId===tv.id);assert(local,'venta registrada');assert.equal(ob.salePaymentsByAccount().get(local.id)[mpAcct.id],tv.total,'cae en la cuenta Mercado Pago');assert.equal(local.transferLabel,'Mercado Pago');
- // Filtro de Ventas por forma de cobro
- await o.press('Ventas');assert(o.all().includes('Efectivo'));await o.press('Mercado Pago');
- assert(/1\s+venta\s+·/.test(o.all()),'solo la de Mercado Pago');assert(o.all().includes(`cobrado por Mercado Pago: ${money(tv.total)}`));
- await o.press('Efectivo');assert(!o.all().includes('cobrado por Efectivo: $0.00'));await o.press('Terminal (tarjeta)');assert(o.all().includes('cobrado por Terminal'));await o.press('Todos los cobros');
+ // 2.11: Ventas sin filtro por forma de cobro (solo mes / semana).
+ await o.press('Ventas');assert(o.all().includes('Este mes')&&!o.all().includes('Todos los cobros'));
  const luisId0=fake.users.find(u=>u.email==='luis@gns.mx').id;
  await o.press('Ajustes');await o.press('Invitar, formas de pago y sincronizar');await flush(6);await o.press('✓ Mercado Pago');await flush(6);assert.deepEqual(fake.T.members.find(m=>m.user_id===luisId0).transfer_ids,['banamex']);
  await x.press('Cuenta');await x.press('Actualizar ahora');await flush(6);await x.press('Vender');await x.add(cat.name);await x.press('Transferencia');

@@ -193,9 +193,45 @@ print(json.dumps({'sheets':wb.sheetnames,'hdr':hdr,'n':len(rows),'last':[str(x) 
   const cash = b.all("SELECT name FROM accounts WHERE kind='Efectivo'")[0].name;
   await pressExact(cash);
   assert(all().includes("Comisión que absorbe el cliente"), "efectivo: también la absorbe el cliente");
+  // 2.11 · Carrito simplificado: sin calculadora, sin espera, sin precio especial ni cobro de hoy.
+  {
+    const t = all();
+    for (const gone of ["Calculadora de efectivo", "Poner en espera", "Precio especial", "Cobro de hoy", "Gauss-Jordan", "Autorizar venta debajo del costo"])
+      assert(!t.includes(gone), "ya no aparece: " + gone);
+    assert(pressables((n) => text(n).includes("Vaciar carrito")).length, "Vaciar carrito visible");
+    await pressLabel("Aplicar descuento");
+    await pressLabel("Descuento 10%");
+    assert(all().includes("Descuento aplicado"), "descuento del 10%");
+    await pressExact("Quitar");
+    assert(!all().includes("Descuento aplicado"), "quitar el descuento");
+    const given = ui.root.findAll((n) => n.type === "TextInput" && n.props.accessibilityLabel === "¿Con cuánto pagó? MXN")[0];
+    assert(given, "efectivo: con cuánto pagó");
+    await act(async () => given.props.onChangeText("2000"));
+    assert(/Cambio: \$/.test(all()), "muestra el cambio");
+    await pressLabel("Canal: Mostrador");
+    await pressLabel("Canal WhatsApp");
+    await pressLabel("Vendió: Dueño");
+    const nm = ui.root.findAll((n) => n.type === "TextInput" && n.props.accessibilityLabel === "Nombre del vendedor")[0];
+    await act(async () => nm.props.onChangeText("Ana"));
+    await pressExact("Agregar");
+    assert(all().includes("Venta al público en general"), "sin cliente: público en general");
+  }
+  const pdfBefore = shared.length;
   await press("Cobrar $");
   for (let i = 0; i < 3; i++) await flush(20);
   assert.equal(b.sales().length, s0 + 1, "venta registrada desde el carrito");
+  {
+    const v = b.sales()[0];
+    assert.equal(v.seller, "Ana", "quién vendió");
+    assert.equal(v.channel, "WhatsApp", "canal");
+    assert.equal(v.cashGiven, 200000, "con cuánto pagó");
+    assert.deepEqual(b.setting("soldByNames", []), ["Ana"], "la vendedora queda guardada");
+    for (let i = 0; i < 6; i++) await flush(200);
+    const pdf = Object.keys(written).filter((u) => /Venta_.*\.pdf$/.test(u));
+    assert.equal(pdf.length, 1, "PDF de la venta: " + Object.keys(written).join(","));
+    assert.equal(shared.slice(pdfBefore).at(-1)?.o?.mimeType, "application/pdf", "se abre para compartir");
+    console.log("  ✓ 2.11: carrito simplificado (descuento, pagó con, canal, vendió) y PDF al cobrar");
+  }
   assert(!ui.root.findAll((n) => n.props.accessibilityLabel === "Abrir carrito").length, "el carrito queda vacío después de cobrar");
   {
     const v = b.saleDetail(b.sales()[0].id);

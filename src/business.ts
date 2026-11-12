@@ -2254,9 +2254,10 @@ export class Business {
       Banco: "Transferencia",
       Efectivo: "Efectivo",
       Tarjeta: "Tarjeta",
-      Billetera: "Billetera",
+      // 2.11: billeteras (Mercado Pago, etc.) se muestran como Transferencia.
+      Billetera: "Transferencia",
     };
-    const order = ["Transferencia", "Tarjeta", "Efectivo", "Billetera"];
+    const order = ["Tarjeta", "Efectivo", "Transferencia"];
     const byMethod = this.all(
       "SELECT a.kind,COALESCE(SUM(CASE WHEN l.kind IN ('sale','refund') THEN l.amount ELSE 0 END),0) gross,COALESCE(SUM(CASE WHEN l.kind='expense' AND l.note LIKE 'Comisión tarjeta%' THEN -l.amount ELSE 0 END),0) fee FROM ledger l JOIN accounts a ON a.id=l.accountId WHERE l.created>=? AND l.created<? GROUP BY a.kind",
       since,
@@ -2269,6 +2270,16 @@ export class Business {
         net: r.gross - r.fee,
       }))
       .filter((r) => r.gross || r.fee)
+      // Varias cuentas con la misma etiqueta (Banco y Billetera → Transferencia) se suman.
+      .reduce((acc: Row[], r) => {
+        const same = acc.find((x) => x.method === r.method);
+        if (same) {
+          same.gross += r.gross;
+          same.fee += r.fee;
+          same.net += r.net;
+        } else acc.push({ ...r });
+        return acc;
+      }, [])
       .sort((x, y) => order.indexOf(x.method) - order.indexOf(y.method));
     // 1.9: comisión que pagaron los clientes (ya va dentro de las ventas).
     const saleMeta = this.settingsMap("sale:");

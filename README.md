@@ -1,4 +1,13 @@
-# Nova Negocio - 2.10.14
+# Nova Negocio - 2.11.0
+
+**2.11.0 - Cobro más sencillo, PDF de la venta, corte de 6:30 PM y resumen mensual (versionCode 77, solo JavaScript).**
+
+- **Carrito / cobro**: se quitan el descuento «Gauss-Jordan», la calculadora de efectivo, «Poner en espera», «Precio especial», «Cobro de hoy», «Notas» y «Autorizar venta debajo del costo». Nuevo botón «Descuento» (5 %, 10 %, 15 %, 20 % o un importe). «Vaciar carrito» como botón visible. Cliente con un check «¿Ya es cliente?» (si no, Venta al público en general). «Canal» y «Vendió» (Dueño o tu vendedora, se agrega una vez) como selectores plegables iguales al filtro de Vender. En efectivo, un solo campo «¿Con cuánto pagó?»; en transferencia, «¿Quién transfiere?»; en tarjeta sin terminal, últimos 4, tipo y operación.
+- **PDF de la venta**: al cobrar se genera y se abre para compartir: logo, productos con foto, fecha y hora, totales y el detalle del cobro (efectivo: pagó con y cambio o pago exacto; tarjeta: no. de transacción de la terminal, últimos 4 y crédito/débito; transferencia: cuenta, emisor y receptor) (`src/salePdf.ts`).
+- **Corte de caja**: va de 6:30 PM del día anterior a 6:30 PM; botón «Cerrar corte» y estado Realizado / En curso / Pendiente; vista «Últimos 7 días».
+- **Resumen**: mes a mes (empieza en 0 cada mes) con semanas; formas de pago (Billetera ahora es Transferencia); gastos solo del mes y solo si hay; Disponible del mes; «Efectivo en resguardo» (ej. lo que tiene Gustavo) anotado sin sumarse; utilidad sencilla (precio de venta - precio de compra - comisiones); proyección del stock con la comisión de tarjeta como supuesto; por vendedor.
+- **Gastos**: «Pagado con» Efectivo, Transferencia MP o Tarjeta.
+- **Ventas**: sin buscador ni botones de estado o de cobro; solo «Este mes» y «Esta semana» (las canceladas en un enlace).
 
 **2.10.14 - Se elimina por completo la sugerencia «Stack Base» (venta cruzada) de Vender y del carrito (versionCode 76, solo JavaScript).**
 

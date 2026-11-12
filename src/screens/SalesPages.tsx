@@ -2,7 +2,9 @@ import React from "react";
 import { STORE_NAME, TILE } from "../theme";
 import { Alert, Pressable, Share, View } from "react-native";
 import { Text } from "../text";
-import { localDay, money, today, type Row } from "../business";
+import { cardFee, feeLabel, grossUp, localDay, money, today, type Row } from "../business";
+import { salesReport } from "../reports";
+import { TextInput } from "../text";
 import { cardLabel, terminalPayments } from "../receipt";
 import {
   Button,
@@ -16,6 +18,7 @@ import {
   s,
   QuickActions,
   MenuList,
+  TextButton,
 } from "../ui";
 import type { Body, OwnerPageContext } from "./ownerContext";
 import {
@@ -25,12 +28,61 @@ import {
   normalize,
   options,
   periodFrom,
+  CORTE_DEFAULT,
+  MONTHS_ES,
+  corteRange,
+  hourLabel,
+  monthWeeks,
   saleDay,
   strings,
   units,
 } from "./ownerShared";
 import { ReportsPage } from "./Reports";
 import { MarginProjectionCard } from "./OrderImport";
+
+/** «2026-11-11» ± n días. */
+function addDaysIso(day: string, n: number): string {
+  const [y, m, d] = day.split("-").map(Number);
+  const t = new Date(y, m - 1, d + n);
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+}
+
+/** 2.11 · Efectivo en resguardo (por ejemplo, el que tiene Gustavo): queda registrado pero no se suma. */
+function CashAsideNote({ b, aside, amount: amt, act }: { b: any; aside: Row; amount: number; act: (fn: () => void, done?: string) => boolean }) {
+  const [edit, setEdit] = React.useState(false);
+  const [money_, setMoney] = React.useState(amt ? String(amt / 100) : "");
+  const [holder, setHolder] = React.useState(String(aside.holder || ""));
+  const [note, setNote] = React.useState(String(aside.note || ""));
+  if (!edit)
+    return (
+      <Pressable accessibilityRole="button" accessibilityLabel="Efectivo en resguardo" onPress={() => setEdit(true)} style={{ marginTop: 10, backgroundColor: C.soft, borderRadius: 12, padding: 10 }}>
+        <Text style={[s.body, { fontWeight: "600" }]}>
+          {amt ? `Efectivo en resguardo: ${money(amt)}${aside.holder ? ` · lo tiene ${aside.holder}` : ""}` : "＋ Anotar efectivo en resguardo"}
+        </Text>
+        <Note>{amt ? `${aside.note ? aside.note + " · " : ""}No se suma en ningún mes. Toca para editar.` : "Efectivo que existe pero no cuenta en el mes (por ejemplo, el que tiene Gustavo)."}</Note>
+      </Pressable>
+    );
+  return (
+    <View style={{ marginTop: 10, backgroundColor: C.soft, borderRadius: 12, padding: 10, gap: 6 }}>
+      <Text style={[s.body, { fontWeight: "600" }]}>Efectivo en resguardo (no se suma)</Text>
+      <TextInput accessibilityLabel="Importe en resguardo" style={s.input} value={money_} onChangeText={setMoney} keyboardType="decimal-pad" placeholder="Importe MXN" placeholderTextColor={C.muted} />
+      <TextInput accessibilityLabel="Quién lo tiene" style={s.input} value={holder} onChangeText={setHolder} placeholder="¿Quién lo tiene? (ej. Gustavo)" placeholderTextColor={C.muted} />
+      <TextInput accessibilityLabel="Nota del resguardo" style={s.input} value={note} onChangeText={setNote} placeholder="Nota (opcional)" placeholderTextColor={C.muted} />
+      <View style={[s.row, { marginVertical: 0 }]}>
+        <Button
+          title="Guardar"
+          small
+          onPress={() => {
+            const c = Math.round(Number(String(money_).replace(/[$,\s]/g, "")) * 100);
+            if (act(() => b.setSetting("cashAside", Number.isFinite(c) && c > 0 ? { amount: c, holder: holder.trim().slice(0, 40), note: note.trim().slice(0, 120), at: new Date().toISOString() } : null), "Efectivo en resguardo guardado"))
+              setEdit(false);
+          }}
+        />
+        <Button title="Cancelar" secondary small onPress={() => setEdit(false)} />
+      </View>
+    </View>
+  );
+}
 
 export function renderSalesPages(ctx: OwnerPageContext): Body | null {
   if (
@@ -90,94 +142,145 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
     m,
   } = d;
   if (page === "Resumen de ventas") {
-    const fromIso = periodFrom(currentPeriod);
-    const ps = b!.periodSummary(fromIso);
+    // 2.11 · Resumen mensual sencillo: empieza en 0 cada mes; se puede ver por semana.
+    const now = new Date();
+    const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const monthKey = /^\d{4}-\d{2}$/.test(filters.ResMes || "") ? filters.ResMes : curKey;
+    const [my, mm] = monthKey.split("-").map(Number);
+    const mStart = new Date(my, mm - 1, 1);
+    const mEnd = new Date(my, mm, 1);
+    const weeks = monthWeeks(mStart, mEnd);
+    const wi = Number(filters.ResSem);
+    const week = filters.ResSem !== "" && filters.ResSem !== undefined && Number.isInteger(wi) && weeks[wi] ? weeks[wi] : null;
+    const from = (week ? week.from : mStart).toISOString();
+    const to = (week ? week.to : mEnd).toISOString();
+    const ps = b!.periodSummary(from, to);
+    const monthName = MONTHS_ES[mm - 1];
+    const shiftMonth = (n: number) => {
+      const t = new Date(my, mm - 1 + n, 1);
+      const key = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}`;
+      if (key > curKey) return;
+      setFilters((old) => ({ ...old, ResMes: key, ResSem: "" }));
+    };
+    const expenses = b!.all(
+      "SELECT l.*,a.name account FROM ledger l JOIN accounts a ON a.id=l.accountId WHERE l.kind='expense' AND l.note NOT LIKE 'Comisión tarjeta%' AND l.created>=? AND l.created<? ORDER BY l.created",
+      from,
+      to,
+    );
+    const aside: Row = b!.setting("cashAside", null) || {};
+    const asideAmt = Number(aside.amount) || 0;
+    const sellers = salesReport(b!, { from, to }).sellers;
+    const profit = ps.revenue - ps.cost - ps.fees;
+    // Proyección: vender todo el stock (supuesto: todo con tarjeta; el cliente absorbe la comisión).
+    const proj = (b!.stock() as Row[])
+      .filter((p) => !p.archived && Number(p.stock) > 0)
+      .reduce(
+        (n, p) => {
+          const q = Number(p.stock);
+          const charged = grossUp(p.price, d.feeBps) * q;
+          n.cost += Number(p.value) || 0;
+          n.charged += charged;
+          n.receive += p.price * q;
+          n.fee += cardFee(charged, d.feeBps);
+          n.pieces += q;
+          return n;
+        },
+        { cost: 0, charged: 0, receive: 0, fee: 0, pieces: 0 },
+      );
+    const periodLabel = week ? week.label : `${monthName} ${my}`;
     return {
       scroll: (
         <>
+          <View style={[s.between, { marginBottom: 8 }]}>
+            <Button title="‹" secondary small onPress={() => shiftMonth(-1)} />
+            <Text style={[s.subtitle, { marginBottom: 0, flex: 1, textAlign: "center" }]}>{`${monthName[0].toUpperCase()}${monthName.slice(1)} ${my}`}</Text>
+            <Button title="›" secondary small disabled={monthKey >= curKey} onPress={() => shiftMonth(1)} />
+          </View>
           <View style={{ marginBottom: 10 }}>
             <Chips
               row
-              options={options(PERIODS)}
-              value={currentPeriod}
-              onChange={setPeriod}
+              options={[{ id: "", name: "Todo el mes" }, ...weeks.map((w, i) => ({ id: String(i), name: w.label }))]}
+              value={week ? String(wi) : ""}
+              onChange={(v) => setFilters((old) => ({ ...old, ResSem: v }))}
             />
           </View>
-          {excelCard("Descargar Excel de ventas")}
           <Card>
-            <View style={s.between}>
-              <Text style={[s.subtitle, { marginBottom: 0 }]}>Ventas totales</Text>
-              {(() => {
-                if (!fromIso) return null;
-                const now = new Date();
-                const prevFromIso =
-                  currentPeriod === "Hoy"
-                    ? new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toISOString()
-                    : currentPeriod === "7 días"
-                      ? new Date(now.getFullYear(), now.getMonth(), now.getDate() - 13).toISOString()
-                      : new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
-                const prevRow = b!.one(
-                  "SELECT COALESCE(SUM(total),0) rev FROM sales WHERE status='confirmed' AND created>=? AND created<?",
-                  prevFromIso,
-                  fromIso,
-                );
-                const prevRev = Number(prevRow?.rev) || 0;
-                if (prevRev <= 0) return null;
-                const pct = Math.round(((ps.revenue - prevRev) * 100) / prevRev);
-                return (
-                  <Pill
-                    text={`${pct >= 0 ? "+" : ""}${pct}% vs. periodo previo`}
-                    tone={pct >= 0 ? "ok" : "warn"}
-                  />
-                );
-              })()}
-            </View>
-            <Text style={s.price}>{money(ps.revenue)}</Text>
-            <Note>
-              {ps.orders} ventas confirmadas · ticket promedio{" "}
-              {money(ps.ticket)}
-            </Note>
+            <Text style={[s.label, { marginLeft: 0, marginTop: 0 }]}>{`Ventas totales · ${periodLabel}`}</Text>
+            <Text style={{ fontSize: 34, fontWeight: "700", color: C.ink, fontVariant: ["tabular-nums"] }}>{money(ps.revenue)}</Text>
+            <Note>{`${ps.orders} ${ps.orders === 1 ? "venta" : "ventas"}${ps.orders ? ` · ticket promedio ${money(ps.ticket)}` : ""}`}</Note>
           </Card>
-          {byMethodCard(ps)}
-          {resultCard(ps)}
           <Card>
-            <Text style={s.subtitle}>Ganancia, mermas y utilidad</Text>
-            {line("Ventas totales", money(ps.revenue))}
-            {line("Costo de la mercancía vendida", minus(ps.cost), {
-              color: C.red,
-            })}
-            {line(
-              "Ganancia bruta",
-              money(ps.gross) + " · " + ps.marginPercent.toFixed(2) + "%",
-              { bold: true },
+            <Text style={s.subtitle}>Ventas por forma de pago</Text>
+            {ps.byMethod.map((x: Row) =>
+              x.method === "Tarjeta" ? (
+                <View key="Tarjeta">
+                  {line("Terminal Mercado Pago", money(x.gross))}
+                  {line(`Comisión Mercado Pago ${feeLabel(d.feeBps)}`, minus(x.fee), { indent: true, color: C.red })}
+                  {line("Neto terminal", money(x.net), { indent: true })}
+                </View>
+              ) : (
+                <View key={x.method}>{line(x.method, money(x.gross))}</View>
+              ),
             )}
-            {divider()}
-            {line("Comisiones de tarjeta", minus(ps.fees), { color: C.red })}
-            {line("Gastos operativos", minus(ps.expenses), {
-              color: C.red,
-              onPress: () => go("Control Operativo"),
-            })}
-            {line("Mermas y ajustes de inventario", minus(ps.shrinkage), {
-              color: ps.shrinkage > 0 ? C.red : undefined,
-            })}
-            {divider()}
-            {line("Utilidad estimada", money(ps.profit), {
-              bold: true,
-              color: ps.profit >= 0 ? C.green : C.red,
-            })}
+            {!ps.byMethod.length && <Note>Sin cobros en este periodo.</Note>}
           </Card>
-          <MarginProjectionCard b={b!} />
-          <ReportsPage
-            b={b!}
-            version={revision}
-            embedded
-            externalFrom={fromIso}
-            externalLabel={currentPeriod}
-          />
-          <Button
-            title="Ver ventas y su desglose"
-            onPress={() => go("Ventas")}
-          />
+          {expenses.length > 0 && (
+            <Card>
+              <Text style={s.subtitle}>Gastos operativos</Text>
+              {expenses.map((x) => (
+                <View key={x.id}>{line(`${x.note} · ${x.account}`, minus(-x.amount), { color: C.red })}</View>
+              ))}
+              {divider()}
+              {line("Total de gastos", minus(ps.expenses), { bold: true, color: C.red })}
+            </Card>
+          )}
+          <Card tone="ok">
+            <Text style={s.subtitle}>Disponible</Text>
+            {line("Ventas cobradas (netas de comisión)", money(ps.netSales))}
+            {ps.expenses > 0 && line("Gastos operativos", minus(ps.expenses), { color: C.red })}
+            {divider()}
+            {line(`Disponible · ${periodLabel}`, money(ps.available), { bold: true, color: ps.available >= 0 ? C.green : C.red })}
+            <CashAsideNote b={b!} aside={aside} amount={asideAmt} act={act} />
+          </Card>
+          <Card>
+            <Text style={s.subtitle}>Utilidad</Text>
+            {line("Ventas (precio de venta)", money(ps.revenue))}
+            {line("Costo de la mercancía (precio de compra)", minus(ps.cost), { color: C.red })}
+            {ps.fees > 0 && line("Comisiones de tarjeta", minus(ps.fees), { color: C.red })}
+            {divider()}
+            {line("Utilidad", `${money(profit)}${ps.revenue ? ` · ${Math.round((profit / ps.revenue) * 100)}%` : ""}`, { bold: true, color: profit >= 0 ? C.green : C.red })}
+            {ps.expenses > 0 && line("Utilidad después de gastos", money(profit - ps.expenses), { color: profit - ps.expenses >= 0 ? C.green : C.red })}
+          </Card>
+          <Card>
+            <Text style={s.subtitle}>Margen y proyección del stock</Text>
+            {line(`Stock a costo · ${units(proj.pieces)}`, money(proj.cost))}
+            {line("Venta proyectada (todo el stock)", money(proj.charged))}
+            {line(`Comisión de tarjeta ${feeLabel(d.feeBps)} (supuesto: todo con tarjeta)`, minus(proj.fee), { color: C.red })}
+            {line("Costo de la mercancía", minus(proj.cost), { color: C.red })}
+            {divider()}
+            {line(
+              "Ganancia proyectada",
+              `${money(proj.charged - proj.fee - proj.cost)}${proj.charged ? ` · ${Math.round(((proj.charged - proj.fee - proj.cost) / proj.charged) * 100)}%` : ""}`,
+              { bold: true, color: C.green },
+            )}
+          </Card>
+          <Card>
+            <Text style={s.subtitle}>Por vendedor</Text>
+            {sellers.length ? (
+              sellers.map((x) => (
+                <View key={x.seller}>
+                  {line(
+                    `${/^t[uú] \(due[ñn]o\)$/i.test(x.seller) ? "Dueño" : x.seller} · ${x.sales} ${x.sales === 1 ? "venta" : "ventas"}`,
+                    money(x.charged),
+                  )}
+                </View>
+              ))
+            ) : (
+              <Note>Sin ventas en este periodo.</Note>
+            )}
+            <Note>Al cobrar eliges quién vendió (Dueño o tu vendedora).</Note>
+          </Card>
+          <Button title="Ver ventas y su desglose" onPress={() => go("Ventas")} />
         </>
       ),
     };
@@ -532,16 +635,19 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
     const activeProd = prodList.includes(filters.VentasVal) ? filters.VentasVal : "";
     const ventasListOpen = filters.VentasListaOpen === "1";
     const qNorm = normalize(query);
+    const rango = filters.VentasRango === "Semana" ? "Semana" : "Mes";
+    const nowD = new Date();
+    const rangeFrom = (
+      rango === "Semana"
+        ? new Date(nowD.getFullYear(), nowD.getMonth(), nowD.getDate() - ((nowD.getDay() + 6) % 7))
+        : new Date(nowD.getFullYear(), nowD.getMonth(), 1)
+    ).toISOString();
     let list = sales.filter((v) => {
+      // 2.11: solo las ventas del mes o de la semana (sin filtros de estado ni de cobro).
       const statusOk =
         filter === "Canceladas"
           ? v.status === "cancelled"
-          : v.status === "confirmed" &&
-            (filter === "Por cobrar"
-              ? v.paid < v.total
-              : filter === "Hoy"
-                ? saleDay(v) === day
-                : true);
+          : v.status === "confirmed" && String(v.created) >= rangeFrom;
       if (!statusOk) return false;
       const prods = saleProducts(v);
       if (activeProd && !prods.has(activeProd)) return false;
@@ -573,9 +679,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
         ? [{ id: "Tarjeta", name: "Terminal (tarjeta)" }]
         : []),
     ];
-    const payFilter = payOptions.some((o) => o.id === filters.VentasPago)
-      ? filters.VentasPago
-      : "Todos";
+    const payFilter: string = "Todos";
     const inGroup = (accountId: string) =>
       payFilter.startsWith("acct:")
         ? accountId === payFilter.slice(5)
@@ -624,7 +728,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                   </Card>
                   <QuickActions
                     items={[
-                      { label: "Corte de caja", icon: "calculator", onPress: () => go("Corte de caja") },
+                      { label: "Corte de caja", icon: "calculator", onPress: () => (setFilters((o) => ({ ...o, Corte: "" })), setCorteDay(""), go("Corte de caja")) },
                       { label: "Resumen", icon: "chart-column", onPress: () => go("Resumen de ventas") },
                       {
                         label: "Nuevo gasto",
@@ -642,35 +746,17 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                 </>
               );
             })()}
-            {false && searchBox("Buscar cliente, folio o suplemento")}
             <View style={{ marginBottom: 6 }}>
               <Chips
                 row
                 options={[
-                  { id: "Activas", name: "Activas" },
-                  { id: "Hoy", name: "Hoy" },
-                  { id: "Por cobrar", name: "Por cobrar" },
-                  {
-                    id: "Canceladas",
-                    name: `Canceladas (${cancelled.length})`,
-                  },
+                  { id: "Mes", name: "Este mes" },
+                  { id: "Semana", name: "Esta semana" },
                 ]}
-                value={filter}
-                onChange={(v) => setFilters((old) => ({ ...old, Ventas: v }))}
+                value={filter === "Canceladas" ? "" : rango}
+                onChange={(v) => setFilters((old) => ({ ...old, Ventas: "", VentasRango: v }))}
               />
             </View>
-            {payOptions.length > 2 && (
-              <View style={{ marginBottom: 6 }}>
-                <Chips
-                  row
-                  options={payOptions}
-                  value={payFilter}
-                  onChange={(v) =>
-                    setFilters((old) => ({ ...old, VentasPago: v }))
-                  }
-                />
-              </View>
-            )}
             {prodList.length > 0 && (
               <View style={{ marginBottom: 10 }}>
                 <Pressable
@@ -753,6 +839,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
             )}
             {filter === "Canceladas" ? (
               <>
+                <TextButton title="‹ Volver a las ventas" onPress={() => setFilters((old) => ({ ...old, Ventas: "" }))} />
                 <Note>No cuentan en tus ventas ni en reportes.</Note>
                 {list.length > 0 && (
                   <Button
@@ -770,10 +857,14 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                 {payFilter !== "Todos"
                   ? ` · cobrado por ${payOptions.find((o) => o.id === payFilter)?.name || ""}: ${money(collectedShown)}`
                   : ""}
-                {cancelled.length
-                  ? ` · ${cancelled.length} ${cancelled.length === 1 ? "cancelada oculta" : "canceladas ocultas"}`
-                  : ""}
               </Note>
+            )}
+            {filter !== "Canceladas" && cancelled.length > 0 && (
+              <TextButton
+                title={`Ver canceladas (${cancelled.length})`}
+                color={C.muted}
+                onPress={() => setFilters((old) => ({ ...old, Ventas: "Canceladas" }))}
+              />
             )}
             <View style={{ height: 8 }} />
           </>
@@ -863,10 +954,79 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
   }
 
   if (page === "Corte de caja") {
+    // 2.11 · Corte de 6:30 PM a 6:30 PM, con «Cerrar corte» y vista de los últimos 7 días.
+    const hhmm = String(b!.setting("corteHour", CORTE_DEFAULT));
     const day = corteDay || today();
-    const [y, mo, dd] = day.split("-").map(Number);
-    const from = new Date(y, mo - 1, dd).toISOString();
-    const to = new Date(y, mo - 1, dd + 1).toISOString();
+    const { from, to } = corteRange(day, hhmm);
+    const nowIso = new Date().toISOString();
+    const closedOf = (dd: string): Row | null => b!.setting("corte:" + dd, null);
+    const statusOf = (dd: string): { text: string; tone: "ok" | "warn" | "neutral" } => {
+      const c = closedOf(dd);
+      if (c) {
+        const t = new Date(c.at);
+        return { text: `Corte realizado · ${hourLabel(`${t.getHours()}:${String(t.getMinutes()).padStart(2, "0")}`)}`, tone: "ok" };
+      }
+      return nowIso < corteRange(dd, hhmm).to ? { text: `En curso · cierra ${hourLabel(hhmm)}`, tone: "neutral" } : { text: "Corte pendiente", tone: "warn" };
+    };
+    const mode = filters.Corte === "7" ? "7" : day === today() ? "Hoy" : day === addDaysIso(today(), -1) ? "Ayer" : "";
+    const modeChips = (
+      <View style={{ marginBottom: 10 }}>
+        <Chips
+          row
+          options={[
+            { id: "Hoy", name: "Hoy" },
+            { id: "Ayer", name: "Ayer" },
+            { id: "7", name: "Últimos 7 días" },
+          ]}
+          value={mode}
+          onChange={(v) => {
+            setFilters((old) => ({ ...old, Corte: v === "7" ? "7" : "" }));
+            if (v !== "7") setCorteDay(v === "Ayer" ? addDaysIso(today(), -1) : today());
+          }}
+        />
+      </View>
+    );
+    if (mode === "7") {
+      const days = Array.from({ length: 7 }, (_, i) => addDaysIso(today(), -i));
+      const rows = days.map((dd) => {
+        const r = corteRange(dd, hhmm);
+        return { dd, ps: b!.periodSummary(r.from, r.to), st: statusOf(dd) };
+      });
+      const total = rows.reduce((n, r) => n + r.ps.revenue, 0);
+      const orders = rows.reduce((n, r) => n + r.ps.orders, 0);
+      const pending = rows.filter((r) => r.st.tone === "warn" && r.ps.orders > 0).length;
+      return {
+        scroll: (
+          <>
+            {modeChips}
+            <Card>
+              <Text style={s.subtitle}>Últimos 7 días</Text>
+              <Text style={s.price}>{money(total)}</Text>
+              <Note>{`${orders} ${orders === 1 ? "venta" : "ventas"}${pending ? ` · ${pending} ${pending === 1 ? "corte pendiente" : "cortes pendientes"}` : " · cortes al día"}`}</Note>
+            </Card>
+            {rows.map(({ dd, ps, st }) => (
+              <Card
+                key={dd}
+                onPress={() => {
+                  setFilters((old) => ({ ...old, Corte: "" }));
+                  setCorteDay(dd);
+                }}
+              >
+                <View style={s.between}>
+                  <Text style={[s.body, { fontWeight: "600", flex: 1 }]}>{dd === today() ? "Hoy" : fmtDay(dd)}</Text>
+                  <Text style={[s.body, { fontWeight: "700", fontVariant: ["tabular-nums"] }]}>{money(ps.revenue)}</Text>
+                </View>
+                <View style={[s.between, { marginTop: 4 }]}>
+                  <Note>{`${ps.orders} ${ps.orders === 1 ? "venta" : "ventas"}`}</Note>
+                  <Pill text={st.text} tone={st.tone} />
+                </View>
+              </Card>
+            ))}
+            <Note>{`Cada corte va de las ${hourLabel(hhmm)} del día anterior a las ${hourLabel(hhmm)}.`}</Note>
+          </>
+        ),
+      };
+    }
     const ps = b!.periodSummary(from, to);
     const expenses = b!.all(
       "SELECT l.*,a.name account FROM ledger l JOIN accounts a ON a.id=l.accountId WHERE l.kind='expense' AND l.note NOT LIKE 'Comisión tarjeta%' AND l.created>=? AND l.created<? ORDER BY l.created",
@@ -928,18 +1088,13 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
     return {
       scroll: (
         <>
-          <DateField
-            label="Día del corte"
-            value={day}
-            onChange={(v) => setCorteDay(v || today())}
-            quick={[
-              { label: "Hoy", days: 0 },
-              { label: "Ayer", days: -1 }, { label: "Semana", days: -7 },
-            ]}
-            allowEmpty={false}
-          />
+          {modeChips}
           <Card>
-            <Text style={s.subtitle}>Ventas del día</Text>
+            <View style={[s.between, { gap: 8 }]}>
+              <Text style={[s.subtitle, { flex: 1 }]}>{day === today() ? "Corte de hoy" : `Corte del ${fmtDay(day)}`}</Text>
+              <Pill text={statusOf(day).text} tone={statusOf(day).tone} />
+            </View>
+            <Note>{`Del ${fmtDay(addDaysIso(day, -1))} ${hourLabel(hhmm)} al ${fmtDay(day)} ${hourLabel(hhmm)}`}</Note>
             <Text style={s.price}>{money(ps.revenue)}</Text>
             <Note>
               {ps.orders} {ps.orders === 1 ? "venta" : "ventas"}
@@ -998,8 +1153,29 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
               {items.map((i) => line(i.name, units(i.qty)))}
             </Card>
           )}
+          {!closedOf(day) ? (
+            <Button
+              icon="lock"
+              title="Cerrar corte"
+              onPress={() =>
+                act(
+                  () =>
+                    b!.setSetting("corte:" + day, {
+                      at: new Date().toISOString(),
+                      revenue: ps.revenue,
+                      orders: ps.orders,
+                      cash: cash.closing,
+                    }),
+                  "Corte cerrado",
+                )
+              }
+            />
+          ) : (
+            <Note color={C.green}>{`Corte cerrado el ${fmtDay(localDay(closedOf(day)!.at))} · ventas ${money(Number(closedOf(day)!.revenue) || 0)} · caja ${money(Number(closedOf(day)!.cash) || 0)}`}</Note>
+          )}
           <Button
             icon="share-2" title="Compartir corte"
+            secondary
             onPress={() =>
               void Share.share({ message: shareText }).catch(() => {})
             }

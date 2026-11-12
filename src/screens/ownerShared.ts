@@ -3,7 +3,7 @@ import { type Outcome, type TerminalPayment } from "../mercadopago";
 import type { IconName } from "../icons";
 import { TILE } from "../theme";
 
-export const VERSION = "2.10.14";
+export const VERSION = "2.11.0";
 export const HOME = "Vender";
 
 export const PAGES = [
@@ -198,6 +198,35 @@ export const channels = [
 ];
 
 export const PERIODS = ["Hoy", "7 días", "Mes", "Todo"];
+
+/** 2.11 · Hora del corte de caja (6:30 PM): el corte de un día va de esa hora del día anterior a esa hora. */
+export const CORTE_DEFAULT = "18:30";
+export function corteRange(day: string, hhmm = CORTE_DEFAULT): { from: string; to: string } {
+  const [y, m, d] = day.split("-").map(Number);
+  const [hh, mm] = (/^\d{1,2}:\d{2}$/.test(hhmm) ? hhmm : CORTE_DEFAULT).split(":").map(Number);
+  return { from: new Date(y, m - 1, d - 1, hh, mm).toISOString(), to: new Date(y, m - 1, d, hh, mm).toISOString() };
+}
+export const MONTHS_ES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+/** Semanas (lunes a domingo) dentro del mes: «3–9 nov». */
+export function monthWeeks(start: Date, end: Date): { from: Date; to: Date; label: string }[] {
+  const out: { from: Date; to: Date; label: string }[] = [];
+  let cur = new Date(start);
+  while (cur < end) {
+    const next = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + (7 - ((cur.getDay() + 6) % 7)));
+    const stop = next < end ? next : end;
+    const last = new Date(stop.getFullYear(), stop.getMonth(), stop.getDate() - 1);
+    const mon = MONTHS_ES[cur.getMonth()].slice(0, 3);
+    out.push({ from: cur, to: stop, label: cur.getDate() === last.getDate() ? `${cur.getDate()} ${mon}` : `${cur.getDate()}–${last.getDate()} ${mon}` });
+    cur = stop;
+  }
+  return out;
+}
+
+/** «18:30» → «6:30 PM». */
+export function hourLabel(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}
 
 export const normalize = (x: any) =>
   String(x ?? "")
