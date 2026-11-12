@@ -1,0 +1,662 @@
+From 54d96edfd23ec128dd06043e57523b4e5ca07210 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 11 Nov 2026 22:16:13 -0600
+Subject: [PATCH] =?UTF-8?q?Nova=20Negocio=202.11.2:=20desglose=20del=20due?=
+ =?UTF-8?q?=C3=B1o,=20aviso=20de=20tarjeta,=20corte=20y=20ventas=20por=20p?=
+ =?UTF-8?q?eriodo?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Carrito: desglose visible (costo, tu precio, % comisión de tarjeta, ganancia) que responde al descuento.
+- Tarjeta: sin captura manual; la terminal manda los datos y llega una notificación con ellos.
+- Ventas: bloque grande del periodo elegido, método de pago en cada venta, sin filtro por suplemento.
+- Corte: efectivo del corte (sin el saldo acumulado de la caja).
+- Resumen: $2,100 de Gustavo en reserva como nota (no se suman).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BEDHDf7xVD58wMNapLuanT
+---
+ App.tsx                     |  30 +++++--
+ app.json                    |   4 +-
+ package-lock.json           |   4 +-
+ package.json                |   2 +-
+ src/push.ts                 |  50 ++++++++++++
+ src/screens/OwnerModals.tsx |  47 ++++++-----
+ src/screens/SalesPages.tsx  | 153 +++++++++---------------------------
+ src/screens/ownerShared.ts  |   2 +-
+ tests/forms.cjs             |   2 +-
+ tests/ui.cjs                |  10 +--
+ tests/v17.cjs               |   8 +-
+ 11 files changed, 152 insertions(+), 160 deletions(-)
+
+diff --git a/App.tsx b/App.tsx
+index 64c7f9f..4063519 100644
+--- a/App.tsx
++++ b/App.tsx
+@@ -43,6 +43,7 @@ import {
+   setupNotifications,
+   scheduleFollowUps,
+   notifyOwnerSale,
++  notifyCardCharge,
+   detachPush,
+ } from "./src/push";
+ import { UpdateNotice } from "./src/screens/UpdateNotice";
+@@ -248,7 +249,8 @@ function AppContent({ business }: { business?: Business }) {
+   const [followPopup, setFollowPopup] = useState(false);
+   const [parkedCart, setParkedCart] = useState<{ items: Cart; f: Record<string, string>; at: string } | null>(null);
+   // 2.9: en el cobro, «Recibes / ganas» se abre con un toque.
+-  const [privateOpen, setPrivateOpen] = useState(false);
++  // 2.11.2: el desglose del dueño se ve de entrada (se puede plegar).
++  const [privateOpen, setPrivateOpen] = useState(true);
+   // 2.9: el formulario abierto (o, si no hay, la pantalla) se desplaza al campo con teclado.
+   const mainList = useRef<any>(null);
+   const formList = useRef<any>(null);
+@@ -866,12 +868,7 @@ function AppContent({ business }: { business?: Business }) {
+       const kind = data?.accounts.find((a) => a.id === d.f.accountId)?.kind || "";
+       if (kind === "Efectivo" && tryCents(d.f.cashGiven || "")) extra.cashGiven = tryCents(d.f.cashGiven);
+       if ((kind === "Banco" || kind === "Billetera") && d.f.transferFrom?.trim()) extra.transferFrom = d.f.transferFrom.trim().slice(0, 80);
+-      if (kind === "Tarjeta" && (d.f.cardLast4 || d.f.cardType || d.f.cardOp))
+-        extra.cardManual = {
+-          last4: String(d.f.cardLast4 || "").replace(/\D/g, "").slice(-4),
+-          type: d.f.cardType || "",
+-          operation: String(d.f.cardOp || "").trim().slice(0, 40),
+-        };
++
+       if (Object.keys(extra).length)
+         b!.setSetting("sale:" + id, {
+           ...b!.setting("sale:" + id, {}),
+@@ -898,7 +895,9 @@ function AppContent({ business }: { business?: Business }) {
+       method: account?.kind || d.f.channel,
+     }).catch(() => {});
+     // 2.11 · Al cobrar se genera el comprobante en PDF y se abre para compartirlo.
+-    if (saleId) setTimeout(() => void shareSalePdf(saleId), 700);
++    // 2.11.2: con terminal se espera a que Mercado Pago mande los datos de la tarjeta.
++    if (saleId && mpInfo) pdfAfterMp.current = saleId;
++    else if (saleId) setTimeout(() => void shareSalePdf(saleId), 700);
+     return { msg, saleId };
+   }
+   /** 2.11 · Comprobante de venta en PDF (logo, productos con foto, fecha, hora y detalle del cobro). */
+@@ -939,6 +938,8 @@ function AppContent({ business }: { business?: Business }) {
+       notify("No se pudo generar el PDF de la venta: " + errText(e));
+     }
+   }
++  /** 2.11.2 · Venta cobrada en la terminal cuyo PDF espera los datos de la tarjeta. */
++  const pdfAfterMp = useRef<string | null>(null);
+   /** Guarda en la venta el cobro hecho en la terminal y concilia su comisión real. */
+   function recordMpPayment(
+     saleId: string,
+@@ -1010,6 +1011,14 @@ function AppContent({ business }: { business?: Business }) {
+         ...(fee !== null ? { realFee: fee } : {}),
+       });
+       refresh();
++      // 2.11.2 · Aviso con los datos de la tarjeta y, si la venta espera su PDF, se genera ahora.
++      if (!manual && entry.kind !== "abono") {
++        void notifyCardCharge(b!, { saleId, amount: Number(entry.amount) || 0, card, fee });
++        if (pdfAfterMp.current === saleId) {
++          pdfAfterMp.current = null;
++          void shareSalePdf(saleId);
++        }
++      }
+       if (manual) {
+         assert(
+           !entry.feeId || fee !== null,
+@@ -1029,6 +1038,11 @@ function AppContent({ business }: { business?: Business }) {
+           errText(e) +
+             (entry.feeId ? " Se conserva la comisión estimada." : ""),
+         );
++      // Sin datos de Mercado Pago el PDF sale igual (con lo que se tenga).
++      if (!manual && pdfAfterMp.current === saleId) {
++        pdfAfterMp.current = null;
++        void shareSalePdf(saleId);
++      }
+       return entry;
+     }
+   }
+diff --git a/app.json b/app.json
+index 1387b88..6bce574 100644
+--- a/app.json
++++ b/app.json
+@@ -2,7 +2,7 @@
+   "expo": {
+     "name": "Nova Negocio",
+     "slug": "nova-negocio",
+-    "version": "2.11.1",
++    "version": "2.11.2",
+     "orientation": "portrait",
+     "userInterfaceStyle": "light",
+     "ios": {
+@@ -20,7 +20,7 @@
+     "android": {
+       "package": "com.novasupps.negocio",
+       "allowBackup": false,
+-      "versionCode": 78,
++      "versionCode": 79,
+       "blockedPermissions": [
+         "android.permission.SYSTEM_ALERT_WINDOW",
+         "android.permission.RECORD_AUDIO"
+diff --git a/package-lock.json b/package-lock.json
+index 09a00c1..059eba0 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1,12 +1,12 @@
+ {
+   "name": "nova-negocio",
+-  "version": "2.11.1",
++  "version": "2.11.2",
+   "lockfileVersion": 3,
+   "requires": true,
+   "packages": {
+     "": {
+       "name": "nova-negocio",
+-      "version": "2.11.1",
++      "version": "2.11.2",
+       "dependencies": {
+         "expo": "~55.0.31",
+         "expo-camera": "~55.0.23",
+diff --git a/package.json b/package.json
+index a06a943..50fe69b 100644
+--- a/package.json
++++ b/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "nova-negocio",
+-  "version": "2.11.1",
++  "version": "2.11.2",
+   "private": true,
+   "main": "index.ts",
+   "scripts": {
+diff --git a/src/push.ts b/src/push.ts
+index c53b9ca..75cfd11 100644
+--- a/src/push.ts
++++ b/src/push.ts
+@@ -1,5 +1,6 @@
+ // Avisos push por cuenta y teléfono; seguimientos locales a las 9:00.
+ import { Platform } from "react-native";
++import { BRANDS_LABEL } from "./receipt";
+ import { money, type Business, type Row } from "./business";
+ import type { Cloud } from "./cloud";
+ import { canPush, notifications, projectId } from "./native";
+@@ -546,3 +547,52 @@ export async function notifyUpdateReady(
+     return false;
+   }
+ }
++
++/**
++ * 2.11.2 · Aviso con los datos que mandó la terminal al cobrar con tarjeta: importe,
++ * tarjeta (marca, crédito/débito, últimos 4), número de operación y comisión real.
++ */
++export async function notifyCardCharge(
++  b: Business,
++  x: { saleId: string; amount: number; card: Row | null | undefined; fee: number | null },
++): Promise<boolean> {
++  if (b.setting("pushOff", false)) return false;
++  const key = "card:" + x.saleId + ":" + (x.card?.operation || "op");
++  if (noticeSeen(b, key)) return true;
++  const N = notifications();
++  if (!N) return false;
++  try {
++    if (!(await N.getPermissionsAsync()).granted) return false;
++    if (Platform.OS === "android")
++      await N.setNotificationChannelAsync("ventas", {
++        name: "Ventas y vendedores",
++        importance: N.AndroidImportance.HIGH,
++        sound: "default",
++        enableVibrate: true,
++      });
++    const c = x.card || {};
++    const brand = String(c.brand || "").toLowerCase();
++    const label = BRANDS_LABEL[brand] || (brand ? brand.replace(/^\w/, (ch) => ch.toUpperCase()) : "Tarjeta");
++    const type = /deb|prepaid/.test(String(c.type || "")) || /^deb/.test(brand) ? "débito" : /cred/.test(String(c.type || "")) ? "crédito" : "";
++    const parts = [
++      `${label}${type ? " " + type : ""}${c.last4 ? ` •••• ${c.last4}` : ""}`,
++      c.operation ? `Op. ${c.operation}` : "",
++      c.authorization ? `Aut. ${c.authorization}` : "",
++      x.fee !== null && x.fee !== undefined ? `Comisión ${money(x.fee)}` : "",
++    ].filter(Boolean);
++    await N.scheduleNotificationAsync({
++      identifier: "tarjeta-" + key,
++      content: {
++        title: `Cobro con tarjeta · ${money(x.amount)}`,
++        body: parts.join(" · "),
++        sound: "default",
++        data: { kind: "card_charge", saleId: x.saleId },
++      },
++      trigger: { channelId: "ventas" },
++    });
++    markNotice(b, key);
++    return true;
++  } catch {
++    return false;
++  }
++}
+diff --git a/src/screens/OwnerModals.tsx b/src/screens/OwnerModals.tsx
+index 84686a0..ed26bec 100644
+--- a/src/screens/OwnerModals.tsx
++++ b/src/screens/OwnerModals.tsx
+@@ -1487,14 +1487,7 @@ export function OwnerFormModal(props: {
+                                 {field("transferFrom", "¿Quién transfiere? (emisor)", false, "Nombre o banco de quien paga")}
+                               </>
+                             );
+-                          if (kind === "Tarjeta" && !mpActive)
+-                            return (
+-                              <>
+-                                {field("cardLast4", "Últimos 4 dígitos", true, "1234")}
+-                                {chips("cardType", "Tipo de tarjeta", options(["Débito", "Crédito"]))}
+-                                {field("cardOp", "No. de operación de la terminal", false, "Opcional")}
+-                              </>
+-                            );
++                          // 2.11.2: con tarjeta no se captura nada; la terminal manda los datos sola.
+                           return null;
+                         })()}
+                         {fromBasket && cartEditor}
+@@ -1575,20 +1568,32 @@ export function OwnerFormModal(props: {
+                             </Text>
+                             <Icon name={privateOpen ? "chevron-down" : "chevron-right"} size={16} color={C.muted} />
+                           </View>
+-                          {privateOpen && (
+-                            <>
+-                              <Text style={[s.label, { marginTop: 6, marginBottom: 2 }]}>Solo lo ves tú</Text>
+-                              {row("Subtotal", money(saleCharge.subtotal))}
+-                              {row("Tu precio", money(saleBase))}
+-                              {row("Comisión que absorbe el cliente", "+" + money(saleCommission))}
+-                              {saleIsCard && row(`Mercado Pago descuenta ${feeLabel(bps)}`, minus(fee), { color: C.red })}
+-                              {row("Recibes", money(received), { bold: true, color: C.green })}
+-                              {cost > 0 &&
+-                                row("Ganancia estimada", money(received - cost), {
+-                                  color: received - cost >= 0 ? C.green : C.red,
++                          {privateOpen && (() => {
++                            // 2.11.2 · Desglose del dueño: costo, tu precio, comisión de tarjeta (%) y ganancia.
++                            // Cambia al momento con el descuento (%) o la forma de pago.
++                            const gain = received - cost;
++                            const pctOf = (part: number, whole: number) => (whole > 0 ? ` · ${Math.round((part / whole) * 100)}%` : "");
++                            return (
++                              <>
++                                <Text style={[s.label, { marginTop: 6, marginBottom: 2 }]}>Solo lo ves tú</Text>
++                                {row("Costo de la mercancía", cost > 0 ? money(cost) : "Sin costo registrado")}
++                                {saleCharge.discount > 0 && row("Precio de lista", money(saleCharge.subtotal))}
++                                {saleCharge.discount > 0 &&
++                                  row(`Descuento${pctOf(saleCharge.discount, saleCharge.subtotal)}`, minus(saleCharge.discount), { color: C.red })}
++                                {row("Tu precio", money(saleBase), { bold: true })}
++                                {row(`Comisión que absorbe el cliente (${feeLabel(bps)})`, "+" + money(saleCommission))}
++                                {row("Cliente paga", money(saleTotal))}
++                                {saleIsCard
++                                  ? row(`Comisión de tarjeta ${feeLabel(bps)}`, minus(fee), { color: C.red })
++                                  : row("Comisión de tarjeta", "$0.00 · sin tarjeta")}
++                                {row("Recibes", money(received), { bold: true, color: C.green })}
++                                {row(`Ganancia${pctOf(gain, saleBase)}`, cost > 0 ? money(gain) : "—", {
++                                  bold: true,
++                                  color: gain >= 0 ? C.green : C.red,
+                                 })}
+-                            </>
+-                          )}
++                              </>
++                            );
++                          })()}
+                           {cost > 0 && saleBase < cost && saleCharge.promo.total > 0 && saleBase + saleCharge.promo.total >= cost && (
+                             <Note color={C.amber}>
+                               Con la promoción esta venta queda debajo del costo. Se permite porque tú la configuraste.
+diff --git a/src/screens/SalesPages.tsx b/src/screens/SalesPages.tsx
+index da35df6..1086a1c 100644
+--- a/src/screens/SalesPages.tsx
++++ b/src/screens/SalesPages.tsx
+@@ -18,6 +18,7 @@ import {
+   QuickActions,
+   MenuList,
+   TextButton,
++  Icon,
+ } from "../ui";
+ import type { Body, OwnerPageContext } from "./ownerContext";
+ import {
+@@ -42,6 +43,7 @@ function addDaysIso(day: string, n: number): string {
+   return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+ }
+ 
++const DEFAULT_CASH_ASIDE: Row = { amount: 210000, holder: "Gustavo", note: "Efectivo en resguardo" };
+ /** 2.11 · Efectivo en resguardo (por ejemplo, el que tiene Gustavo): queda registrado pero no se suma. */
+ function CashAsideNote({ b, aside, amount: amt, act }: { b: any; aside: Row; amount: number; act: (fn: () => void, done?: string) => boolean }) {
+   const [edit, setEdit] = React.useState(false);
+@@ -69,7 +71,7 @@ function CashAsideNote({ b, aside, amount: amt, act }: { b: any; aside: Row; amo
+           small
+           onPress={() => {
+             const c = Math.round(Number(String(money_).replace(/[$,\s]/g, "")) * 100);
+-            if (act(() => b.setSetting("cashAside", Number.isFinite(c) && c > 0 ? { amount: c, holder: holder.trim().slice(0, 40), note: note.trim().slice(0, 120), at: new Date().toISOString() } : null), "Efectivo en resguardo guardado"))
++            if (act(() => b.setSetting("cashAside", { amount: Number.isFinite(c) && c > 0 ? c : 0, holder: holder.trim().slice(0, 40), note: note.trim().slice(0, 120), at: new Date().toISOString() }), "Efectivo en resguardo guardado"))
+               setEdit(false);
+           }}
+         />
+@@ -123,7 +125,6 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
+     corteDay,
+     setCorteDay,
+     revision,
+-    productById,
+     query,
+   } = ctx;
+   const d = data!;
+@@ -158,7 +159,8 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
+       from,
+       to,
+     );
+-    const aside: Row = b!.setting("cashAside", null) || {};
++    // 2.11.2: de entrada, los $2,100 en efectivo que tiene Gustavo (se puede editar).
++    const aside: Row = b!.setting("cashAside", null) || DEFAULT_CASH_ASIDE;
+     const asideAmt = Number(aside.amount) || 0;
+     const sellers = salesReport(b!, { from, to }).sellers;
+     const profit = ps.revenue - ps.cost - ps.fees;
+@@ -606,24 +608,6 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
+     const filter =
+       filters.Ventas === "Todas" ? "Activas" : filters.Ventas || "Activas";
+     const cancelled = sales.filter((v) => v.status === "cancelled");
+-    const saleProducts = (v: Row) => {
+-      const ls = d.lines.get(v.id) ?? [];
+-      const prods = new Set<string>();
+-      for (const l of ls) {
+-        const p = productById.get(l.productId);
+-        const pr = String(p?.familyName || p?.name || l.name || "").trim();
+-        if (pr) prods.add(pr);
+-      }
+-      return prods;
+-    };
+-    const allProds = new Set<string>();
+-    for (const v of sales) {
+-      if (v.status === "cancelled" && filter !== "Canceladas") continue;
+-      for (const pr of saleProducts(v)) allProds.add(pr);
+-    }
+-    const prodList = [...allProds].sort();
+-    const activeProd = prodList.includes(filters.VentasVal) ? filters.VentasVal : "";
+-    const ventasListOpen = filters.VentasListaOpen === "1";
+     const qNorm = normalize(query);
+     const rango = filters.VentasRango === "Semana" ? "Semana" : "Mes";
+     const nowD = new Date();
+@@ -639,13 +623,8 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
+           ? v.status === "cancelled"
+           : v.status === "confirmed" && String(v.created) >= rangeFrom;
+       if (!statusOk) return false;
+-      const prods = saleProducts(v);
+-      if (activeProd && !prods.has(activeProd)) return false;
+       if (!qNorm) return true;
+-      const hay = normalize(
+-        [v.customer, v.folio, v.channel, v.seller, ...prods].join(" "),
+-      );
+-      return hay.includes(qNorm);
++      return normalize([v.customer, v.folio, v.channel, v.seller].join(" ")).includes(qNorm);
+     });
+     // Filtro por forma de cobro: efectivo, cada cuenta de transferencia (Mercado Pago, Banamex…) y terminal.
+     const kindOf = (id: string) =>
+@@ -703,16 +682,18 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
+         header: (
+           <>
+             {(() => {
+-              const ps = d.todaySales;
++              // 2.11.2: el bloque grande sigue al filtro de la lista (mes o semana); hoy va debajo.
++              const ps = b!.periodSummary(rangeFrom);
++              const hoy = d.todaySales;
+               return (
+                 <>
+                   <Card>
+-                    <Text style={[s.label, { marginLeft: 0, marginTop: 0 }]}>Vendido hoy</Text>
++                    <Text style={[s.label, { marginLeft: 0, marginTop: 0 }]}>{rango === "Semana" ? "Vendido esta semana" : "Vendido este mes"}</Text>
+                     <Text style={{ fontSize: 36, fontWeight: "700", color: C.ink, fontVariant: ["tabular-nums"] }}>
+                       {money(ps.revenue)}
+                     </Text>
+                     <Text style={s.muted}>
+-                      {`${ps.orders} ${ps.orders === 1 ? "venta" : "ventas"}`}
++                      {`${ps.orders} ${ps.orders === 1 ? "venta" : "ventas"} · hoy ${money(hoy.revenue)} (${hoy.orders})`}
+                       {m.receivable > 0 ? ` · Por cobrar ${money(m.receivable)}` : ""}
+                     </Text>
+                   </Card>
+@@ -747,86 +728,6 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
+                 onChange={(v) => setFilters((old) => ({ ...old, Ventas: "", VentasRango: v }))}
+               />
+             </View>
+-            {prodList.length > 0 && (
+-              <View style={{ marginBottom: 10 }}>
+-                <Pressable
+-                  accessibilityRole="button"
+-                  onPress={() =>
+-                    setFilters((old) => ({
+-                      ...old,
+-                      VentasListaOpen: ventasListOpen ? "" : "1",
+-                    }))
+-                  }
+-                  style={[
+-                    s.input,
+-                    s.between,
+-                    {
+-                      paddingVertical: 10,
+-                      paddingHorizontal: 14,
+-                      backgroundColor: C.paper,
+-                    },
+-                  ]}
+-                >
+-                  <Text style={[s.body, { fontWeight: "600", flex: 1 }]} numberOfLines={1}>
+-                    {`📋 Filtrar por suplemento: ${activeProd || "Todos"}`}
+-                  </Text>
+-                  <Text style={[s.body, { color: C.brand, fontWeight: "700" }]}>
+-                    {ventasListOpen ? "Cerrar ▴" : "Elegir ▾"}
+-                  </Text>
+-                </Pressable>
+-                {ventasListOpen && (
+-                  <View
+-                    style={{
+-                      marginTop: 6,
+-                      backgroundColor: C.paper,
+-                      borderRadius: 16,
+-                      padding: 8,
+-                      gap: 2,
+-                      borderWidth: 1,
+-                      borderColor: C.line,
+-                    }}
+-                  >
+-                    {["", ...prodList].map((pName) => {
+-                      const on = activeProd === pName;
+-                      return (
+-                        <Pressable
+-                          key={pName || "all"}
+-                          accessibilityRole="button"
+-                          onPress={() =>
+-                            setFilters((old) => ({
+-                              ...old,
+-                              VentasVal: pName,
+-                              VentasListaOpen: "",
+-                            }))
+-                          }
+-                          style={[
+-                            s.option,
+-                            {
+-                              paddingVertical: 10,
+-                              paddingHorizontal: 12,
+-                              borderRadius: 10,
+-                              backgroundColor: on ? C.brandSoft : "transparent",
+-                            },
+-                          ]}
+-                        >
+-                          <Text
+-                            style={[
+-                              s.body,
+-                              {
+-                                fontWeight: on ? "700" : "400",
+-                                color: on ? C.brand : C.ink,
+-                              },
+-                            ]}
+-                          >
+-                            {pName || "Mostrar todas las ventas"}
+-                          </Text>
+-                        </Pressable>
+-                      );
+-                    })}
+-                  </View>
+-                )}
+-              </View>
+-            )}
+             {filter === "Canceladas" ? (
+               <>
+                 <TextButton title="‹ Volver a las ventas" onPress={() => setFilters((old) => ({ ...old, Ventas: "" }))} />
+@@ -906,6 +807,24 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
+                   {lines.map((l) => `${l.qty} × ${l.name}`).join(" · ")}
+                 </Text>
+               )}
++              {v.status === "confirmed" && (() => {
++                // 2.11.2 · Con qué se pagó (efectivo, tarjeta o transferencia · cuenta).
++                const pays = Object.entries(d.payByAccount.get(v.id) || {}).filter(([, amt]) => (amt as number) > 0);
++                const label = (id: string) => {
++                  const a = accounts.find((x) => x.id === id);
++                  if (!a) return "Cobro";
++                  return a.kind === "Efectivo" ? "Efectivo" : a.kind === "Tarjeta" ? "Tarjeta (terminal)" : `Transferencia · ${a.name}`;
++                };
++                const text = pays.length
++                  ? pays.map(([id, amt]) => (pays.length > 1 ? `${label(id)} ${money(amt as number)}` : label(id))).join(" + ")
++                  : "Sin cobro";
++                return (
++                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 }}>
++                    <Icon name={pays.some(([id]) => accounts.find((x) => x.id === id)?.kind === "Tarjeta") ? "credit-card" : pays.some(([id]) => accounts.find((x) => x.id === id)?.kind === "Efectivo") ? "banknote" : "landmark"} size={14} color={C.muted} />
++                    <Text style={[s.muted, { fontSize: 13 }]} numberOfLines={1}>{text}</Text>
++                  </View>
++                );
++              })()}
+               {v.status === "confirmed" && balance > 0 && (
+                 <Button
+                   title="Abonar"
+@@ -1035,6 +954,8 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
+       to,
+     );
+     const result = ps.netSales - ps.expenses;
++    // 2.11.2: efectivo del corte = cobrado en efectivo − gastos y compras en efectivo (± otros movimientos).
++    const cashNet = cash.sales - cash.expenses - cash.purchases + cash.others.reduce((n: number, x: Row) => n + Number(x.amount), 0);
+     const shareText = [
+       `*Corte de caja · ${STORE_NAME}*`,
+       fmtDay(day),
+@@ -1065,7 +986,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
+         ? [`Compras pagadas en efectivo: ${money(cash.purchases)}`]
+         : []),
+       ...cash.others.map((x: Row) => `${x.label}: ${money(x.amount)}`),
+-      `Caja al abrir: ${money(cash.opening)} · Caja esperada al cierre: ${money(cash.closing)}`,
++      `*Efectivo del corte: ${money(cashNet)}*`,
+       ...(cancelled ? [`Ventas canceladas: ${cancelled}`] : []),
+       ...(items.length
+         ? [
+@@ -1114,9 +1035,9 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
+             })}
+           </Card>
+           <Card tone="warn">
+-            <Text style={s.subtitle}>Efectivo</Text>
+-            {line("Caja al abrir el día", money(cash.opening))}
+-            {line("＋ Ventas cobradas en efectivo", money(cash.sales))}
++            {/* 2.11.2: solo el efectivo del corte (sin el saldo acumulado de la caja). */}
++            <Text style={s.subtitle}>Efectivo del corte</Text>
++            {line("Ventas cobradas en efectivo", money(cash.sales), { bold: true })}
+             {!!cash.expenses &&
+               line("− Gastos pagados en efectivo", minus(cash.expenses), {
+                 color: C.red,
+@@ -1133,7 +1054,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
+               ),
+             )}
+             {divider()}
+-            {line("Caja esperada al cierre", money(cash.closing), {
++            {line("Efectivo que debe haber del corte", money(cashNet), {
+               bold: true,
+             })}
+           </Card>
+@@ -1154,7 +1075,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
+                       at: new Date().toISOString(),
+                       revenue: ps.revenue,
+                       orders: ps.orders,
+-                      cash: cash.closing,
++                      cash: cashNet,
+                     }),
+                   "Corte cerrado",
+                 )
+diff --git a/src/screens/ownerShared.ts b/src/screens/ownerShared.ts
+index 2226e20..b55023d 100644
+--- a/src/screens/ownerShared.ts
++++ b/src/screens/ownerShared.ts
+@@ -3,7 +3,7 @@ import { type Outcome, type TerminalPayment } from "../mercadopago";
+ import type { IconName } from "../icons";
+ import { TILE } from "../theme";
+ 
+-export const VERSION = "2.11.1";
++export const VERSION = "2.11.2";
+ export const HOME = "Vender";
+ 
+ export const PAGES = [
+diff --git a/tests/forms.cjs b/tests/forms.cjs
+index 0ceec89..b42eaed 100644
+--- a/tests/forms.cjs
++++ b/tests/forms.cjs
+@@ -111,7 +111,7 @@ async function adv(){await press('Ajustes');const sw=ui.root.findAll(n=>n.type==
+   assert.equal(sql.prepare("SELECT SUM(l.qty) n FROM lots l JOIN products p ON p.id=l.productId WHERE p.name='Prod B'").get().n,stock0+1,'unidad regresó al inventario');
+   assert.equal(sql.prepare("SELECT SUM(amount) n FROM ledger WHERE ref=? AND kind='sale'").get(sale.id).n,sale.total/2,'devolución registrada');
+   assert(text(ui.root).includes('Devolución parcial'));});
+- await check('1.0.1 · Corte con caja esperada y utilidad con mermas',async()=>{await press('Ventas');await press('Corte de caja');const t=text(ui.root);assert(t.includes('Caja esperada al cierre'));assert(t.includes('Caja al abrir el día'));
++ await check('1.0.1 · Corte con caja esperada y utilidad con mermas',async()=>{await press('Ventas');await press('Corte de caja');const t=text(ui.root);assert(t.includes('Efectivo del corte'));assert(t.includes('Efectivo que debe haber del corte'));assert(!t.includes('Caja al abrir el día'),'2.11.2: sin el saldo acumulado');
+   await press('Ventas');await press('Resumen');assert(text(ui.root).includes('Costo de la mercancía (precio de compra)'));assert(text(ui.root).includes('Ganancia proyectada'));});
+  await check('1.0.2 · El carrito no pasa de lo disponible',async()=>{await press('Stock');await pressExact('Nuevo producto');await type('Nombre *','Prod Limite');await type('Precio de venta MXN *','80');await type('Stock inicial (opcional)','2');await type('Costo por unidad MXN *','30');await pressExact('Guardar');assert(!formOpen());
+   await type('Buscar nombre, SKU o marca','Prod Limite');await sellFromStock();const plus=()=>act(async()=>ui.root.findAll(n=>n.props.accessibilityLabel==='Agregar una')[0].props.onPress());
+diff --git a/tests/ui.cjs b/tests/ui.cjs
+index 9f5194d..5c9d78b 100644
+--- a/tests/ui.cjs
++++ b/tests/ui.cjs
+@@ -39,7 +39,7 @@ async function flush(ms=800){await act(async()=>{await new Promise(r=>setTimeout
+  global.__NOVA_SKIP_LOCK=true;require('./seed.cjs')(db).setSetting('appRole','owner');await act(async()=>{ui=renderer.create(React.createElement(App));});
+  // 2.0: abre en Vender (categorías con fotos); el resumen está en Ventas → 📊 Resumen.
+  assert(ui.root.findAll(n=>n.props.accessibilityLabel==='Filtrar por').length>0,'abre en Vender');
+- await press('Ventas');assert(text(ui.root).includes('Vendido hoy'));await press('Resumen');
++ await press('Ventas');assert(text(ui.root).includes('Vendido este mes')&&!text(ui.root).includes('Filtrar por suplemento'),'2.11.2: bloque del mes y sin filtro por suplemento');await press('Resumen');
+  // 2.11: resumen mensual sencillo (empieza en 0 cada mes, por semana, sin «Todo»).
+  {const home=text(ui.root);for(const t of ['Todo el mes','Ventas totales','Ventas por forma de pago','Disponible','Utilidad','Margen y proyección del stock','Por vendedor','Efectivo en resguardo'])assert(home.includes(t)||(t==='Efectivo en resguardo'&&home.includes('resguardo')),'Resumen: '+t);
+   const label=()=>ui.root.findAll(n=>n.type==='Text'&&/^(Enero|Febrero|Marzo|Abril|Mayo|Junio|Julio|Agosto|Septiembre|Octubre|Noviembre|Diciembre) \d{4}$/.test(text(n).trim()))[0];
+@@ -52,13 +52,13 @@ async function flush(ms=800){await act(async()=>{await new Promise(r=>setTimeout
+   require('../src/business.ts');new (require('../src/business.ts').Business)(db).setSetting('transferAccounts',[{id:'banamex',label:'Banamex',bank:'Banamex',holder:'Emmanuel M',clabe:'002180700000000000',account:'',card:'',note:''},{id:'oculta',label:'Cuenta oculta',bank:'BBVA',holder:'Emmanuel M',clabe:'',account:'',card:'4152313812345678',note:'',ownerHidden:true}]);
+   await press(cash);assert(!text(ui.root).includes('Datos para transferencia'),'efectivo: sin datos de transferencia');
+   await press(transfer);assert(text(ui.root).includes('Datos para transferencia')&&text(ui.root).includes('Banamex'),'transferencia: el dueño ve sus datos');assert(!text(ui.root).includes('Cuenta oculta'),'2.5: sin las que el dueño no usa');}
+- assert(!text(ui.root).includes('Solo lo ves tú'),'2.9: lo privado va detrás de un toque');assert(/Recibes \$/.test(text(ui.root)),'2.9: una línea Recibes');{const t=ui.root.findAll(n=>n.type==='Pressable'&&n.props.accessibilityLabel==='Ver lo que recibes');assert(t.length,'toque privado');await act(async()=>t[0].props.onPress());}
++ assert(text(ui.root).includes('Solo lo ves tú')&&text(ui.root).includes('Costo de la mercancía')&&text(ui.root).includes('Ganancia'),'2.11.2: desglose del dueño visible de entrada');
+  await press(cash);assert(text(ui.root).includes('Comisión que absorbe el cliente'),'2.0: en efectivo también la absorbe el cliente');
+- await press(card);assert(text(ui.root).includes('Mercado Pago descuenta 4.06%'));
+- assert(!text(ui.root).includes('Sumar comisión'),'2.0: sin interruptor, siempre la absorbe el cliente');assert(text(ui.root).includes('Solo lo ves tú')&&text(ui.root).includes('Recibes')&&text(ui.root).includes('Subtotal'),'desglose del dueño');
++ await press(card);assert(text(ui.root).includes('Comisión de tarjeta 4.06%'));
++ assert(!text(ui.root).includes('Sumar comisión'),'2.0: sin interruptor, siempre la absorbe el cliente');assert(text(ui.root).includes('Solo lo ves tú')&&text(ui.root).includes('Recibes')&&text(ui.root).includes('Tu precio'),'desglose del dueño');
+  await act(async()=>callbacks.state('background'));
+  await act(async()=>ui.unmount());await act(async()=>{ui=renderer.create(React.createElement(App));});
+- assert(/1\s+×\s+\$/.test(text(ui.root)));{const t=ui.root.findAll(n=>n.type==='Pressable'&&n.props.accessibilityLabel==='Ver lo que recibes');await act(async()=>t[0].props.onPress());}assert(text(ui.root).includes('Mercado Pago descuenta 4.06%'));
++ assert(/1\s+×\s+\$/.test(text(ui.root)));assert(text(ui.root).includes('Comisión de tarjeta 4.06%'));
+  const before=sql.prepare('SELECT count(*) n FROM sales').get().n;
+  const action=buttons('Cobrar $')[0];
+  await act(async()=>{action.props.onPress();action.props.onPress();});
+diff --git a/tests/v17.cjs b/tests/v17.cjs
+index b768bb6..3131158 100644
+--- a/tests/v17.cjs
++++ b/tests/v17.cjs
+@@ -120,9 +120,8 @@ const day = (n) => addDays(require("../src/business.ts").today(), n);
+   // El carrito: productos, cliente, forma de cobro y desglose en una sola pantalla.
+   await pressLabel("Abrir carrito");
+   // 2.9: cobro directo: total y forma de pago arriba; lo privado detrás de un toque.
+-  assert(all().includes("Tu carrito · 1 pieza") && all().includes("Total a cobrar") && !all().includes("Solo lo ves tú"), all().slice(0, 600));
++  assert(all().includes("Tu carrito · 1 pieza") && all().includes("Total a cobrar") && all().includes("Solo lo ves tú"), all().slice(0, 600));
+   assert(all().indexOf("Forma de pago") < all().indexOf("Tu carrito"), "la forma de pago va antes de los productos");
+-  await pressLabel("Ver lo que recibes");
+   assert(all().includes("Solo lo ves tú"), "carrito con desglose del dueño");
+   assert(!ui.root.findAll((n) => /^Categoría /.test(n.props.accessibilityLabel || "")).length, "el carrito no repite el catálogo");
+   await pressExact("Cerrar");
+@@ -189,7 +188,8 @@ print(json.dumps({'sheets':wb.sheetnames,'hdr':hdr,'n':len(rows),'last':[str(x)
+   await pressLabel("Abrir carrito");
+   const cardName = b.all("SELECT name FROM accounts WHERE kind='Tarjeta'")[0].name;
+   await pressExact(cardName);
+-  assert(all().includes("Mercado Pago descuenta 4.06%") && all().includes("Recibes"), "desglose con tarjeta");
++  assert(!all().includes("Últimos 4 dígitos") && !all().includes("No. de operación"), "2.11.2: con tarjeta no se capturan datos");
++  assert(all().includes("Comisión de tarjeta 4.06%") && all().includes("Recibes"), "desglose con tarjeta");
+   const cash = b.all("SELECT name FROM accounts WHERE kind='Efectivo'")[0].name;
+   await pressExact(cash);
+   assert(all().includes("Comisión que absorbe el cliente"), "efectivo: también la absorbe el cliente");
+@@ -202,6 +202,8 @@ print(json.dumps({'sheets':wb.sheetnames,'hdr':hdr,'n':len(rows),'last':[str(x)
+     await pressLabel("Aplicar descuento");
+     await pressLabel("Descuento 10%");
+     assert(all().includes("Descuento aplicado"), "descuento del 10%");
++    // 2.11.2: el desglose del dueño responde al % de descuento (costo, tu precio, comisión, ganancia).
++    assert(all().includes("Descuento · 10%") && all().includes("Costo de la mercancía") && /Ganancia · -?\d+%/.test(all()), "desglose con el descuento");
+     await pressExact("Quitar");
+     assert(!all().includes("Descuento aplicado"), "quitar el descuento");
+     const given = ui.root.findAll((n) => n.type === "TextInput" && n.props.accessibilityLabel === "¿Con cuánto pagó? MXN")[0];
+-- 
+2.43.0
+
