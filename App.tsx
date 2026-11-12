@@ -3566,7 +3566,7 @@ function AppContent({ business }: { business?: Business }) {
   const tabOf = (p: string) =>
     TABS.some((t) => t.name === p)
       ? p
-      : ["Catálogo", "Detalle producto", "Lotes", "Repetidos"].includes(p)
+      : ["Catálogo", "Detalle producto", "Lotes", "Repetidos", "Actualizar existencias"].includes(p)
         ? "Stock"
         : ["Detalle venta", "Corte de caja", "Resumen de ventas", "Cobros"].includes(p)
           ? "Ventas"

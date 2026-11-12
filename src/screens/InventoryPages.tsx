@@ -363,6 +363,9 @@ export function renderInventoryPages(ctx: OwnerPageContext): Body | null {
               {page === "Stock" && (
                 <Button title="Reporte de stock (Excel)" icon="file-spreadsheet" secondary small flex onPress={() => void exportStock()} />
               )}
+              {page === "Stock" && (
+                <Button title="Actualizar existencias (Excel)" icon="upload" secondary small flex onPress={() => go("Actualizar existencias")} />
+              )}
             </View>
             {!!dups.length && (
               <TextButton

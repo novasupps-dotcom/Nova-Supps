@@ -8,6 +8,7 @@ import { TILE } from "../theme";
 import { CloudBackupCard } from "./CloudBackup";
 import { CatalogImportPage } from "./CatalogImport";
 import { OrderImportPage } from "./OrderImport";
+import { StockImportPage } from "./StockImport";
 import { CustomerCatalogPage } from "./CustomerCatalog";
 import type { Body, OwnerPageContext } from "./ownerContext";
 import {
@@ -61,6 +62,21 @@ export function renderParameters(ctx: OwnerPageContext): Body | null {
     return {
       scroll: (
         <OrderImportPage
+          b={b!}
+          notify={notify}
+          onChanged={() => {
+            refresh();
+            void syncRef.current();
+          }}
+        />
+      ),
+    };
+
+  // 2.11.3 · Stock → Actualizar existencias (Excel del conteo).
+  if (page === "Actualizar existencias")
+    return {
+      scroll: (
+        <StockImportPage
           b={b!}
           notify={notify}
           onChanged={() => {

@@ -136,9 +136,19 @@ async function press(label) { const c = pressables((n) => text(n).trim() === lab
   assert(text(modal).includes("Servings:") && text(modal).includes("60 Servicios"), text(modal));
   assert(text(modal).includes("Sabor:"), "tiene sabores → muestra Sabor:");
   assert(!text(modal).includes("Apriétame"), "sin botón Apriétame");
-  await act(async () => pressables((n) => n.props.accessibilityLabel === "Agregar sabor Grape")[0].props.onPress());
+  // 2.11.3: primero se elige el sabor (no agrega nada) y después «Agregar al carrito».
   const grapeId = grid.find((p) => p.flavor === "Grape").id;
-  assert.equal(cart[grapeId], 1);
+  assert(pressables((n) => n.props.accessibilityLabel === "Elige un sabor" || (text(n).includes("Elige un sabor") && n.props.disabled)).length || text(ui.root).includes("Elige un sabor"), "pide elegir sabor");
+  await act(async () => pressables((n) => n.props.accessibilityLabel === "Elegir sabor Grape")[0].props.onPress());
+  assert.equal(cart[grapeId] || 0, 0, "elegir el sabor no lo agrega");
+  const other = grid.find((p) => p.familyKey && p.flavor && p.flavor !== "Grape" && p.name.startsWith("Psychotic Black · Insane Labz · 60"));
+  if (other) {
+    await act(async () => pressables((n) => n.props.accessibilityLabel === "Elegir sabor " + other.flavor)[0].props.onPress());
+    assert.equal(cart[other.id] || 0, 0, "cambiar de sabor tampoco agrega");
+    await act(async () => pressables((n) => n.props.accessibilityLabel === "Elegir sabor Grape")[0].props.onPress());
+  }
+  await act(async () => pressables((n) => text(n).trim() === "Agregar al carrito" && !n.props.disabled)[0].props.onPress());
+  assert.equal(cart[grapeId], 1, "se agrega con el botón");
   issues.push(...screenIssues(ui, "sabores"));
   await act(async () => ui.unmount());
 
