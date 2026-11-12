@@ -43,6 +43,7 @@ import {
   setupNotifications,
   scheduleFollowUps,
   notifyOwnerSale,
+  notifyCardCharge,
   detachPush,
 } from "./src/push";
 import { UpdateNotice } from "./src/screens/UpdateNotice";
@@ -248,7 +249,8 @@ function AppContent({ business }: { business?: Business }) {
   const [followPopup, setFollowPopup] = useState(false);
   const [parkedCart, setParkedCart] = useState<{ items: Cart; f: Record<string, string>; at: string } | null>(null);
   // 2.9: en el cobro, «Recibes / ganas» se abre con un toque.
-  const [privateOpen, setPrivateOpen] = useState(false);
+  // 2.11.2: el desglose del dueño se ve de entrada (se puede plegar).
+  const [privateOpen, setPrivateOpen] = useState(true);
   // 2.9: el formulario abierto (o, si no hay, la pantalla) se desplaza al campo con teclado.
   const mainList = useRef<any>(null);
   const formList = useRef<any>(null);
@@ -866,12 +868,7 @@ function AppContent({ business }: { business?: Business }) {
       const kind = data?.accounts.find((a) => a.id === d.f.accountId)?.kind || "";
       if (kind === "Efectivo" && tryCents(d.f.cashGiven || "")) extra.cashGiven = tryCents(d.f.cashGiven);
       if ((kind === "Banco" || kind === "Billetera") && d.f.transferFrom?.trim()) extra.transferFrom = d.f.transferFrom.trim().slice(0, 80);
-      if (kind === "Tarjeta" && (d.f.cardLast4 || d.f.cardType || d.f.cardOp))
-        extra.cardManual = {
-          last4: String(d.f.cardLast4 || "").replace(/\D/g, "").slice(-4),
-          type: d.f.cardType || "",
-          operation: String(d.f.cardOp || "").trim().slice(0, 40),
-        };
+
       if (Object.keys(extra).length)
         b!.setSetting("sale:" + id, {
           ...b!.setting("sale:" + id, {}),
@@ -898,7 +895,9 @@ function AppContent({ business }: { business?: Business }) {
       method: account?.kind || d.f.channel,
     }).catch(() => {});
     // 2.11 · Al cobrar se genera el comprobante en PDF y se abre para compartirlo.
-    if (saleId) setTimeout(() => void shareSalePdf(saleId), 700);
+    // 2.11.2: con terminal se espera a que Mercado Pago mande los datos de la tarjeta.
+    if (saleId && mpInfo) pdfAfterMp.current = saleId;
+    else if (saleId) setTimeout(() => void shareSalePdf(saleId), 700);
     return { msg, saleId };
   }
   /** 2.11 · Comprobante de venta en PDF (logo, productos con foto, fecha, hora y detalle del cobro). */
@@ -939,6 +938,8 @@ function AppContent({ business }: { business?: Business }) {
       notify("No se pudo generar el PDF de la venta: " + errText(e));
     }
   }
+  /** 2.11.2 · Venta cobrada en la terminal cuyo PDF espera los datos de la tarjeta. */
+  const pdfAfterMp = useRef<string | null>(null);
   /** Guarda en la venta el cobro hecho en la terminal y concilia su comisión real. */
   function recordMpPayment(
     saleId: string,
@@ -1010,6 +1011,14 @@ function AppContent({ business }: { business?: Business }) {
         ...(fee !== null ? { realFee: fee } : {}),
       });
       refresh();
+      // 2.11.2 · Aviso con los datos de la tarjeta y, si la venta espera su PDF, se genera ahora.
+      if (!manual && entry.kind !== "abono") {
+        void notifyCardCharge(b!, { saleId, amount: Number(entry.amount) || 0, card, fee });
+        if (pdfAfterMp.current === saleId) {
+          pdfAfterMp.current = null;
+          void shareSalePdf(saleId);
+        }
+      }
       if (manual) {
         assert(
           !entry.feeId || fee !== null,
@@ -1029,6 +1038,11 @@ function AppContent({ business }: { business?: Business }) {
           errText(e) +
             (entry.feeId ? " Se conserva la comisión estimada." : ""),
         );
+      // Sin datos de Mercado Pago el PDF sale igual (con lo que se tenga).
+      if (!manual && pdfAfterMp.current === saleId) {
+        pdfAfterMp.current = null;
+        void shareSalePdf(saleId);
+      }
       return entry;
     }
   }

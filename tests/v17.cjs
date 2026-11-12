@@ -120,9 +120,8 @@ const day = (n) => addDays(require("../src/business.ts").today(), n);
   // El carrito: productos, cliente, forma de cobro y desglose en una sola pantalla.
   await pressLabel("Abrir carrito");
   // 2.9: cobro directo: total y forma de pago arriba; lo privado detrás de un toque.
-  assert(all().includes("Tu carrito · 1 pieza") && all().includes("Total a cobrar") && !all().includes("Solo lo ves tú"), all().slice(0, 600));
+  assert(all().includes("Tu carrito · 1 pieza") && all().includes("Total a cobrar") && all().includes("Solo lo ves tú"), all().slice(0, 600));
   assert(all().indexOf("Forma de pago") < all().indexOf("Tu carrito"), "la forma de pago va antes de los productos");
-  await pressLabel("Ver lo que recibes");
   assert(all().includes("Solo lo ves tú"), "carrito con desglose del dueño");
   assert(!ui.root.findAll((n) => /^Categoría /.test(n.props.accessibilityLabel || "")).length, "el carrito no repite el catálogo");
   await pressExact("Cerrar");
@@ -189,7 +188,8 @@ print(json.dumps({'sheets':wb.sheetnames,'hdr':hdr,'n':len(rows),'last':[str(x) 
   await pressLabel("Abrir carrito");
   const cardName = b.all("SELECT name FROM accounts WHERE kind='Tarjeta'")[0].name;
   await pressExact(cardName);
-  assert(all().includes("Mercado Pago descuenta 4.06%") && all().includes("Recibes"), "desglose con tarjeta");
+  assert(!all().includes("Últimos 4 dígitos") && !all().includes("No. de operación"), "2.11.2: con tarjeta no se capturan datos");
+  assert(all().includes("Comisión de tarjeta 4.06%") && all().includes("Recibes"), "desglose con tarjeta");
   const cash = b.all("SELECT name FROM accounts WHERE kind='Efectivo'")[0].name;
   await pressExact(cash);
   assert(all().includes("Comisión que absorbe el cliente"), "efectivo: también la absorbe el cliente");
@@ -202,6 +202,8 @@ print(json.dumps({'sheets':wb.sheetnames,'hdr':hdr,'n':len(rows),'last':[str(x) 
     await pressLabel("Aplicar descuento");
     await pressLabel("Descuento 10%");
     assert(all().includes("Descuento aplicado"), "descuento del 10%");
+    // 2.11.2: el desglose del dueño responde al % de descuento (costo, tu precio, comisión, ganancia).
+    assert(all().includes("Descuento · 10%") && all().includes("Costo de la mercancía") && /Ganancia · -?\d+%/.test(all()), "desglose con el descuento");
     await pressExact("Quitar");
     assert(!all().includes("Descuento aplicado"), "quitar el descuento");
     const given = ui.root.findAll((n) => n.type === "TextInput" && n.props.accessibilityLabel === "¿Con cuánto pagó? MXN")[0];

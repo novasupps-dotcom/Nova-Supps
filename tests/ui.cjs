@@ -39,7 +39,7 @@ async function flush(ms=800){await act(async()=>{await new Promise(r=>setTimeout
  global.__NOVA_SKIP_LOCK=true;require('./seed.cjs')(db).setSetting('appRole','owner');await act(async()=>{ui=renderer.create(React.createElement(App));});
  // 2.0: abre en Vender (categorías con fotos); el resumen está en Ventas → 📊 Resumen.
  assert(ui.root.findAll(n=>n.props.accessibilityLabel==='Filtrar por').length>0,'abre en Vender');
- await press('Ventas');assert(text(ui.root).includes('Vendido hoy'));await press('Resumen');
+ await press('Ventas');assert(text(ui.root).includes('Vendido este mes')&&!text(ui.root).includes('Filtrar por suplemento'),'2.11.2: bloque del mes y sin filtro por suplemento');await press('Resumen');
  // 2.11: resumen mensual sencillo (empieza en 0 cada mes, por semana, sin «Todo»).
  {const home=text(ui.root);for(const t of ['Todo el mes','Ventas totales','Ventas por forma de pago','Disponible','Utilidad','Margen y proyección del stock','Por vendedor','Efectivo en resguardo'])assert(home.includes(t)||(t==='Efectivo en resguardo'&&home.includes('resguardo')),'Resumen: '+t);
   const label=()=>ui.root.findAll(n=>n.type==='Text'&&/^(Enero|Febrero|Marzo|Abril|Mayo|Junio|Julio|Agosto|Septiembre|Octubre|Noviembre|Diciembre) \d{4}$/.test(text(n).trim()))[0];
@@ -52,13 +52,13 @@ async function flush(ms=800){await act(async()=>{await new Promise(r=>setTimeout
   require('../src/business.ts');new (require('../src/business.ts').Business)(db).setSetting('transferAccounts',[{id:'banamex',label:'Banamex',bank:'Banamex',holder:'Emmanuel M',clabe:'002180700000000000',account:'',card:'',note:''},{id:'oculta',label:'Cuenta oculta',bank:'BBVA',holder:'Emmanuel M',clabe:'',account:'',card:'4152313812345678',note:'',ownerHidden:true}]);
   await press(cash);assert(!text(ui.root).includes('Datos para transferencia'),'efectivo: sin datos de transferencia');
   await press(transfer);assert(text(ui.root).includes('Datos para transferencia')&&text(ui.root).includes('Banamex'),'transferencia: el dueño ve sus datos');assert(!text(ui.root).includes('Cuenta oculta'),'2.5: sin las que el dueño no usa');}
- assert(!text(ui.root).includes('Solo lo ves tú'),'2.9: lo privado va detrás de un toque');assert(/Recibes \$/.test(text(ui.root)),'2.9: una línea Recibes');{const t=ui.root.findAll(n=>n.type==='Pressable'&&n.props.accessibilityLabel==='Ver lo que recibes');assert(t.length,'toque privado');await act(async()=>t[0].props.onPress());}
+ assert(text(ui.root).includes('Solo lo ves tú')&&text(ui.root).includes('Costo de la mercancía')&&text(ui.root).includes('Ganancia'),'2.11.2: desglose del dueño visible de entrada');
  await press(cash);assert(text(ui.root).includes('Comisión que absorbe el cliente'),'2.0: en efectivo también la absorbe el cliente');
- await press(card);assert(text(ui.root).includes('Mercado Pago descuenta 4.06%'));
- assert(!text(ui.root).includes('Sumar comisión'),'2.0: sin interruptor, siempre la absorbe el cliente');assert(text(ui.root).includes('Solo lo ves tú')&&text(ui.root).includes('Recibes')&&text(ui.root).includes('Subtotal'),'desglose del dueño');
+ await press(card);assert(text(ui.root).includes('Comisión de tarjeta 4.06%'));
+ assert(!text(ui.root).includes('Sumar comisión'),'2.0: sin interruptor, siempre la absorbe el cliente');assert(text(ui.root).includes('Solo lo ves tú')&&text(ui.root).includes('Recibes')&&text(ui.root).includes('Tu precio'),'desglose del dueño');
  await act(async()=>callbacks.state('background'));
  await act(async()=>ui.unmount());await act(async()=>{ui=renderer.create(React.createElement(App));});
- assert(/1\s+×\s+\$/.test(text(ui.root)));{const t=ui.root.findAll(n=>n.type==='Pressable'&&n.props.accessibilityLabel==='Ver lo que recibes');await act(async()=>t[0].props.onPress());}assert(text(ui.root).includes('Mercado Pago descuenta 4.06%'));
+ assert(/1\s+×\s+\$/.test(text(ui.root)));assert(text(ui.root).includes('Comisión de tarjeta 4.06%'));
  const before=sql.prepare('SELECT count(*) n FROM sales').get().n;
  const action=buttons('Cobrar $')[0];
  await act(async()=>{action.props.onPress();action.props.onPress();});

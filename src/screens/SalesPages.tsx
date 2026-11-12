@@ -18,6 +18,7 @@ import {
   QuickActions,
   MenuList,
   TextButton,
+  Icon,
 } from "../ui";
 import type { Body, OwnerPageContext } from "./ownerContext";
 import {
@@ -42,6 +43,7 @@ function addDaysIso(day: string, n: number): string {
   return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
 }
 
+const DEFAULT_CASH_ASIDE: Row = { amount: 210000, holder: "Gustavo", note: "Efectivo en resguardo" };
 /** 2.11 · Efectivo en resguardo (por ejemplo, el que tiene Gustavo): queda registrado pero no se suma. */
 function CashAsideNote({ b, aside, amount: amt, act }: { b: any; aside: Row; amount: number; act: (fn: () => void, done?: string) => boolean }) {
   const [edit, setEdit] = React.useState(false);
@@ -69,7 +71,7 @@ function CashAsideNote({ b, aside, amount: amt, act }: { b: any; aside: Row; amo
           small
           onPress={() => {
             const c = Math.round(Number(String(money_).replace(/[$,\s]/g, "")) * 100);
-            if (act(() => b.setSetting("cashAside", Number.isFinite(c) && c > 0 ? { amount: c, holder: holder.trim().slice(0, 40), note: note.trim().slice(0, 120), at: new Date().toISOString() } : null), "Efectivo en resguardo guardado"))
+            if (act(() => b.setSetting("cashAside", { amount: Number.isFinite(c) && c > 0 ? c : 0, holder: holder.trim().slice(0, 40), note: note.trim().slice(0, 120), at: new Date().toISOString() }), "Efectivo en resguardo guardado"))
               setEdit(false);
           }}
         />
@@ -123,7 +125,6 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
     corteDay,
     setCorteDay,
     revision,
-    productById,
     query,
   } = ctx;
   const d = data!;
@@ -158,7 +159,8 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
       from,
       to,
     );
-    const aside: Row = b!.setting("cashAside", null) || {};
+    // 2.11.2: de entrada, los $2,100 en efectivo que tiene Gustavo (se puede editar).
+    const aside: Row = b!.setting("cashAside", null) || DEFAULT_CASH_ASIDE;
     const asideAmt = Number(aside.amount) || 0;
     const sellers = salesReport(b!, { from, to }).sellers;
     const profit = ps.revenue - ps.cost - ps.fees;
@@ -606,24 +608,6 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
     const filter =
       filters.Ventas === "Todas" ? "Activas" : filters.Ventas || "Activas";
     const cancelled = sales.filter((v) => v.status === "cancelled");
-    const saleProducts = (v: Row) => {
-      const ls = d.lines.get(v.id) ?? [];
-      const prods = new Set<string>();
-      for (const l of ls) {
-        const p = productById.get(l.productId);
-        const pr = String(p?.familyName || p?.name || l.name || "").trim();
-        if (pr) prods.add(pr);
-      }
-      return prods;
-    };
-    const allProds = new Set<string>();
-    for (const v of sales) {
-      if (v.status === "cancelled" && filter !== "Canceladas") continue;
-      for (const pr of saleProducts(v)) allProds.add(pr);
-    }
-    const prodList = [...allProds].sort();
-    const activeProd = prodList.includes(filters.VentasVal) ? filters.VentasVal : "";
-    const ventasListOpen = filters.VentasListaOpen === "1";
     const qNorm = normalize(query);
     const rango = filters.VentasRango === "Semana" ? "Semana" : "Mes";
     const nowD = new Date();
@@ -639,13 +623,8 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
           ? v.status === "cancelled"
           : v.status === "confirmed" && String(v.created) >= rangeFrom;
       if (!statusOk) return false;
-      const prods = saleProducts(v);
-      if (activeProd && !prods.has(activeProd)) return false;
       if (!qNorm) return true;
-      const hay = normalize(
-        [v.customer, v.folio, v.channel, v.seller, ...prods].join(" "),
-      );
-      return hay.includes(qNorm);
+      return normalize([v.customer, v.folio, v.channel, v.seller].join(" ")).includes(qNorm);
     });
     // Filtro por forma de cobro: efectivo, cada cuenta de transferencia (Mercado Pago, Banamex…) y terminal.
     const kindOf = (id: string) =>
@@ -703,16 +682,18 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
         header: (
           <>
             {(() => {
-              const ps = d.todaySales;
+              // 2.11.2: el bloque grande sigue al filtro de la lista (mes o semana); hoy va debajo.
+              const ps = b!.periodSummary(rangeFrom);
+              const hoy = d.todaySales;
               return (
                 <>
                   <Card>
-                    <Text style={[s.label, { marginLeft: 0, marginTop: 0 }]}>Vendido hoy</Text>
+                    <Text style={[s.label, { marginLeft: 0, marginTop: 0 }]}>{rango === "Semana" ? "Vendido esta semana" : "Vendido este mes"}</Text>
                     <Text style={{ fontSize: 36, fontWeight: "700", color: C.ink, fontVariant: ["tabular-nums"] }}>
                       {money(ps.revenue)}
                     </Text>
                     <Text style={s.muted}>
-                      {`${ps.orders} ${ps.orders === 1 ? "venta" : "ventas"}`}
+                      {`${ps.orders} ${ps.orders === 1 ? "venta" : "ventas"} · hoy ${money(hoy.revenue)} (${hoy.orders})`}
                       {m.receivable > 0 ? ` · Por cobrar ${money(m.receivable)}` : ""}
                     </Text>
                   </Card>
@@ -747,86 +728,6 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                 onChange={(v) => setFilters((old) => ({ ...old, Ventas: "", VentasRango: v }))}
               />
             </View>
-            {prodList.length > 0 && (
-              <View style={{ marginBottom: 10 }}>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() =>
-                    setFilters((old) => ({
-                      ...old,
-                      VentasListaOpen: ventasListOpen ? "" : "1",
-                    }))
-                  }
-                  style={[
-                    s.input,
-                    s.between,
-                    {
-                      paddingVertical: 10,
-                      paddingHorizontal: 14,
-                      backgroundColor: C.paper,
-                    },
-                  ]}
-                >
-                  <Text style={[s.body, { fontWeight: "600", flex: 1 }]} numberOfLines={1}>
-                    {`📋 Filtrar por suplemento: ${activeProd || "Todos"}`}
-                  </Text>
-                  <Text style={[s.body, { color: C.brand, fontWeight: "700" }]}>
-                    {ventasListOpen ? "Cerrar ▴" : "Elegir ▾"}
-                  </Text>
-                </Pressable>
-                {ventasListOpen && (
-                  <View
-                    style={{
-                      marginTop: 6,
-                      backgroundColor: C.paper,
-                      borderRadius: 16,
-                      padding: 8,
-                      gap: 2,
-                      borderWidth: 1,
-                      borderColor: C.line,
-                    }}
-                  >
-                    {["", ...prodList].map((pName) => {
-                      const on = activeProd === pName;
-                      return (
-                        <Pressable
-                          key={pName || "all"}
-                          accessibilityRole="button"
-                          onPress={() =>
-                            setFilters((old) => ({
-                              ...old,
-                              VentasVal: pName,
-                              VentasListaOpen: "",
-                            }))
-                          }
-                          style={[
-                            s.option,
-                            {
-                              paddingVertical: 10,
-                              paddingHorizontal: 12,
-                              borderRadius: 10,
-                              backgroundColor: on ? C.brandSoft : "transparent",
-                            },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              s.body,
-                              {
-                                fontWeight: on ? "700" : "400",
-                                color: on ? C.brand : C.ink,
-                              },
-                            ]}
-                          >
-                            {pName || "Mostrar todas las ventas"}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                )}
-              </View>
-            )}
             {filter === "Canceladas" ? (
               <>
                 <TextButton title="‹ Volver a las ventas" onPress={() => setFilters((old) => ({ ...old, Ventas: "" }))} />
@@ -906,6 +807,24 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                   {lines.map((l) => `${l.qty} × ${l.name}`).join(" · ")}
                 </Text>
               )}
+              {v.status === "confirmed" && (() => {
+                // 2.11.2 · Con qué se pagó (efectivo, tarjeta o transferencia · cuenta).
+                const pays = Object.entries(d.payByAccount.get(v.id) || {}).filter(([, amt]) => (amt as number) > 0);
+                const label = (id: string) => {
+                  const a = accounts.find((x) => x.id === id);
+                  if (!a) return "Cobro";
+                  return a.kind === "Efectivo" ? "Efectivo" : a.kind === "Tarjeta" ? "Tarjeta (terminal)" : `Transferencia · ${a.name}`;
+                };
+                const text = pays.length
+                  ? pays.map(([id, amt]) => (pays.length > 1 ? `${label(id)} ${money(amt as number)}` : label(id))).join(" + ")
+                  : "Sin cobro";
+                return (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 }}>
+                    <Icon name={pays.some(([id]) => accounts.find((x) => x.id === id)?.kind === "Tarjeta") ? "credit-card" : pays.some(([id]) => accounts.find((x) => x.id === id)?.kind === "Efectivo") ? "banknote" : "landmark"} size={14} color={C.muted} />
+                    <Text style={[s.muted, { fontSize: 13 }]} numberOfLines={1}>{text}</Text>
+                  </View>
+                );
+              })()}
               {v.status === "confirmed" && balance > 0 && (
                 <Button
                   title="Abonar"
@@ -1035,6 +954,8 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
       to,
     );
     const result = ps.netSales - ps.expenses;
+    // 2.11.2: efectivo del corte = cobrado en efectivo − gastos y compras en efectivo (± otros movimientos).
+    const cashNet = cash.sales - cash.expenses - cash.purchases + cash.others.reduce((n: number, x: Row) => n + Number(x.amount), 0);
     const shareText = [
       `*Corte de caja · ${STORE_NAME}*`,
       fmtDay(day),
@@ -1065,7 +986,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
         ? [`Compras pagadas en efectivo: ${money(cash.purchases)}`]
         : []),
       ...cash.others.map((x: Row) => `${x.label}: ${money(x.amount)}`),
-      `Caja al abrir: ${money(cash.opening)} · Caja esperada al cierre: ${money(cash.closing)}`,
+      `*Efectivo del corte: ${money(cashNet)}*`,
       ...(cancelled ? [`Ventas canceladas: ${cancelled}`] : []),
       ...(items.length
         ? [
@@ -1114,9 +1035,9 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
             })}
           </Card>
           <Card tone="warn">
-            <Text style={s.subtitle}>Efectivo</Text>
-            {line("Caja al abrir el día", money(cash.opening))}
-            {line("＋ Ventas cobradas en efectivo", money(cash.sales))}
+            {/* 2.11.2: solo el efectivo del corte (sin el saldo acumulado de la caja). */}
+            <Text style={s.subtitle}>Efectivo del corte</Text>
+            {line("Ventas cobradas en efectivo", money(cash.sales), { bold: true })}
             {!!cash.expenses &&
               line("− Gastos pagados en efectivo", minus(cash.expenses), {
                 color: C.red,
@@ -1133,7 +1054,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
               ),
             )}
             {divider()}
-            {line("Caja esperada al cierre", money(cash.closing), {
+            {line("Efectivo que debe haber del corte", money(cashNet), {
               bold: true,
             })}
           </Card>
@@ -1154,7 +1075,7 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
                       at: new Date().toISOString(),
                       revenue: ps.revenue,
                       orders: ps.orders,
-                      cash: cash.closing,
+                      cash: cashNet,
                     }),
                   "Corte cerrado",
                 )
