@@ -178,6 +178,9 @@ print(json.dumps({'sheets':wb.sheetnames,'hdr':hdr,'n':len(rows),'last':[str(x) 
   assert.equal(Object.keys(written).filter((u) => /Stock_Nova_.*\.xlsx$/.test(u)).length, 1, "Excel de stock: " + Object.keys(written).join(","));
   assert(all().includes("Reporte de stock listo"), "aviso del reporte de stock");
   console.log("  ✓ 2.10: reporte de stock en Excel desde Stock");
+  await press("Actualizar existencias (Excel)");
+  assert(all().includes("Actualizar existencias desde Excel") && all().includes("Elegir archivo de Excel"), "2.11.3: pantalla para cargar el conteo");
+  await tab("Stock");
   const inCart = () => pressables((n) => text(n).trim() === "Al carrito" && !n.props.disabled);
   const s0 = b.sales().length;
   await act(async () => inCart()[0].props.onPress());

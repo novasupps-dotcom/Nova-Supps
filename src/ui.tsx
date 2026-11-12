@@ -2500,14 +2500,15 @@ function ProductSheet({
   expiringIds?: Set<string>;
 }) {
   const { height } = useWindowDimensions();
-  const [selectedId, setSelectedId] = useState<string>(members[0]?.id || "");
+  // 2.11.3: con varios sabores primero se elige el sabor (nada se agrega solo); después «Agregar al carrito».
+  const pickFlavor = members.length > 1;
+  const [selectedId, setSelectedId] = useState<string>(pickFlavor ? "" : members[0]?.id || "");
   useEffect(() => {
-    if (!members.some((m) => m.id === selectedId)) {
-      setSelectedId(members[0]?.id || "");
-    }
-  }, [members, selectedId]);
+    if (selectedId && !members.some((m) => m.id === selectedId)) setSelectedId(pickFlavor ? "" : members[0]?.id || "");
+  }, [members, selectedId, pickFlavor]);
 
-  const selected = members.find((m) => m.id === selectedId) || members[0];
+  const chosen = members.find((m) => m.id === selectedId) || null;
+  const selected = chosen || members[0];
   const photo =
     (productHasImage(selected) ? selected : null) ||
     allMembers.find((m) => productHasImage(m)) ||
@@ -2652,21 +2653,17 @@ function ProductSheet({
                       >
                         {members.map((m) => {
                           const fLabel = m.flavor || m.name;
-                          const isSel = m.id === selected.id;
+                          const isSel = m.id === chosen?.id;
                           const mQty = qtyOf(m.id);
                           const mMax = limitOf(m.id);
                           const mOut = mMax < 1 && mQty < 1;
-                          const mFull = mOut || mQty >= mMax;
                           return (
                             <Pressable
                               key={m.id}
                               accessibilityRole="button"
                               accessibilityState={{ selected: isSel }}
-                              accessibilityLabel={`Agregar sabor ${fLabel}`}
-                              onPress={() => {
-                                setSelectedId(m.id);
-                                if (!mFull) onAdd(m.id);
-                              }}
+                              accessibilityLabel={`Elegir sabor ${fLabel}`}
+                              onPress={() => setSelectedId(m.id)}
                               style={{
                                 flexDirection: "row",
                                 alignItems: "center",
@@ -2771,8 +2768,21 @@ function ProductSheet({
               </Text>
             </View>
 
+            {/* 2.11.3 · Agregar al carrito (con varios sabores, después de elegir uno). */}
+            {(qty < 1 || !chosen) && (
+              <View style={{ marginTop: 10 }}>
+                <Button
+                  icon="shopping-cart"
+                  title={!chosen ? "Elige un sabor" : full ? "Sin existencias" : "Agregar al carrito"}
+                  disabled={!chosen || full}
+                  onPress={() => {
+                    if (chosen && !full) onAdd(chosen.id);
+                  }}
+                />
+              </View>
+            )}
             {/* Controles rápidos de cantidad cuando ya está en el carrito */}
-            {qty > 0 && (
+            {qty > 0 && !!chosen && (
               <View
                 style={[
                   s.between,
