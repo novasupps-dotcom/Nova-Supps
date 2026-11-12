@@ -1,16 +1,16 @@
 // 2.11.3 · Stock → «Actualizar existencias (Excel)»: carga el Excel del conteo, muestra qué
-// cambia (y cuántas piezas se vendieron después del archivo) y lo aplica en un solo paso.
+// cambia y lo aplica en un solo paso. 2.11.4: reemplaza piezas y precio de venta.
 import * as FS from "expo-file-system/legacy";
 import * as Picker from "expo-document-picker";
 import React, { useState } from "react";
 import { View } from "react-native";
 import { Text } from "../text";
-import type { Business } from "../business";
+import { money, type Business } from "../business";
 import { readCatalogFile } from "../catalogImport";
 import { base64ToBytes } from "../photos";
-import { applyStockImport, fileDate, planStockImport, type StockImportPlan } from "../stockImport";
+import { applyStockImport, planStockImport, priceChanges, stockChanges, type StockImportPlan } from "../stockImport";
 import { XLSX_MIME } from "../salesExcel";
-import { Button, C, Card, Note, fmtDay, s } from "../ui";
+import { Button, C, Card, Note, s } from "../ui";
 
 const FILE_TYPES = [XLSX_MIME, "application/vnd.ms-excel", "text/csv", "application/octet-stream"];
 
@@ -31,7 +31,7 @@ export function StockImportPage({ b, notify, onChanged }: { b: Business; notify:
       await new Promise((ok) => setTimeout(ok, 30));
       const raw = await FS.readAsStringAsync(asset.uri, { encoding: FS.EncodingType.Base64 });
       const table = readCatalogFile(base64ToBytes(raw));
-      setPlan(planStockImport(b, table, { since: fileDate(asset.name || "") }));
+      setPlan(planStockImport(b, table));
       setFileName(asset.name || "archivo");
     } catch (e) {
       setPlan(null);
@@ -50,7 +50,7 @@ export function StockImportPage({ b, notify, onChanged }: { b: Business; notify:
       const r = applyStockImport(b, plan);
       setPlan(null);
       onChanged();
-      notify(`Existencias actualizadas · ${r.stock} ${r.stock === 1 ? "producto" : "productos"}${r.minimum ? ` · ${r.minimum} mínimos` : ""}`);
+      notify(`Excel aplicado · ${r.stock} ${r.stock === 1 ? "existencia" : "existencias"} · ${r.price} ${r.price === 1 ? "precio" : "precios"}`);
     } catch (e) {
       setError("No se aplicó ningún cambio: " + errText(e));
     } finally {
@@ -63,8 +63,8 @@ export function StockImportPage({ b, notify, onChanged }: { b: Business; notify:
       <Card>
         <Text style={s.subtitle}>Actualizar existencias desde Excel</Text>
         <Note>
-          Usa el «Reporte de stock» con la columna «Físicas» ya contada (o cualquier Excel con «SKU» y «Físicas» / «Existencias»). Solo cambian las
-          unidades físicas y el mínimo: precios y costos no se tocan. No mueve dinero ni cuenta como merma.
+          Usa el «Reporte de stock» con «Físicas» y «Precio de Venta» (o «Precio»). Las piezas y el precio de cada producto quedan exactamente como
+          en el Excel: se reemplazan, no se suman, y no se crean productos nuevos. El costo de compra no cambia. No mueve dinero ni cuenta como merma.
         </Note>
         <Button title={busy || (plan ? "Elegir otro archivo" : "Elegir archivo de Excel")} icon="file-spreadsheet" secondary={!!plan} disabled={!!busy} onPress={() => void pick()} />
         {!!error && <Note color={C.red}>{error}</Note>}
@@ -78,9 +78,6 @@ export function StockImportPage({ b, notify, onChanged }: { b: Business; notify:
               {plan.missing.length ? ` · ${plan.missing.length} sin producto` : ""}
               {plan.errors.length ? ` · ${plan.errors.length} con error` : ""}
             </Note>
-            {plan.since && (
-              <Note>{`Archivo del ${fmtDay(plan.since.slice(0, 10))}: se descuentan las piezas vendidas después.`}</Note>
-            )}
           </Card>
           {plan.changes.map((r) => (
             <View key={r.line} style={[s.between, { paddingVertical: 8, paddingHorizontal: 4, borderBottomWidth: 1, borderColor: C.line, gap: 10 }]}>
@@ -88,17 +85,10 @@ export function StockImportPage({ b, notify, onChanged }: { b: Business; notify:
                 <Text style={[s.body, { fontWeight: "600" }]} numberOfLines={2}>
                   {r.productName}
                 </Text>
-                <Note>
-                  {[
-                    r.soldAfter ? `${r.counted} contadas − ${r.soldAfter} vendidas después` : "",
-                    r.minimum !== null && r.minimum !== r.minimumNow ? `mínimo ${r.minimumNow} → ${r.minimum}` : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" · ") || r.sku}
-                </Note>
+                <Note>{priceChanges(r) ? `Precio ${money(r.priceNow ?? 0)} → ${money(r.price ?? 0)}` : r.sku}</Note>
               </View>
-              {r.target !== null && r.target !== r.current && (
-                <Text style={[s.body, { fontWeight: "700", color: r.target > r.current ? C.green : C.red }]}>{`${r.current} → ${r.target}`}</Text>
+              {stockChanges(r) && (
+                <Text style={[s.body, { fontWeight: "700", color: r.target! > r.current ? C.green : C.red }]}>{`${r.current} → ${r.target} pzas`}</Text>
               )}
             </View>
           ))}
