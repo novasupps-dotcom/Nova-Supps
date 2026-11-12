@@ -1,0 +1,48 @@
+# Nova Negocio · aplica un parche (.patch) que esté en la raíz de master en una rama nueva
+# y abre el pull request. Se corre a mano: Actions → "Aplicar parche" → Run workflow.
+name: Aplicar parche
+
+on:
+  workflow_dispatch:
+    inputs:
+      parche:
+        description: "Archivo .patch en la raíz"
+        default: "nova-2.11.0.patch"
+      rama:
+        description: "Rama nueva"
+        default: "nova-2.11.0"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  aplicar:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+      - name: Aplicar el parche en la rama nueva
+        env:
+          PARCHE: ${{ inputs.parche }}
+          RAMA: ${{ inputs.rama }}
+        run: |
+          git config user.name "novasupps-dotcom"
+          git config user.email "344072640+novasupps-dotcom@users.noreply.github.com"
+          git checkout -b "$RAMA"
+          cp "$PARCHE" /tmp/cambios.patch
+          git rm -q "$PARCHE"
+          git commit -q -m "Quitar $PARCHE de la raíz"
+          git am --committer-date-is-author-date /tmp/cambios.patch
+          git push -u origin "$RAMA"
+      - name: Abrir el pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RAMA: ${{ inputs.rama }}
+        run: |
+          gh pr create --base master --head "$RAMA" \
+            --title "Nova Negocio 2.11.0" \
+            --body "Cobro más sencillo, PDF de la venta al cobrar, corte de 6:30 PM a 6:30 PM con «Cerrar corte», resumen mensual sencillo, gastos con Efectivo / Transferencia MP / Tarjeta y Ventas por mes o semana. Ver README (2.11.0)." \
+            || echo "No se pudo abrir el PR automáticamente: ábrelo desde la rama $RAMA."
