@@ -11,7 +11,6 @@ import {
   C,
   Card,
   Chips,
-  DateField,
   Note,
   Pill,
   fmtDay,
@@ -22,12 +21,9 @@ import {
 } from "../ui";
 import type { Body, OwnerPageContext } from "./ownerContext";
 import {
-  PERIODS,
   amount,
   minus,
   normalize,
-  options,
-  periodFrom,
   CORTE_DEFAULT,
   MONTHS_ES,
   corteRange,
@@ -38,7 +34,6 @@ import {
   units,
 } from "./ownerShared";
 import { ReportsPage } from "./Reports";
-import { MarginProjectionCard } from "./OrderImport";
 
 /** «2026-11-11» ± n días. */
 function addDaysIso(day: string, n: number): string {
@@ -100,13 +95,10 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
     data,
     page,
     b,
-    currentPeriod,
-    setPeriod,
     excelCard,
     excelOpen,
     openExcel,
     byMethodCard,
-    resultCard,
     line,
     divider,
     go,
@@ -114,7 +106,6 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
     cashAccount,
     exportBackup,
     filters,
-    searchBox,
     act,
     saleDetailId,
     sendReceipt,
@@ -614,7 +605,6 @@ export function renderSalesPages(ctx: OwnerPageContext): Body | null {
     // Las canceladas se ocultan siempre, salvo en su propio filtro.
     const filter =
       filters.Ventas === "Todas" ? "Activas" : filters.Ventas || "Activas";
-    const day = today();
     const cancelled = sales.filter((v) => v.status === "cancelled");
     const saleProducts = (v: Row) => {
       const ls = d.lines.get(v.id) ?? [];

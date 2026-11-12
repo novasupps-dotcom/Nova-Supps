@@ -21,7 +21,6 @@ import {
   cardFee,
   feeLabel,
   grossUp,
-  jordanianDiscount,
   money,
   promoSummary,
   today,
